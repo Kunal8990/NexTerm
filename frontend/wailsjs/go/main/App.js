@@ -18,6 +18,10 @@ export function BroadcastCommand(arg1) {
   return window['go']['main']['App']['BroadcastCommand'](arg1);
 }
 
+export function CheckSSHAgent() {
+  return window['go']['main']['App']['CheckSSHAgent']();
+}
+
 export function ClassifyConnectionError(arg1) {
   return window['go']['main']['App']['ClassifyConnectionError'](arg1);
 }
@@ -96,6 +100,10 @@ export function GetSavedPasswords() {
 
 export function GetSecurityPolicy() {
   return window['go']['main']['App']['GetSecurityPolicy']();
+}
+
+export function GetSessionPassphrase(arg1) {
+  return window['go']['main']['App']['GetSessionPassphrase'](arg1);
 }
 
 export function GetSessionPassword(arg1) {
@@ -324,6 +332,10 @@ export function UpdateFolder(arg1, arg2) {
 
 export function UpdateSession(arg1) {
   return window['go']['main']['App']['UpdateSession'](arg1);
+}
+
+export function ValidatePrivateKeyFile(arg1, arg2) {
+  return window['go']['main']['App']['ValidatePrivateKeyFile'](arg1, arg2);
 }
 
 export function WriteToTerminal(arg1, arg2) {

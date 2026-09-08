@@ -5687,10 +5687,18 @@ function showHashDialog() {
 async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
   const isEdit = !!editProfile;
   let savedPassword = "";
-  if (isEdit && editProfile.vaultKey && window.go && window.go.main && window.go.main.App && window.go.main.App.GetSessionPassword) {
-    try {
-      savedPassword = await window.go.main.App.GetSessionPassword(editProfile.vaultKey);
-    } catch (_) {}
+  let savedPassphrase = "";
+  if (isEdit && editProfile.vaultKey && window.go && window.go.main && window.go.main.App) {
+    if (window.go.main.App.GetSessionPassword) {
+      try {
+        savedPassword = await window.go.main.App.GetSessionPassword(editProfile.vaultKey);
+      } catch (_) {}
+    }
+    if (window.go.main.App.GetSessionPassphrase) {
+      try {
+        savedPassphrase = await window.go.main.App.GetSessionPassphrase(editProfile.vaultKey);
+      } catch (_) {}
+    }
   }
 
   const p = editProfile || {
@@ -5917,21 +5925,22 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
           <div class="sess-form-group">
             <label>Authentication Method</label>
             <select id="sAuthType">
-              <option value="password" ${p.authType === 'password' || !p.privateKeyPath ? 'selected' : ''}>Password (Encrypted in DPAPI Vault)</option>
-              <option value="key" ${p.authType === 'key' || p.privateKeyPath ? 'selected' : ''}>Private Key (RSA / Ed25519 / PEM)</option>
+              <option value="password" ${p.authType === 'password' || (!p.privateKeyPath && p.authType !== 'agent' && p.authType !== 'keyboard-interactive') ? 'selected' : ''}>Password (Encrypted in Vault)</option>
+              <option value="key" ${p.authType === 'key' || p.privateKeyPath ? 'selected' : ''}>Private Key (RSA / Ed25519 / OpenSSH)</option>
               <option value="agent" ${p.authType === 'agent' ? 'selected' : ''}>SSH Agent / Pageant</option>
+              <option value="keyboard-interactive" ${p.authType === 'keyboard-interactive' ? 'selected' : ''}>Keyboard-Interactive</option>
             </select>
           </div>
 
-          <div id="sessPassFields" class="${p.authType === 'key' ? 'hidden' : ''}">
+          <div id="sessPassFields" class="${p.authType === 'key' || p.authType === 'agent' ? 'hidden' : ''}">
             <div class="sess-form-group">
               <label>Password</label>
               <div class="sess-password-wrap">
-                <input type="password" id="sPassword" value="${escapeHtml(savedPassword)}" placeholder="Enter password (stored encrypted in DPAPI vault)" autocomplete="off" />
+                <input type="password" id="sPassword" value="${escapeHtml(savedPassword)}" placeholder="Enter password (stored encrypted in Vault)" autocomplete="off" />
                 <button type="button" class="sess-password-toggle" id="togglePwBtn" title="Toggle visibility">👁️</button>
               </div>
               <div style="font-size: 10.5px; color: var(--text-dim); margin-top: 4px;">
-                🔐 Encrypted using Windows DPAPI. Leave blank to prompt on connection.
+                🔐 Encrypted using platform credential vault. Leave blank to prompt on connection.
               </div>
             </div>
           </div>
@@ -5943,10 +5952,19 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
                 <input type="text" id="sKeyPath" value="${escapeHtml(p.privateKeyPath || '')}" placeholder="C:\\Users\\...\\.ssh\\id_rsa" />
                 <button class="btn-secondary" id="browseKeyBtn" type="button">Browse...</button>
               </div>
+              <div id="keyInfoBadge" style="margin-top: 6px; font-size: 11px; min-height: 18px;">
+                ${p.keyType ? `<span style="color: #4ade80;">🔑 ${escapeHtml(p.keyType)} ${p.keyFingerprint ? '• ' + escapeHtml(p.keyFingerprint) : ''}</span>` : ''}
+              </div>
             </div>
             <div class="sess-form-group">
-              <label>Passphrase (Optional for encrypted private keys)</label>
-              <input type="password" id="sKeyPassphrase" value="${escapeHtml(p.keyPassphrase || '')}" placeholder="Key passphrase if encrypted" />
+              <label>Key Passphrase</label>
+              <div class="sess-password-wrap">
+                <input type="password" id="sKeyPassphrase" value="${escapeHtml(savedPassphrase)}" placeholder="Passphrase if key is encrypted (stored in Vault)" />
+                <button type="button" class="sess-password-toggle" id="toggleKeyPassBtn" title="Toggle visibility">👁️</button>
+              </div>
+              <div style="font-size: 10.5px; color: var(--text-dim); margin-top: 4px;">
+                🔐 Encrypted in platform credential vault. Never stored in plaintext.
+              </div>
             </div>
           </div>
 
@@ -5955,6 +5973,7 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
               <input type="checkbox" id="sUseAgent" ${p.useAgent ? 'checked' : ''} />
               <span><b>Enable SSH Agent / Pageant authentication forwarding</b></span>
             </label>
+            <div id="sessAgentStatus" style="font-size: 11px; margin-top: 6px; margin-left: 26px; min-height: 16px;"></div>
           </div>
         </div>
 
@@ -6320,6 +6339,67 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
     };
   }
 
+  // Key passphrase visibility toggle
+  const toggleKeyPassBtn = box.querySelector("#toggleKeyPassBtn");
+  const keyPassInput = box.querySelector("#sKeyPassphrase");
+  if (toggleKeyPassBtn && keyPassInput) {
+    toggleKeyPassBtn.onclick = () => {
+      const isPw = keyPassInput.type === "password";
+      keyPassInput.type = isPw ? "text" : "password";
+      toggleKeyPassBtn.textContent = isPw ? "🔒" : "👁️";
+    };
+  }
+
+  // Real-time private key inspection & validation
+  const updateKeyInfo = async () => {
+    const keyPathInput = box.querySelector("#sKeyPath");
+    const keyPassInput = box.querySelector("#sKeyPassphrase");
+    const badge = box.querySelector("#keyInfoBadge");
+    if (!badge) return;
+
+    const path = keyPathInput ? keyPathInput.value.trim() : "";
+    const passphrase = keyPassInput ? keyPassInput.value : "";
+    if (!path) {
+      badge.innerHTML = "";
+      return;
+    }
+
+    badge.innerHTML = `<span style="color: var(--text-dim);">⏳ Inspecting private key...</span>`;
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.ValidatePrivateKeyFile) {
+      try {
+        const info = await window.go.main.App.ValidatePrivateKeyFile(path, passphrase);
+        if (info && info.valid) {
+          badge.innerHTML = `<span style="color: #4ade80;">🟢 Valid <b>${escapeHtml(info.keyType || 'Key')}</b> • Fingerprint: <code>${escapeHtml(info.fingerprint || '')}</code></span>`;
+        } else if (info && info.encrypted && !passphrase) {
+          badge.innerHTML = `<span style="color: #fbbf24;">🔒 Encrypted private key (${escapeHtml(info.keyType || 'Key')}) • Passphrase required</span>`;
+        } else if (info && info.error) {
+          badge.innerHTML = `<span style="color: #f87171;">⚠️ ${escapeHtml(info.error)}</span>`;
+        }
+      } catch (err) {
+        badge.innerHTML = `<span style="color: #f87171;">⚠️ ${escapeHtml(err.message || String(err))}</span>`;
+      }
+    }
+  };
+
+  // SSH Agent status checker
+  const updateAgentStatus = async () => {
+    const statusDiv = box.querySelector("#sessAgentStatus");
+    if (!statusDiv) return;
+    statusDiv.innerHTML = `<span style="color: var(--text-dim);">Checking SSH Agent...</span>`;
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.CheckSSHAgent) {
+      try {
+        const res = await window.go.main.App.CheckSSHAgent();
+        if (res && res.available) {
+          statusDiv.innerHTML = `<span style="color: #4ade80;">🟢 SSH Agent active (${res.keyCount} key${res.keyCount === 1 ? '' : 's'} loaded)</span>`;
+        } else {
+          statusDiv.innerHTML = `<span style="color: #94a3b8;">⚠️ SSH Agent not detected (${escapeHtml(res.error || 'Agent service not running')})</span>`;
+        }
+      } catch (_) {
+        statusDiv.innerHTML = `<span style="color: #94a3b8;">⚠️ SSH Agent unreachable</span>`;
+      }
+    }
+  };
+
   // Auth type dropdown
   const authSelect = box.querySelector("#sAuthType");
   const passFields = box.querySelector("#sessPassFields");
@@ -6327,8 +6407,32 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
   if (authSelect) {
     authSelect.onchange = () => {
       const isKey = authSelect.value === "key";
-      if (passFields) passFields.classList.toggle("hidden", isKey);
+      const isAgent = authSelect.value === "agent";
+      if (passFields) passFields.classList.toggle("hidden", isKey || isAgent);
       if (keyFields) keyFields.classList.toggle("hidden", !isKey);
+      if (isAgent) updateAgentStatus();
+      if (isKey) updateKeyInfo();
+    };
+  }
+
+  // Key inputs live change
+  const keyPathInput = box.querySelector("#sKeyPath");
+  if (keyPathInput) {
+    keyPathInput.oninput = () => updateKeyInfo();
+  }
+  if (keyPassInput) {
+    keyPassInput.oninput = () => updateKeyInfo();
+  }
+
+  // Agent forwarding checkbox
+  const useAgentCheck = box.querySelector("#sUseAgent");
+  if (useAgentCheck) {
+    useAgentCheck.onchange = () => {
+      if (useAgentCheck.checked) updateAgentStatus();
+      else {
+        const statusDiv = box.querySelector("#sessAgentStatus");
+        if (statusDiv) statusDiv.innerHTML = "";
+      }
     };
   }
 
@@ -6336,15 +6440,24 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
   const browseKeyBtn = box.querySelector("#browseKeyBtn");
   if (browseKeyBtn) {
     browseKeyBtn.onclick = async () => {
-      if (window.go && window.go.main && window.go.main.App) {
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.SelectPrivateKeyFile) {
         try {
           const path = await window.go.main.App.SelectPrivateKeyFile();
           if (path) {
             box.querySelector("#sKeyPath").value = path;
+            await updateKeyInfo();
           }
         } catch (_) {}
       }
     };
+  }
+
+  // Initial key and agent checks
+  if (p.privateKeyPath) {
+    updateKeyInfo();
+  }
+  if (p.useAgent || p.authType === "agent") {
+    updateAgentStatus();
   }
 
   // Jump Host checkbox toggle
@@ -6502,6 +6615,10 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
       }
       if (enteredPw && profile.vaultKey) {
         await window.go.main.App.SaveSessionPassword(profile.vaultKey, enteredPw);
+      }
+      const enteredPass = box.querySelector("#sKeyPassphrase") ? box.querySelector("#sKeyPassphrase").value : "";
+      if (enteredPass && profile.vaultKey) {
+        await window.go.main.App.SaveSessionPassword(profile.vaultKey + "_passphrase", enteredPass);
       }
       if (jumpPw && profile.jumpVaultKey) {
         await window.go.main.App.SaveSessionPassword(profile.jumpVaultKey, jumpPw);

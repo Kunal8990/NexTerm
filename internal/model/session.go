@@ -7,11 +7,14 @@ type SessionProfile struct {
 	Name              string `json:"name"`
 	Host              string `json:"host"`
 	Port              int    `json:"port"`
-	Username          string `json:"username"`
-	AuthType          string `json:"authType,omitempty"` // "password", "key", or "agent"
-	VaultKey          string `json:"vaultKey,omitempty"`
-	PrivateKeyPath    string `json:"privateKeyPath,omitempty"`
-	KeyPassphrase     string `json:"keyPassphrase,omitempty"`
+	Username           string `json:"username"`
+	AuthType           string `json:"authType,omitempty"` // "password", "key", "agent", or "keyboard-interactive"
+	VaultKey           string `json:"vaultKey,omitempty"`
+	PassphraseVaultKey string `json:"passphraseVaultKey,omitempty"`
+	PrivateKeyPath     string `json:"privateKeyPath,omitempty"`
+	KeyPassphrase      string `json:"keyPassphrase,omitempty"`
+	KeyType            string `json:"keyType,omitempty"`
+	KeyFingerprint     string `json:"keyFingerprint,omitempty"`
 	StartupCommand    string `json:"startupCommand,omitempty"`
 	TerminalType      string `json:"terminalType,omitempty"`      // e.g. "xterm-256color"
 	Theme             string `json:"theme,omitempty"`             // e.g. "dark-modern", "monokai", "dracula", "nord"

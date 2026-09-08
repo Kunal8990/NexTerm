@@ -184,8 +184,14 @@ func (a *App) cleanupVaultKeys(n *model.TreeNode) {
 	if n == nil {
 		return
 	}
-	if n.Session != nil && n.Session.VaultKey != "" {
-		_ = a.vault.Delete(n.Session.VaultKey)
+	if n.Session != nil {
+		if n.Session.VaultKey != "" {
+			_ = a.vault.Delete(n.Session.VaultKey)
+			_ = a.vault.Delete(n.Session.VaultKey + "_passphrase")
+		}
+		if n.Session.PassphraseVaultKey != "" {
+			_ = a.vault.Delete(n.Session.PassphraseVaultKey)
+		}
 	}
 	for _, c := range n.Children {
 		a.cleanupVaultKeys(c)
@@ -210,6 +216,23 @@ func (a *App) AddSession(parentID string, profile model.SessionProfile) (*model.
 	if profile.Name == "" {
 		profile.Name = profile.Host
 	}
+
+	// Inspect key and extract metadata before save
+	if profile.PrivateKeyPath != "" && (profile.KeyType == "" || profile.KeyFingerprint == "") {
+		if info, err := sshsession.ValidatePrivateKey(profile.PrivateKeyPath, profile.KeyPassphrase); err == nil && info.Valid {
+			profile.KeyType = info.KeyType
+			profile.KeyFingerprint = info.Fingerprint
+		}
+	}
+
+	// Securely persist key passphrase to vault, never in sessions.json
+	if profile.KeyPassphrase != "" && a.vault != nil {
+		pvKey := profile.VaultKey + "_passphrase"
+		_ = a.vault.Save(pvKey, profile.KeyPassphrase)
+		profile.PassphraseVaultKey = pvKey
+		profile.KeyPassphrase = ""
+	}
+
 	node := &model.TreeNode{
 		ID:      uuid.NewString(),
 		Name:    profile.Name,
@@ -231,6 +254,29 @@ func (a *App) UpdateSession(profile model.SessionProfile) (*model.TreeNode, erro
 	if profile.VaultKey == "" {
 		profile.VaultKey = profile.ID
 	}
+
+	// Inspect key and extract metadata
+	if profile.PrivateKeyPath != "" {
+		pass := profile.KeyPassphrase
+		if pass == "" && a.vault != nil {
+			if saved, ok, _ := a.vault.Load(profile.VaultKey + "_passphrase"); ok {
+				pass = saved
+			}
+		}
+		if info, err := sshsession.ValidatePrivateKey(profile.PrivateKeyPath, pass); err == nil && info.Valid {
+			profile.KeyType = info.KeyType
+			profile.KeyFingerprint = info.Fingerprint
+		}
+	}
+
+	// Securely persist key passphrase to vault, never in sessions.json
+	if profile.KeyPassphrase != "" && a.vault != nil {
+		pvKey := profile.VaultKey + "_passphrase"
+		_ = a.vault.Save(pvKey, profile.KeyPassphrase)
+		profile.PassphraseVaultKey = pvKey
+		profile.KeyPassphrase = ""
+	}
+
 	node.Name = profile.Name
 	node.Session = &profile
 	return a.root, a.store.Save(a.root)
@@ -252,10 +298,14 @@ func (a *App) DuplicateSession(id string) (*model.TreeNode, error) {
 	cloneProfile.VaultKey = cloneProfile.ID
 	cloneProfile.Name = cloneProfile.Name + " (Copy)"
 
-	// Duplicate password in vault if present
+	// Duplicate password & passphrase in vault if present
 	if a.vault != nil && oldVaultKey != "" {
 		if pwd, ok, err := a.vault.Load(oldVaultKey); err == nil && ok && pwd != "" {
 			_ = a.vault.Save(cloneProfile.VaultKey, pwd)
+		}
+		if pass, ok, err := a.vault.Load(oldVaultKey + "_passphrase"); err == nil && ok && pass != "" {
+			_ = a.vault.Save(cloneProfile.VaultKey+"_passphrase", pass)
+			cloneProfile.PassphraseVaultKey = cloneProfile.VaultKey + "_passphrase"
 		}
 	}
 
@@ -496,6 +546,48 @@ func (a *App) GetSessionPassword(vaultKey string) (string, error) {
 	return pwd, nil
 }
 
+// GetSessionPassphrase retrieves a stored key passphrase from the vault for editing.
+func (a *App) GetSessionPassphrase(vaultKey string) (string, error) {
+	if a.vault == nil || vaultKey == "" {
+		return "", nil
+	}
+	pass, ok, err := a.vault.Load(vaultKey + "_passphrase")
+	if err != nil || !ok {
+		return "", nil
+	}
+	return pass, nil
+}
+
+// SelectPrivateKeyFile opens a native OS file dialog to select a private key file.
+func (a *App) SelectPrivateKeyFile() (string, error) {
+	return wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
+		Title: "Select SSH Private Key",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "Private Key Files (*.pem, *.key, id_*, *.id, *.pk, *.ppk)", Pattern: "*.pem;*.key;id_*;*.id;*.pk;*.ppk"},
+			{DisplayName: "All Files (*.*)", Pattern: "*.*"},
+		},
+	})
+}
+
+// ValidatePrivateKeyFile checks a private key file and returns metadata (type, fingerprint, encryption).
+func (a *App) ValidatePrivateKeyFile(path, passphrase string) (*sshsession.KeyInfo, error) {
+	return sshsession.ValidatePrivateKey(path, passphrase)
+}
+
+// CheckSSHAgent returns the status of the local SSH agent (OpenSSH agent / Pageant).
+func (a *App) CheckSSHAgent() (map[string]interface{}, error) {
+	avail, count, err := sshsession.CheckAgentStatus()
+	errMsg := ""
+	if err != nil {
+		errMsg = err.Error()
+	}
+	return map[string]interface{}{
+		"available": avail,
+		"keyCount":  count,
+		"error":     errMsg,
+	}, nil
+}
+
 // OpenSession connects a saved (or ad-hoc) session and returns a tabID.
 func (a *App) OpenSession(profile model.SessionProfile, password string) (string, error) {
 	tabID := uuid.NewString()
@@ -513,10 +605,11 @@ func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, p
 		Host:              profile.Host,
 		Port:              profile.Port,
 		Username:          profile.Username,
+		AuthType:          sshsession.AuthType(profile.AuthType),
+		UseAgent:          profile.UseAgent,
 		StartupCommand:    profile.StartupCommand,
 		TerminalType:      profile.TerminalType,
 		KeepAliveInterval: profile.KeepAliveInterval,
-		KeyPassphrase:     profile.KeyPassphrase,
 		WorkingDirectory:  profile.WorkingDirectory,
 		ConnectionTimeout: profile.ConnectionTimeout,
 		Compression:       profile.Compression,
@@ -529,7 +622,22 @@ func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, p
 		Rows:              profile.Rows,
 	}
 
+	// Load passphrase securely from vault if present
+	if profile.PassphraseVaultKey != "" && a.vault != nil {
+		if savedPass, ok, err := a.vault.Load(profile.PassphraseVaultKey); err == nil && ok && savedPass != "" {
+			opts.KeyPassphrase = savedPass
+		}
+	} else if profile.VaultKey != "" && a.vault != nil {
+		if savedPass, ok, err := a.vault.Load(profile.VaultKey + "_passphrase"); err == nil && ok && savedPass != "" {
+			opts.KeyPassphrase = savedPass
+		}
+	}
+	if profile.KeyPassphrase != "" {
+		opts.KeyPassphrase = profile.KeyPassphrase
+	}
+
 	if profile.PrivateKeyPath != "" {
+		opts.PrivateKeyPath = profile.PrivateKeyPath
 		keyBytes, err := sshsession.ReadPrivateKeyFile(profile.PrivateKeyPath)
 		if err != nil {
 			return fmt.Errorf("read private key: %w", err)
@@ -550,7 +658,9 @@ func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, p
 		opts.JumpHost = profile.JumpHost
 		opts.JumpPort = profile.JumpPort
 		opts.JumpUsername = profile.JumpUsername
+		opts.JumpAuthType = sshsession.AuthType(profile.JumpAuthType)
 		if profile.JumpPrivateKeyPath != "" {
+			opts.JumpPrivateKeyPath = profile.JumpPrivateKeyPath
 			jKeyBytes, err := sshsession.ReadPrivateKeyFile(profile.JumpPrivateKeyPath)
 			if err == nil {
 				opts.JumpPrivateKeyPEM = jKeyBytes
@@ -637,17 +747,6 @@ func (a *App) QuickConnect(host string, port int, username, password, privateKey
 		PrivateKeyPath: privateKeyPath,
 	}
 	return a.OpenSession(profile, password)
-}
-
-// SelectPrivateKeyFile launches the native Windows open file dialog.
-func (a *App) SelectPrivateKeyFile() (string, error) {
-	file, err := wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
-		Title: "Select Private Key File",
-		Filters: []wailsruntime.FileFilter{
-			{DisplayName: "SSH Keys (*.pem;*.id_rsa;*.key;*.*)", Pattern: "*;*.pem;*.id_rsa;*.key;*.pub"},
-		},
-	})
-	return file, err
 }
 
 // ExportSessions returns the serialized JSON of the entire session tree.

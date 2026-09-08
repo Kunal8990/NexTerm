@@ -121,8 +121,11 @@ export namespace model {
 	    username: string;
 	    authType?: string;
 	    vaultKey?: string;
+	    passphraseVaultKey?: string;
 	    privateKeyPath?: string;
 	    keyPassphrase?: string;
+	    keyType?: string;
+	    keyFingerprint?: string;
 	    startupCommand?: string;
 	    terminalType?: string;
 	    theme?: string;
@@ -183,8 +186,11 @@ export namespace model {
 	        this.username = source["username"];
 	        this.authType = source["authType"];
 	        this.vaultKey = source["vaultKey"];
+	        this.passphraseVaultKey = source["passphraseVaultKey"];
 	        this.privateKeyPath = source["privateKeyPath"];
 	        this.keyPassphrase = source["keyPassphrase"];
+	        this.keyType = source["keyType"];
+	        this.keyFingerprint = source["keyFingerprint"];
 	        this.startupCommand = source["startupCommand"];
 	        this.terminalType = source["terminalType"];
 	        this.theme = source["theme"];
@@ -552,6 +558,30 @@ export namespace sshsession {
 	        this.message = source["message"];
 	        this.description = source["description"];
 	        this.rawError = source["rawError"];
+	    }
+	}
+	export class KeyInfo {
+	    valid: boolean;
+	    path?: string;
+	    keyType: string;
+	    fingerprint: string;
+	    encrypted: boolean;
+	    comment?: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new KeyInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.valid = source["valid"];
+	        this.path = source["path"];
+	        this.keyType = source["keyType"];
+	        this.fingerprint = source["fingerprint"];
+	        this.encrypted = source["encrypted"];
+	        this.comment = source["comment"];
+	        this.error = source["error"];
 	    }
 	}
 

@@ -18,6 +18,8 @@ export function AddWorkspacePane(arg1:string):Promise<model.Pane>;
 
 export function BroadcastCommand(arg1:string):Promise<void>;
 
+export function CheckSSHAgent():Promise<{[key: string]: any}>;
+
 export function ClassifyConnectionError(arg1:string):Promise<sshsession.ClassifiedError>;
 
 export function CloseTab(arg1:string):Promise<void>;
@@ -57,6 +59,8 @@ export function GetMacros():Promise<Array<macro.Macro>>;
 export function GetSavedPasswords():Promise<Array<main.SavedCredential>>;
 
 export function GetSecurityPolicy():Promise<security.SecurityPolicy>;
+
+export function GetSessionPassphrase(arg1:string):Promise<string>;
 
 export function GetSessionPassword(arg1:string):Promise<string>;
 
@@ -171,5 +175,7 @@ export function ToggleFolder(arg1:string,arg2:boolean):Promise<model.TreeNode>;
 export function UpdateFolder(arg1:string,arg2:string):Promise<model.TreeNode>;
 
 export function UpdateSession(arg1:model.SessionProfile):Promise<model.TreeNode>;
+
+export function ValidatePrivateKeyFile(arg1:string,arg2:string):Promise<sshsession.KeyInfo>;
 
 export function WriteToTerminal(arg1:string,arg2:string):Promise<void>;

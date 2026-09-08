@@ -30,13 +30,19 @@ type Session struct {
 }
 
 type ConnectOptions struct {
+	OnData            func(data []byte)
+	OnDisconnected    func(reason string, classified ClassifiedError)
 	OnStateChange     func(state ConnectionState, message string)
 	Host              string
 	Port              int
 	Username          string
-	Password          string // empty if using a key
-	PrivateKeyPEM     []byte // empty if using a password
+	AuthType          AuthType // "password", "key", "agent", "keyboard-interactive"
+	Password          string   // empty if using a key
+	PrivateKeyPath    string   // path to private key on disk
+	PrivateKeyPEM     []byte   // raw private key data
 	KeyPassphrase     string
+	UseAgent          bool   // enable SSH Agent forwarding/auth
+	AgentSocket       string // optional custom SSH_AUTH_SOCK path
 	StartupCommand    string
 	TerminalType      string
 	KeepAliveInterval int // in seconds
@@ -44,7 +50,7 @@ type ConnectOptions struct {
 	Rows              int
 
 	// Terminal & Startup
-	WorkingDirectory  string
+	WorkingDirectory string
 
 	// SSH Advanced
 	ConnectionTimeout int // in seconds
@@ -56,16 +62,18 @@ type ConnectOptions struct {
 	ProxyPassword     string
 
 	// HostKeyCallback for verifying server identities against known_hosts.
-	HostKeyCallback   ssh.HostKeyCallback
+	HostKeyCallback ssh.HostKeyCallback
 
 	// Jump Host / Bastion Proxy Configuration
-	UseJumpHost       bool
-	JumpHost          string
-	JumpPort          int
-	JumpUsername      string
-	JumpPassword      string
-	JumpPrivateKeyPEM []byte
-	JumpKeyPassphrase string
+	UseJumpHost        bool
+	JumpHost           string
+	JumpPort           int
+	JumpUsername       string
+	JumpAuthType       AuthType
+	JumpPassword       string
+	JumpPrivateKeyPath string
+	JumpPrivateKeyPEM  []byte
+	JumpKeyPassphrase  string
 }
 
 func Connect(opts ConnectOptions) (*Session, error) {
@@ -129,12 +137,15 @@ func Connect(opts ConnectOptions) (*Session, error) {
 			opts.JumpPort = 22
 		}
 		jumpOpts := ConnectOptions{
-			Host:          opts.JumpHost,
-			Port:          opts.JumpPort,
-			Username:      opts.JumpUsername,
-			Password:      opts.JumpPassword,
-			PrivateKeyPEM: opts.JumpPrivateKeyPEM,
-			KeyPassphrase: opts.JumpKeyPassphrase,
+			Host:           opts.JumpHost,
+			Port:           opts.JumpPort,
+			Username:       opts.JumpUsername,
+			Password:       opts.JumpPassword,
+			PrivateKeyPath: opts.JumpPrivateKeyPath,
+			PrivateKeyPEM:  opts.JumpPrivateKeyPEM,
+			KeyPassphrase:  opts.JumpKeyPassphrase,
+			AuthType:       opts.JumpAuthType,
+			UseAgent:       opts.UseAgent,
 		}
 		jumpAuth, jErr := buildAuthMethods(jumpOpts)
 		if jErr != nil {
@@ -182,70 +193,81 @@ func Connect(opts ConnectOptions) (*Session, error) {
 		_ = conn.Close()
 		return nil, fmt.Errorf("ssh handshake failed: %w", err)
 	}
-	client := ssh.NewClient(sshConn, chans, reqs)
 
+	client := ssh.NewClient(sshConn, chans, reqs)
 	sshSess, err := client.NewSession()
 	if err != nil {
 		_ = client.Close()
-		return nil, fmt.Errorf("new session: %w", err)
-	}
-
-	modes := ssh.TerminalModes{
-		ssh.ECHO:          1,
-		ssh.TTY_OP_ISPEED: 14400,
-		ssh.TTY_OP_OSPEED: 14400,
-	}
-	if err := sshSess.RequestPty(opts.TerminalType, opts.Rows, opts.Cols, modes); err != nil {
-		_ = sshSess.Close()
-		_ = client.Close()
-		return nil, fmt.Errorf("request pty: %w", err)
+		return nil, fmt.Errorf("failed to create session: %w", err)
 	}
 
 	stdin, err := sshSess.StdinPipe()
 	if err != nil {
 		_ = sshSess.Close()
 		_ = client.Close()
-		return nil, err
+		return nil, fmt.Errorf("failed to open stdin pipe: %w", err)
 	}
+
 	stdout, err := sshSess.StdoutPipe()
 	if err != nil {
 		_ = sshSess.Close()
 		_ = client.Close()
-		return nil, err
+		return nil, fmt.Errorf("failed to open stdout pipe: %w", err)
 	}
+
 	stderr, err := sshSess.StderrPipe()
 	if err != nil {
 		_ = sshSess.Close()
 		_ = client.Close()
-		return nil, err
+		return nil, fmt.Errorf("failed to open stderr pipe: %w", err)
 	}
 
-	if err := sshSess.Shell(); err != nil {
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          1,
+		ssh.TTY_OP_ISPEED: 115200,
+		ssh.TTY_OP_OSPEED: 115200,
+	}
+
+	if err := sshSess.RequestPty(opts.TerminalType, opts.Rows, opts.Cols, modes); err != nil {
 		_ = sshSess.Close()
 		_ = client.Close()
-		return nil, fmt.Errorf("start shell: %w", err)
+		return nil, fmt.Errorf("failed to request pty: %w", err)
 	}
 
-	s := &Session{
-		client:   client,
-		sshSess:  sshSess,
-		stdin:    stdin,
-		stopChan: make(chan struct{}),
+	// Change working directory if requested
+	if opts.WorkingDirectory != "" {
+		_ = sshSess.Setenv("PWD", opts.WorkingDirectory)
 	}
 
 	if opts.StartupCommand != "" {
-		_, _ = stdin.Write([]byte(opts.StartupCommand + "\r\n"))
-	} else if opts.WorkingDirectory != "" {
-		_, _ = stdin.Write([]byte(fmt.Sprintf("cd %q\r\n", opts.WorkingDirectory)))
+		if err := sshSess.Start(opts.StartupCommand); err != nil {
+			_ = sshSess.Close()
+			_ = client.Close()
+			return nil, fmt.Errorf("failed to start startup command: %w", err)
+		}
+	} else {
+		if err := sshSess.Shell(); err != nil {
+			_ = sshSess.Close()
+			_ = client.Close()
+			return nil, fmt.Errorf("failed to start shell: %w", err)
+		}
 	}
 
-	if opts.OnStateChange != nil {
-		opts.OnStateChange(StateConnected, "Connected")
+	s := &Session{
+		client:         client,
+		sshSess:        sshSess,
+		stdin:          stdin,
+		stopChan:       make(chan struct{}),
+		OnData:         opts.OnData,
+		OnDisconnected: opts.OnDisconnected,
 	}
 
-	// Start reading stdout and stderr
 	go s.readLoop(stdout)
 	go s.readLoop(stderr)
+
+	if opts.OnStateChange != nil {
+		opts.OnStateChange(StateConnected, fmt.Sprintf("Connected to %s:%d", opts.Host, opts.Port))
+	}
 
 	// Start keepalive heartbeat
 	go s.keepAliveLoop(time.Duration(opts.KeepAliveInterval) * time.Second)
@@ -254,20 +276,64 @@ func Connect(opts ConnectOptions) (*Session, error) {
 }
 
 func buildAuthMethods(opts ConnectOptions) ([]ssh.AuthMethod, error) {
-	if len(opts.PrivateKeyPEM) > 0 {
-		var signer ssh.Signer
-		var err error
-		if opts.KeyPassphrase != "" {
-			signer, err = ssh.ParsePrivateKeyWithPassphrase(opts.PrivateKeyPEM, []byte(opts.KeyPassphrase))
-		} else {
-			signer, err = ssh.ParsePrivateKey(opts.PrivateKeyPEM)
+	// 1. Explicit auth provider type
+	switch opts.AuthType {
+	case AuthTypePrivateKey:
+		p := &PrivateKeyAuthProvider{
+			KeyPath:       opts.PrivateKeyPath,
+			KeyPEM:        opts.PrivateKeyPEM,
+			KeyPassphrase: opts.KeyPassphrase,
 		}
-		if err != nil {
-			return nil, fmt.Errorf("parse private key: %w", err)
+		return p.BuildAuthMethods()
+
+	case AuthTypeAgent:
+		p := &SSHAgentAuthProvider{
+			CustomSocket: opts.AgentSocket,
 		}
-		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+		return p.BuildAuthMethods()
+
+	case AuthTypeKeyboardInteractive:
+		p := &PasswordAuthProvider{Password: opts.Password}
+		return p.BuildAuthMethods()
+
+	case AuthTypePassword:
+		p := &PasswordAuthProvider{Password: opts.Password}
+		return p.BuildAuthMethods()
 	}
-	return []ssh.AuthMethod{ssh.Password(opts.Password)}, nil
+
+	// 2. Fallback / combined chain
+	var methods []ssh.AuthMethod
+
+	// Private Key
+	if len(opts.PrivateKeyPEM) > 0 || opts.PrivateKeyPath != "" {
+		p := &PrivateKeyAuthProvider{
+			KeyPath:       opts.PrivateKeyPath,
+			KeyPEM:        opts.PrivateKeyPEM,
+			KeyPassphrase: opts.KeyPassphrase,
+		}
+		m, err := p.BuildAuthMethods()
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, m...)
+	}
+
+	// SSH Agent
+	if opts.UseAgent {
+		agentProv := &SSHAgentAuthProvider{CustomSocket: opts.AgentSocket}
+		if m, err := agentProv.BuildAuthMethods(); err == nil {
+			methods = append(methods, m...)
+		}
+	}
+
+	// Password & Interactive
+	if opts.Password != "" || len(methods) == 0 {
+		pwProv := &PasswordAuthProvider{Password: opts.Password}
+		m, _ := pwProv.BuildAuthMethods()
+		methods = append(methods, m...)
+	}
+
+	return methods, nil
 }
 
 func (s *Session) readLoop(reader io.Reader) {
