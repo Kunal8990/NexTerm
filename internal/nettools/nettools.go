@@ -121,7 +121,7 @@ func PortScan(host string, ports []int) []PortScanResult {
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
-			addr := fmt.Sprintf("%s:%d", host, port)
+			addr := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 			start := time.Now()
 			conn, err := net.DialTimeout("tcp", addr, 1200*time.Millisecond)
 			dur := time.Since(start)
