@@ -33,7 +33,10 @@ let userSettings = {
   cursorStyle: "block",
   scrollback: 10000,
   rightClickPaste: true,
-  autoCopySelection: true
+  autoCopySelection: true,
+  autoReconnect: false,
+  reconnectAttempts: 5,
+  reconnectDelay: 2
 };
 
 const THEMES = {
@@ -788,6 +791,334 @@ function setTabConnectionState(tabId, state, errorInfo = null, customMessage = "
 
   updateStatus();
   renderTree();
+}
+
+// ==========================================================================
+// Reconnection Manager Subsystem
+// Automatic & interactive retry with exponential backoff (1s, 2s, 4s, 8s...)
+// ==========================================================================
+
+function getTabReconnectBanner(tabId) {
+  const t = tabs[tabId];
+  if (!t || !t.paneEl) return null;
+  return t.paneEl.querySelector(`#reconnectBanner_${tabId}`);
+}
+
+function hideReconnectBanner(tabId) {
+  const banner = getTabReconnectBanner(tabId);
+  if (banner) banner.remove();
+  if (tabs[tabId]) {
+    tabs[tabId].awaitingReconnectPrompt = false;
+  }
+}
+
+function showReconnectPromptBanner(tabId, profile, classifiedErr) {
+  const t = tabs[tabId];
+  if (!t || !t.paneEl) return;
+  hideReconnectBanner(tabId);
+
+  const container = t.paneEl.querySelector(".pane-terminal-top") || t.paneEl;
+  const banner = document.createElement("div");
+  banner.className = "reconnect-banner";
+  banner.id = `reconnectBanner_${tabId}`;
+  banner.innerHTML = `
+    <div class="reconnect-banner-left">
+      <span class="reconnect-pulse-icon">⚡</span>
+      <div>
+        <div class="reconnect-banner-title">Connection Lost</div>
+        <div class="reconnect-banner-desc">Connection to <b>${escapeHtml(profile.host)}</b> was terminated. Reconnect?</div>
+      </div>
+    </div>
+    <div class="reconnect-banner-actions">
+      <button class="btn btn-primary" id="btnRecNow_${tabId}">⚡ Reconnect (Yes)</button>
+      <button class="btn btn-secondary" id="btnRecAuto_${tabId}">🔄 Auto-Retry (5x)</button>
+      <button class="btn btn-outline" id="btnRecDismiss_${tabId}">✕ Dismiss</button>
+    </div>
+  `;
+
+  container.appendChild(banner);
+  t.awaitingReconnectPrompt = true;
+
+  const btnNow = banner.querySelector(`#btnRecNow_${tabId}`);
+  if (btnNow) {
+    btnNow.onclick = () => {
+      hideReconnectBanner(tabId);
+      startReconnectionSequence(tabId, true);
+    };
+  }
+
+  const btnAuto = banner.querySelector(`#btnRecAuto_${tabId}`);
+  if (btnAuto) {
+    btnAuto.onclick = () => {
+      hideReconnectBanner(tabId);
+      startReconnectionSequence(tabId, false);
+    };
+  }
+
+  const btnDismiss = banner.querySelector(`#btnRecDismiss_${tabId}`);
+  if (btnDismiss) {
+    btnDismiss.onclick = () => {
+      hideReconnectBanner(tabId);
+      if (t.term) t.term.write("\r\n\x1b[90m● Reconnection prompt dismissed.\x1b[0m\r\n");
+    };
+  }
+}
+
+function updateReconnectProgressBanner(tabId, attempt, maxAttempts, secondsRemaining) {
+  const t = tabs[tabId];
+  if (!t || !t.paneEl) return;
+
+  let banner = getTabReconnectBanner(tabId);
+  const container = t.paneEl.querySelector(".pane-terminal-top") || t.paneEl;
+
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = `reconnectBanner_${tabId}`;
+    container.appendChild(banner);
+  }
+
+  banner.className = "reconnect-banner in-progress";
+  banner.innerHTML = `
+    <div class="reconnect-banner-left">
+      <span class="reconnect-spinner">↻</span>
+      <div>
+        <div class="reconnect-banner-title">Reconnecting...</div>
+        <div class="reconnect-banner-desc">Attempt <b>${attempt} of ${maxAttempts}</b> — retrying in <b>${secondsRemaining}s</b> (backoff: 1s, 2s, 4s...)</div>
+      </div>
+    </div>
+    <div class="reconnect-banner-actions">
+      <button class="btn btn-primary" id="btnRecForceNow_${tabId}">Retry Now</button>
+      <button class="btn btn-danger" id="btnRecCancel_${tabId}">✕ Cancel</button>
+    </div>
+  `;
+
+  const btnForce = banner.querySelector(`#btnRecForceNow_${tabId}`);
+  if (btnForce) {
+    btnForce.onclick = () => {
+      if (t.reconnectState) {
+        if (t.reconnectState.timerId) clearTimeout(t.reconnectState.timerId);
+        if (t.reconnectState.countdownTimerId) clearInterval(t.reconnectState.countdownTimerId);
+      }
+      executeReconnectAttempt(tabId, attempt);
+    };
+  }
+
+  const btnCancel = banner.querySelector(`#btnRecCancel_${tabId}`);
+  if (btnCancel) {
+    btnCancel.onclick = () => {
+      cancelReconnection(tabId);
+    };
+  }
+}
+
+function showReconnectFailedBanner(tabId, maxAttempts) {
+  const t = tabs[tabId];
+  if (!t || !t.paneEl) return;
+
+  let banner = getTabReconnectBanner(tabId);
+  const container = t.paneEl.querySelector(".pane-terminal-top") || t.paneEl;
+
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = `reconnectBanner_${tabId}`;
+    container.appendChild(banner);
+  }
+
+  banner.className = "reconnect-banner failed";
+  banner.innerHTML = `
+    <div class="reconnect-banner-left">
+      <span class="reconnect-pulse-icon">❌</span>
+      <div>
+        <div class="reconnect-banner-title">Reconnection Failed</div>
+        <div class="reconnect-banner-desc">Could not restore connection after <b>${maxAttempts} attempts</b>.</div>
+      </div>
+    </div>
+    <div class="reconnect-banner-actions">
+      <button class="btn btn-primary" id="btnRecRetryLoop_${tabId}">↻ Try Again</button>
+      <button class="btn btn-outline" id="btnRecDismissFailed_${tabId}">✕ Dismiss</button>
+    </div>
+  `;
+
+  const btnRetry = banner.querySelector(`#btnRecRetryLoop_${tabId}`);
+  if (btnRetry) {
+    btnRetry.onclick = () => {
+      hideReconnectBanner(tabId);
+      startReconnectionSequence(tabId, true);
+    };
+  }
+
+  const btnDismiss = banner.querySelector(`#btnRecDismissFailed_${tabId}`);
+  if (btnDismiss) {
+    btnDismiss.onclick = () => {
+      hideReconnectBanner(tabId);
+    };
+  }
+}
+
+function cancelReconnection(tabId) {
+  const t = tabs[tabId];
+  if (!t) return;
+
+  if (t.reconnectState) {
+    if (t.reconnectState.timerId) clearTimeout(t.reconnectState.timerId);
+    if (t.reconnectState.countdownTimerId) clearInterval(t.reconnectState.countdownTimerId);
+    t.reconnectState.active = false;
+    t.reconnectState.manualCancel = true;
+  }
+
+  hideReconnectBanner(tabId);
+  setTabConnectionState(tabId, "Closed", null, "Reconnection canceled by user");
+  if (t.term) {
+    t.term.write("\r\n\x1b[1;90m● Reconnection canceled by user.\x1b[0m\r\n\r\n");
+  }
+  showToast("Reconnection canceled", "info");
+}
+
+function startReconnectionSequence(tabId, forceImmediate = false) {
+  const t = tabs[tabId];
+  if (!t || t.isLocal) return;
+
+  hideReconnectBanner(tabId);
+
+  if (t.reconnectState) {
+    if (t.reconnectState.timerId) clearTimeout(t.reconnectState.timerId);
+    if (t.reconnectState.countdownTimerId) clearInterval(t.reconnectState.countdownTimerId);
+  }
+
+  const p = t.profile;
+  const maxAttempts = p.reconnectAttempts || userSettings.reconnectAttempts || 5;
+  const initialDelay = p.reconnectDelay || userSettings.reconnectDelay || 2;
+
+  t.reconnectState = {
+    active: true,
+    attempt: 1,
+    maxAttempts,
+    initialDelay,
+    timerId: null,
+    countdownTimerId: null,
+    secondsRemaining: 0,
+    manualCancel: false
+  };
+
+  scheduleReconnectAttempt(tabId, 1, forceImmediate);
+}
+
+function scheduleReconnectAttempt(tabId, attempt, forceImmediate = false) {
+  const t = tabs[tabId];
+  if (!t || !t.reconnectState || !t.reconnectState.active) return;
+
+  const { maxAttempts, initialDelay } = t.reconnectState;
+  t.reconnectState.attempt = attempt;
+
+  // Exponential backoff: attempt 1 = initialDelay (or 0 if immediate), attempt 2 = initialDelay * 2, attempt 3 = initialDelay * 4...
+  let delaySeconds = 0;
+  if (forceImmediate && attempt === 1) {
+    delaySeconds = 0;
+  } else {
+    delaySeconds = Math.min(60, Math.round(initialDelay * Math.pow(2, attempt - 1)));
+  }
+
+  if (delaySeconds <= 0) {
+    executeReconnectAttempt(tabId, attempt);
+    return;
+  }
+
+  t.reconnectState.secondsRemaining = delaySeconds;
+  setTabConnectionState(tabId, "Reconnecting", null, `Reconnecting to ${t.profile.host} (Attempt ${attempt}/${maxAttempts} in ${delaySeconds}s)...`);
+
+  if (t.term) {
+    t.term.write(`\r\n\x1b[1;33m● [Attempt ${attempt}/${maxAttempts}] Reconnecting in ${delaySeconds}s... (Press Esc or click Cancel to stop)\x1b[0m\r\n`);
+  }
+
+  updateReconnectProgressBanner(tabId, attempt, maxAttempts, delaySeconds);
+
+  // 1-second countdown interval
+  t.reconnectState.countdownTimerId = setInterval(() => {
+    if (!t.reconnectState || !t.reconnectState.active) {
+      clearInterval(t.reconnectState?.countdownTimerId);
+      return;
+    }
+    t.reconnectState.secondsRemaining -= 1;
+    const remaining = t.reconnectState.secondsRemaining;
+    if (remaining > 0) {
+      updateReconnectProgressBanner(tabId, attempt, maxAttempts, remaining);
+      if (statusMessageEl && activeTabId === tabId) {
+        statusMessageEl.textContent = `● Reconnecting to ${t.profile.host} (Attempt ${attempt}/${maxAttempts} in ${remaining}s)...`;
+      }
+    } else {
+      clearInterval(t.reconnectState.countdownTimerId);
+    }
+  }, 1000);
+
+  t.reconnectState.timerId = setTimeout(() => {
+    clearInterval(t.reconnectState?.countdownTimerId);
+    executeReconnectAttempt(tabId, attempt);
+  }, delaySeconds * 1000);
+}
+
+async function executeReconnectAttempt(tabId, attempt) {
+  const t = tabs[tabId];
+  if (!t || !t.reconnectState || !t.reconnectState.active) return;
+
+  const { maxAttempts } = t.reconnectState;
+  const profile = t.profile;
+
+  setTabConnectionState(tabId, "Reconnecting", null, `Connecting to ${profile.host} (Attempt ${attempt}/${maxAttempts})...`);
+  if (t.term) {
+    t.term.write(`\x1b[1;36m● [Attempt ${attempt}/${maxAttempts}] Connecting to ${profile.host}:${profile.port || 22}...\x1b[0m\r\n`);
+  }
+
+  let password = "";
+  if (!profile.privateKeyPath && window.go && window.go.main && window.go.main.App && profile.vaultKey) {
+    try {
+      password = await window.go.main.App.GetSavedPassword(profile.vaultKey);
+    } catch (_) {}
+  }
+
+  try {
+    if (window.go && window.go.main && window.go.main.App) {
+      if (typeof window.go.main.App.OpenSessionWithTabID === "function") {
+        await window.go.main.App.OpenSessionWithTabID(tabId, profile, password);
+      } else {
+        await window.go.main.App.OpenSession(profile, password);
+      }
+    }
+
+    // Success!
+    if (t.reconnectState) {
+      if (t.reconnectState.timerId) clearTimeout(t.reconnectState.timerId);
+      if (t.reconnectState.countdownTimerId) clearInterval(t.reconnectState.countdownTimerId);
+      t.reconnectState.active = false;
+    }
+
+    hideReconnectBanner(tabId);
+    setTabConnectionState(tabId, "Connected");
+    if (t.term) {
+      t.term.write(`\r\n\x1b[1;32m✔ [Attempt ${attempt}/${maxAttempts}] Successfully reconnected to ${profile.host}!\x1b[0m\r\n\r\n`);
+    }
+    showToast(`Reconnected to ${profile.name}`, "success");
+  } catch (err) {
+    if (!t.reconnectState || !t.reconnectState.active) return;
+
+    const classified = parseClassifiedError(err);
+    if (attempt < maxAttempts) {
+      const nextDelay = Math.min(60, Math.round(t.reconnectState.initialDelay * Math.pow(2, attempt)));
+      if (t.term) {
+        t.term.write(`\x1b[1;31m✖ [Attempt ${attempt}/${maxAttempts}] Connection failed: [${classified.category}] ${classified.message}. Next retry in ${nextDelay}s...\x1b[0m\r\n`);
+      }
+      scheduleReconnectAttempt(tabId, attempt + 1, false);
+    } else {
+      // All attempts exhausted
+      t.reconnectState.active = false;
+      setTabConnectionState(tabId, "Failed", classified);
+      if (t.term) {
+        t.term.write(`\r\n\x1b[1;31m✖ Reconnection failed after ${maxAttempts} attempts.\x1b[0m\r\n`);
+        renderTerminalDiagnosticCard(t.term, profile, classified);
+      }
+      showReconnectFailedBanner(tabId, maxAttempts);
+      showToast(`Reconnection failed after ${maxAttempts} attempts: [${classified.category}]`, "error");
+    }
+  }
 }
 
 function updateStatus() {
@@ -2639,9 +2970,46 @@ function createTab(tabId, profile, isLocal = false, initialState = "Connected") 
       setTabConnectionState(tabId, "Closed", errInfo, reason);
       term.write(`\r\n\x1b[1;31m[● Connection lost: ${errInfo.category} - ${errInfo.message}]\x1b[0m\r\n`);
       renderTerminalDiagnosticCard(term, profile, errInfo);
+
+      // Reconnection Logic: Auto-reconnect or show interactive prompt
+      if (!isLocal && tabs[tabId]) {
+        const shouldAuto = profile.autoReconnect !== undefined ? profile.autoReconnect : userSettings.autoReconnect;
+        if (shouldAuto) {
+          startReconnectionSequence(tabId, false);
+        } else {
+          showReconnectPromptBanner(tabId, profile, errInfo);
+          term.write(`\x1b[1;33m● Connection lost to ${profile.host}. Press \x1b[1;36m[Enter]\x1b[1;33m or \x1b[1;36m[Y]\x1b[1;33m to reconnect, or \x1b[1;36m[N]\x1b[1;33m to dismiss.\x1b[0m\r\n\r\n`);
+          tabs[tabId].awaitingReconnectPrompt = true;
+        }
+      }
     });
     if (typeof unsubClosed === "function") unsubs.push(unsubClosed);
   }
+
+  // Keyboard shortcut handler on terminal (Enter/Y/N for reconnect, Esc to cancel)
+  term.onKey((e) => {
+    const tObj = tabs[tabId];
+    if (!tObj) return;
+
+    if (tObj.awaitingReconnectPrompt) {
+      if (e.key === "\r" || e.key.toLowerCase() === "y") {
+        tObj.awaitingReconnectPrompt = false;
+        hideReconnectBanner(tabId);
+        startReconnectionSequence(tabId, true);
+        return;
+      } else if (e.key.toLowerCase() === "n" || (e.domEvent && e.domEvent.key === "Escape")) {
+        tObj.awaitingReconnectPrompt = false;
+        hideReconnectBanner(tabId);
+        term.write("\r\n\x1b[90m● Reconnection dismissed.\x1b[0m\r\n");
+        return;
+      }
+    }
+
+    if (tObj.reconnectState && tObj.reconnectState.active && e.domEvent && e.domEvent.key === "Escape") {
+      cancelReconnection(tabId);
+      return;
+    }
+  });
 
   // 1. Right-Click Quick Paste
   paneEl.addEventListener("contextmenu", async (e) => {
@@ -2733,7 +3101,9 @@ function createTab(tabId, profile, isLocal = false, initialState = "Connected") 
     sftpPath: profile.initialDir || "~",
     terminalCwd: profile.initialDir || "~",
     lastSftpPath: "~",
-    unsubscribers: unsubs
+    unsubscribers: unsubs,
+    reconnectState: null,
+    awaitingReconnectPrompt: false
   };
 
   renderWorkspace();
@@ -3276,6 +3646,14 @@ function activateTab(tabId) {
 function closeTab(tabId) {
   const t = tabs[tabId];
   if (!t) return;
+
+  // Clean up any active reconnection timers and banner
+  if (t.reconnectState) {
+    if (t.reconnectState.timerId) clearTimeout(t.reconnectState.timerId);
+    if (t.reconnectState.countdownTimerId) clearInterval(t.reconnectState.countdownTimerId);
+    t.reconnectState.active = false;
+  }
+  hideReconnectBanner(tabId);
 
   // 1. Explicitly clean up and destroy Wails runtime event listeners
   if (t.unsubscribers && Array.isArray(t.unsubscribers)) {
@@ -5362,7 +5740,10 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
     stopBits: 1,
     parity: "none",
     rdpDomain: "",
-    rdpFullScreen: false
+    rdpFullScreen: false,
+    autoReconnect: editProfile?.autoReconnect !== undefined ? editProfile.autoReconnect : (userSettings.autoReconnect || false),
+    reconnectAttempts: editProfile?.reconnectAttempts || userSettings.reconnectAttempts || 5,
+    reconnectDelay: editProfile?.reconnectDelay || userSettings.reconnectDelay || 2
   };
 
   const currentThemeData = THEMES[p.theme] || THEMES["dark-modern"];
@@ -5756,6 +6137,26 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
               </div>
             </div>
           </div>
+          <!-- Automatic Reconnection Box -->
+          <div style="background: #11141d; border: 1px solid #252b3b; border-radius: 6px; padding: 12px; margin-top: 12px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+              <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="sAutoReconnect" ${p.autoReconnect ? 'checked' : ''} />
+                <span><b>Auto reconnect on connection lost</b></span>
+              </label>
+              <span style="font-size: 11px; color: var(--accent-cyan);">Exponential Backoff (1s, 2s, 4s...)</span>
+            </div>
+            <div class="sess-form-row" id="reconnectConfigRow" style="margin-top: 8px;">
+              <div class="sess-form-group">
+                <label>Retry attempts</label>
+                <input type="number" id="sReconnectAttempts" value="${p.reconnectAttempts || 5}" min="1" max="50" />
+              </div>
+              <div class="sess-form-group">
+                <label>Retry initial delay (seconds)</label>
+                <input type="number" id="sReconnectDelay" value="${p.reconnectDelay || 2}" min="1" max="60" />
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 6. APPEARANCE TAB -->
@@ -6054,6 +6455,9 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
       keepAliveInterval: parseInt(box.querySelector("#sKeepAlive").value, 10) || 15,
       connectionTimeout: parseInt(box.querySelector("#sTimeout").value, 10) || 10,
       compression: box.querySelector("#sCompression") ? box.querySelector("#sCompression").checked : false,
+      autoReconnect: box.querySelector("#sAutoReconnect") ? box.querySelector("#sAutoReconnect").checked : false,
+      reconnectAttempts: parseInt(box.querySelector("#sReconnectAttempts")?.value, 10) || 5,
+      reconnectDelay: parseInt(box.querySelector("#sReconnectDelay")?.value, 10) || 2,
       proxyType: box.querySelector("#sProxyType") ? box.querySelector("#sProxyType").value : "none",
       proxyHost: box.querySelector("#sProxyHost") ? box.querySelector("#sProxyHost").value.trim() : "",
       proxyPort: parseInt(box.querySelector("#sProxyPort")?.value, 10) || 1080,
@@ -6197,6 +6601,25 @@ async function showSettingsDialog() {
             <input type="checkbox" id="cfgAutoCopy" ${userSettings.autoCopySelection !== false ? 'checked' : ''} />
             <span>Auto-Copy Highlighted Selection to Clipboard</span>
           </label>
+        </div>
+        <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-subtle);">
+          <div style="font-weight: 600; font-size: 12px; margin-bottom: 8px; color: var(--accent-cyan);">🔄 Reconnection Preferences</div>
+          <div class="form-group">
+            <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="cfgAutoReconnect" ${userSettings.autoReconnect ? 'checked' : ''} />
+              <span>Auto-reconnect on connection lost (Exponential Backoff: 1s, 2s, 4s...)</span>
+            </label>
+          </div>
+          <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 6px;">
+            <div class="form-group">
+              <label>Default Retry attempts</label>
+              <input type="number" id="cfgReconnectAttempts" value="${userSettings.reconnectAttempts || 5}" min="1" max="50" />
+            </div>
+            <div class="form-group">
+              <label>Default Retry initial delay (seconds)</label>
+              <input type="number" id="cfgReconnectDelay" value="${userSettings.reconnectDelay || 2}" min="1" max="60" />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -6477,6 +6900,9 @@ async function showSettingsDialog() {
     userSettings.cursorBlink = box.querySelector("#cfgCursorBlink").checked;
     userSettings.rightClickPaste = box.querySelector("#cfgRightClickPaste").checked;
     userSettings.autoCopySelection = box.querySelector("#cfgAutoCopy").checked;
+    userSettings.autoReconnect = box.querySelector("#cfgAutoReconnect") ? box.querySelector("#cfgAutoReconnect").checked : false;
+    userSettings.reconnectAttempts = parseInt(box.querySelector("#cfgReconnectAttempts")?.value, 10) || 5;
+    userSettings.reconnectDelay = parseInt(box.querySelector("#cfgReconnectDelay")?.value, 10) || 2;
 
     localStorage.setItem("nexterm_settings", JSON.stringify(userSettings));
 
@@ -7415,47 +7841,21 @@ function setupEventListeners() {
   safeClick("toolTunnel", showTunnelingDialog);
 
   // Floating controls
-  safeClick("reconnectBtn", async () => {
+  safeClick("reconnectBtn", () => {
     if (!activeTabId || !tabs[activeTabId]) return;
     const t = tabs[activeTabId];
     if (t.isLocal) {
       showToast("Cannot reconnect a local terminal", "info");
       return;
     }
-    const tabId = activeTabId;
-    const profile = t.profile;
-
-    setTabConnectionState(tabId, "Reconnecting", null, `Reconnecting to ${profile.host}...`);
-    if (t.term) {
-      t.term.write(`\r\n\x1b[1;33m● Reconnecting to ${profile.username || 'user'}@${profile.host}:${profile.port || 22}...\x1b[0m\r\n`);
+    if (t.reconnectState && t.reconnectState.active) {
+      showToast("Retrying connection immediately...", "info");
+      if (t.reconnectState.timerId) clearTimeout(t.reconnectState.timerId);
+      if (t.reconnectState.countdownTimerId) clearInterval(t.reconnectState.countdownTimerId);
+      executeReconnectAttempt(activeTabId, t.reconnectState.attempt || 1);
+      return;
     }
-    showToast(`Reconnecting to ${profile.host}...`, "info");
-
-    let password = "";
-    if (!profile.privateKeyPath && window.go && window.go.main && window.go.main.App && profile.vaultKey) {
-      try {
-        password = await window.go.main.App.GetSavedPassword(profile.vaultKey);
-      } catch (_) {}
-    }
-
-    try {
-      if (window.go && window.go.main && window.go.main.App) {
-        if (typeof window.go.main.App.OpenSessionWithTabID === "function") {
-          await window.go.main.App.OpenSessionWithTabID(tabId, profile, password);
-        } else {
-          await window.go.main.App.OpenSession(profile, password);
-        }
-      }
-      setTabConnectionState(tabId, "Connected");
-      showToast(`Reconnected to ${profile.name}`, "success");
-    } catch (err) {
-      const classified = parseClassifiedError(err);
-      setTabConnectionState(tabId, "Failed", classified);
-      if (t.term) {
-        renderTerminalDiagnosticCard(t.term, profile, classified);
-      }
-      showToast(`Reconnection failed: [${classified.category}] ${classified.message}`, "error");
-    }
+    startReconnectionSequence(activeTabId, true);
   });
   safeClick("clearTermBtn", () => {
     if (activeTabId && tabs[activeTabId]) tabs[activeTabId].term.clear();

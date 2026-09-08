@@ -4287,4 +4287,164 @@ html, body, #app {
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
+/* ==========================================================================
+   Reconnection Banner Overlay
+   ========================================================================== */
+.pane-terminal-top {
+  position: relative;
+}
+
+.reconnect-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 18px;
+  background: rgba(15, 20, 32, 0.96);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 0 14px rgba(245, 158, 11, 0.25);
+  backdrop-filter: blur(10px);
+  animation: slideDownBanner 0.22s ease-out;
+  max-width: 92%;
+  min-width: 440px;
+  color: #f1f5f9;
+  user-select: none;
+}
+
+@keyframes slideDownBanner {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -14px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.reconnect-banner.in-progress {
+  border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 0 14px rgba(56, 189, 248, 0.3);
+}
+
+.reconnect-banner.failed {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.65), 0 0 14px rgba(239, 68, 68, 0.3);
+}
+
+.reconnect-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.reconnect-banner-title {
+  font-weight: 700;
+  color: #f59e0b;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.reconnect-banner.in-progress .reconnect-banner-title {
+  color: #38bdf8;
+}
+
+.reconnect-banner.failed .reconnect-banner-title {
+  color: #ef4444;
+}
+
+.reconnect-banner-desc {
+  color: #cbd5e1;
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reconnect-pulse-icon {
+  font-size: 15px;
+  animation: pulseIcon 1.2s infinite ease-in-out;
+}
+
+.reconnect-spinner {
+  display: inline-block;
+  font-size: 14px;
+  color: #38bdf8;
+  animation: spinIcon 0.9s linear infinite;
+}
+
+@keyframes spinIcon {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulseIcon {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.7; }
+}
+
+.reconnect-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.reconnect-banner-actions button {
+  font-size: 11.5px;
+  padding: 4px 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.reconnect-banner-actions .btn-primary {
+  background: #2563eb;
+  border: 1px solid #3b82f6;
+  color: #fff;
+}
+.reconnect-banner-actions .btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.reconnect-banner-actions .btn-secondary {
+  background: #1e293b;
+  border: 1px solid #475569;
+  color: #e2e8f0;
+}
+.reconnect-banner-actions .btn-secondary:hover {
+  background: #334155;
+  color: #fff;
+}
+
+.reconnect-banner-actions .btn-outline {
+  background: transparent;
+  border: 1px solid #475569;
+  color: #94a3b8;
+}
+.reconnect-banner-actions .btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+
+.reconnect-banner-actions .btn-danger {
+  background: #dc2626;
+  border: 1px solid #ef4444;
+  color: #fff;
+}
+.reconnect-banner-actions .btn-danger:hover {
+  background: #b91c1c;
+}
+
+
 

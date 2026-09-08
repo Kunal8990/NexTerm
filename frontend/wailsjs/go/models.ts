@@ -140,6 +140,9 @@ export namespace model {
 	    connectionTimeout?: number;
 	    compression?: boolean;
 	    useAgent?: boolean;
+	    autoReconnect?: boolean;
+	    reconnectAttempts?: number;
+	    reconnectDelay?: number;
 	    proxyType?: string;
 	    proxyHost?: string;
 	    proxyPort?: number;
@@ -199,6 +202,9 @@ export namespace model {
 	        this.connectionTimeout = source["connectionTimeout"];
 	        this.compression = source["compression"];
 	        this.useAgent = source["useAgent"];
+	        this.autoReconnect = source["autoReconnect"];
+	        this.reconnectAttempts = source["reconnectAttempts"];
+	        this.reconnectDelay = source["reconnectDelay"];
 	        this.proxyType = source["proxyType"];
 	        this.proxyHost = source["proxyHost"];
 	        this.proxyPort = source["proxyPort"];

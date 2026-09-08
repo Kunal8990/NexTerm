@@ -37,6 +37,9 @@ type SessionProfile struct {
 	ConnectionTimeout int    `json:"connectionTimeout,omitempty"` // in seconds, default 10
 	Compression       bool   `json:"compression,omitempty"`
 	UseAgent          bool   `json:"useAgent,omitempty"`
+	AutoReconnect     bool   `json:"autoReconnect,omitempty"`
+	ReconnectAttempts int    `json:"reconnectAttempts,omitempty"` // default 5
+	ReconnectDelay    int    `json:"reconnectDelay,omitempty"`    // in seconds, default 2
 	ProxyType         string `json:"proxyType,omitempty"`         // "none", "socks5", "http"
 	ProxyHost         string `json:"proxyHost,omitempty"`
 	ProxyPort         int    `json:"proxyPort,omitempty"`
