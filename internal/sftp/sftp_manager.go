@@ -76,12 +76,25 @@ func (m *SFTPManager) List(tabID string, sshClient *ssh.Client, remotePath strin
 		return nil, "", err
 	}
 
-	if remotePath == "" || remotePath == "~" {
+	if remotePath == "" || remotePath == "~" || strings.HasPrefix(remotePath, "~/") {
 		wd, err := client.Getwd()
-		if err == nil && wd != "" {
-			remotePath = wd
+		if err != nil || wd == "" || wd == "." {
+			if rp, rperr := client.RealPath("."); rperr == nil && rp != "" && rp != "." {
+				wd = rp
+			}
+		}
+		if wd != "" && wd != "." {
+			if remotePath == "" || remotePath == "~" {
+				remotePath = wd
+			} else {
+				remotePath = path.Join(wd, strings.TrimPrefix(remotePath, "~/"))
+			}
 		} else {
-			remotePath = "/"
+			if remotePath == "" || remotePath == "~" {
+				remotePath = "/"
+			} else {
+				remotePath = "/" + strings.TrimPrefix(remotePath, "~/")
+			}
 		}
 	}
 

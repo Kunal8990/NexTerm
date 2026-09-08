@@ -733,6 +733,10 @@ function renderNode(node, filter = "") {
       document.querySelectorAll(".tree-node-row.selected").forEach(el => el.classList.remove("selected"));
       row.classList.add("selected");
       if (statusMessageEl) statusMessageEl.textContent = `Selected: ${node.name}`;
+      const openTabEntry = Object.entries(tabs).find(([_, t]) => t.profile && (t.profile.id === node.session.id || (t.profile.host === node.session.host && t.profile.username === node.session.username)));
+      if (openTabEntry) {
+        activateTab(openTabEntry[0]);
+      }
     });
     row.addEventListener("contextmenu", (e) => {
       e.preventDefault();
@@ -1038,7 +1042,7 @@ function createTab(tabId, profile, isLocal = false) {
     tabEl,
     isConnected: true,
     isLocal,
-    sftpPath: profile.initialDir || "/"
+    sftpPath: profile.initialDir || "~"
   };
 
   activateTab(tabId);
@@ -1135,7 +1139,7 @@ function activateTab(tabId) {
     const sftpBadge = document.getElementById("sftpActiveTabBadge");
     if (!currentTab.isLocal) {
       if (sftpBadge) sftpBadge.textContent = currentTab.profile.name || currentTab.profile.host;
-      currentSFTPPath = currentTab.sftpPath || (currentTab.profile && currentTab.profile.initialDir) || "/";
+      currentSFTPPath = currentTab.sftpPath || (currentTab.profile && currentTab.profile.initialDir) || "~";
       switchSidebarView("sftp");
       refreshSFTP(currentSFTPPath);
     } else {
@@ -1278,7 +1282,7 @@ async function refreshSFTP(targetPath = "") {
   }
 
   const activeTab = tabs[activeTabId];
-  const path = targetPath || (activeTab && activeTab.sftpPath) || currentSFTPPath || "/";
+  const path = targetPath || (activeTab && activeTab.sftpPath) || currentSFTPPath || "~";
   fileListEl.innerHTML = `<div class="sftp-empty-hint">Loading files from ${escapeHtml(path)}...</div>`;
 
   try {
@@ -1300,7 +1304,11 @@ async function refreshSFTP(targetPath = "") {
       renderConnectedServers();
     }
   } catch (err) {
-    fileListEl.innerHTML = `<div class="sftp-empty-hint" style="color: var(--accent-red);">SFTP Error: ${escapeHtml(err.toString())}</div>`;
+    fileListEl.innerHTML = `<div class="sftp-empty-hint" style="color: var(--accent-red); padding: 16px 12px; line-height: 1.5;">
+      ⚠️ SFTP Listing failed for <b>${escapeHtml(path)}</b>:<br>
+      <span style="font-size: 11px; opacity: 0.85;">${escapeHtml(err.toString())}</span><br><br>
+      <button class="btn-primary" style="font-size: 11px; padding: 4px 10px; cursor: pointer;" onclick="refreshSFTP('~')">↻ Open Home Directory (~)</button>
+    </div>`;
   }
 }
 
@@ -3513,16 +3521,29 @@ function setupEventListeners() {
 }
 
 function switchSidebarView(view) {
-  const views = ["sessions", "sftp", "macros", "tunnel", "tools"];
-  views.forEach(v => {
-    const viewEl = document.getElementById(`view${v.charAt(0).toUpperCase() + v.slice(1)}`);
-    const tabEl = document.getElementById(`navTab${v.charAt(0).toUpperCase() + v.slice(1)}`);
+  const views = {
+    sessions: { viewId: "viewSessions", tabId: "navTabSessions" },
+    sftp: { viewId: "viewSFTP", tabId: "navTabSFTP" },
+    macros: { viewId: "viewMacros", tabId: "navTabMacros" },
+    tunnel: { viewId: "viewTunnel", tabId: "navTabTunnel" },
+    tools: { viewId: "viewTools", tabId: "navTabTools" }
+  };
+
+  Object.entries(views).forEach(([v, ids]) => {
+    const viewEl = document.getElementById(ids.viewId);
+    const tabEl = document.getElementById(ids.tabId);
     const isTarget = v === view;
-    if (viewEl) viewEl.classList.toggle("hidden", !isTarget);
+    if (viewEl) {
+      viewEl.classList.toggle("hidden", !isTarget);
+      viewEl.style.display = isTarget ? "flex" : "none";
+    }
     if (tabEl) tabEl.classList.toggle("active", isTarget);
   });
 
-  if (view === "sftp") refreshSFTP();
+  if (view === "sftp") {
+    const path = (tabs[activeTabId] && tabs[activeTabId].sftpPath) || currentSFTPPath || "~";
+    refreshSFTP(path);
+  }
   if (view === "macros") renderSidebarMacros();
   if (view === "tunnel") renderSidebarTunnels();
 }
