@@ -319,7 +319,19 @@
                 <div class="sftp-empty-hint">Connect to an SSH server to browse remote files via SFTP</div>
               </div>
 
-              <!-- 5. Bottom Status Bar -->
+              <!-- 5. MobaXterm Bottom SFTP Options -->
+              <div class="moba-sftp-bottom-options">
+                <label class="moba-sftp-opt-label">
+                  <input type="checkbox" id="sftpRemoteMonitorCheckbox" />
+                  <span class="moba-opt-icon">📊</span> Remote monitoring
+                </label>
+                <label class="moba-sftp-opt-label">
+                  <input type="checkbox" id="sftpFollowTermCheckbox" checked />
+                  <span class="moba-opt-icon">📁</span> Follow terminal folder
+                </label>
+              </div>
+
+              <!-- 6. Bottom Status Bar -->
               <div class="moba-sftp-footer">
                 <span id="sftpCountBadge">0 items</span>
                 <span id="sftpActiveTabBadge" class="sftp-target-badge">No SSH Tab</span>

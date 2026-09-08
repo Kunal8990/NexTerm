@@ -814,6 +814,7 @@ function activateHomeTab() {
     t.paneEl.classList.remove("active");
   });
 
+  switchSidebarView("sessions");
   updateStatus();
 }
 
@@ -1132,14 +1133,14 @@ function activateTab(tabId) {
     }, 40);
 
     const sftpBadge = document.getElementById("sftpActiveTabBadge");
-    if (sftpBadge) {
-      if (!currentTab.isLocal) {
-        sftpBadge.textContent = currentTab.profile.name || currentTab.profile.host;
-        currentSFTPPath = currentTab.sftpPath || (currentTab.profile && currentTab.profile.initialDir) || "/";
-        refreshSFTP(currentSFTPPath);
-      } else {
-        sftpBadge.textContent = "Local Terminal";
-      }
+    if (!currentTab.isLocal) {
+      if (sftpBadge) sftpBadge.textContent = currentTab.profile.name || currentTab.profile.host;
+      currentSFTPPath = currentTab.sftpPath || (currentTab.profile && currentTab.profile.initialDir) || "/";
+      switchSidebarView("sftp");
+      refreshSFTP(currentSFTPPath);
+    } else {
+      if (sftpBadge) sftpBadge.textContent = "Local Terminal";
+      switchSidebarView("sessions");
     }
   }
 
@@ -1372,8 +1373,8 @@ function renderSFTPItems(items, path = currentSFTPPath) {
   // 1. Parent Directory row `..` if not at root
   if (path && path !== "/" && path !== "") {
     const parentRow = document.createElement("div");
-    parentRow.className = "moba-file-row";
-    parentRow.title = "Go to parent directory (Double-click)";
+    parentRow.className = "moba-file-row moba-parent-row";
+    parentRow.title = "Go to parent directory (Click or Double-click)";
     parentRow.innerHTML = `
       <div class="moba-row-left">
         <span class="moba-row-icon">
@@ -1383,7 +1384,12 @@ function renderSFTPItems(items, path = currentSFTPPath) {
       </div>
       <span class="moba-row-size"></span>
     `;
-    parentRow.addEventListener("dblclick", () => {
+    parentRow.addEventListener("click", (e) => {
+      e.stopPropagation();
+      goSFTPParentDirectory();
+    });
+    parentRow.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
       goSFTPParentDirectory();
     });
     fileListEl.appendChild(parentRow);
@@ -1400,7 +1406,7 @@ function renderSFTPItems(items, path = currentSFTPPath) {
   filteredItems.forEach(item => {
     const row = document.createElement("div");
     const isSelected = selectedSFTPItem && selectedSFTPItem.path === item.path;
-    row.className = `moba-file-row ${isSelected ? 'selected' : ''}`;
+    row.className = `moba-file-row ${isSelected ? 'selected' : ''} ${item.isDir ? 'is-dir' : 'is-file'}`;
     row.dataset.path = item.path;
     row.dataset.isDir = item.isDir;
 
@@ -1416,16 +1422,24 @@ function renderSFTPItems(items, path = currentSFTPPath) {
       <span class="moba-row-size">${escapeHtml(sizeFormatted)}</span>
     `;
 
-    // Single Click -> Select Row
-    row.addEventListener("click", (e) => {
+    // Click on row
+    row.addEventListener("click", async (e) => {
       e.stopPropagation();
+      const wasSelected = selectedSFTPItem && selectedSFTPItem.path === item.path;
       selectedSFTPItem = item;
       fileListEl.querySelectorAll(".moba-file-row").forEach(r => r.classList.remove("selected"));
       row.classList.add("selected");
+
+      // Clicking folder icon or re-clicking selected folder navigates into it
+      if (item.isDir && (e.target.closest(".moba-row-icon") || wasSelected)) {
+        selectedSFTPItem = null;
+        await refreshSFTP(item.path);
+      }
     });
 
-    // Double Click -> Navigate or Open Editor
-    row.addEventListener("dblclick", async () => {
+    // Double Click -> Navigate directory or Open Editor
+    row.addEventListener("dblclick", async (e) => {
+      e.stopPropagation();
       if (item.isDir) {
         selectedSFTPItem = null;
         await refreshSFTP(item.path);
