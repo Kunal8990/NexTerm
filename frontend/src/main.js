@@ -59,6 +59,213 @@ const THEMES = {
     brightMagenta: "#a78bfa",
     brightCyan: "#22d3ee",
     brightWhite: "#ffffff"
+  },
+  "solarized-dark": {
+    background: "#002b36",
+    foreground: "#839496",
+    cursor: "#93a1a1",
+    cursorAccent: "#002b36",
+    selectionBackground: "rgba(7, 54, 66, 0.8)",
+    black: "#073642",
+    red: "#dc322f",
+    green: "#859900",
+    yellow: "#b58900",
+    blue: "#268bd2",
+    magenta: "#d33682",
+    cyan: "#2aa198",
+    white: "#eee8d5",
+    brightBlack: "#586e75",
+    brightRed: "#cb4b16",
+    brightGreen: "#586e75",
+    brightYellow: "#657b83",
+    brightBlue: "#839496",
+    brightMagenta: "#6c71c4",
+    brightCyan: "#93a1a1",
+    brightWhite: "#fdf6e3"
+  },
+  "monokai": {
+    background: "#272822",
+    foreground: "#f8f8f2",
+    cursor: "#f8f8f0",
+    cursorAccent: "#272822",
+    selectionBackground: "rgba(73, 72, 62, 0.8)",
+    black: "#272822",
+    red: "#f92672",
+    green: "#a6e22e",
+    yellow: "#f4bf75",
+    blue: "#66d9ef",
+    magenta: "#ae81ff",
+    cyan: "#a1efe4",
+    white: "#f8f8f2",
+    brightBlack: "#75715e",
+    brightRed: "#f92672",
+    brightGreen: "#a6e22e",
+    brightYellow: "#f4bf75",
+    brightBlue: "#66d9ef",
+    brightMagenta: "#ae81ff",
+    brightCyan: "#a1efe4",
+    brightWhite: "#f9f8f5"
+  },
+  "nord": {
+    background: "#2e3440",
+    foreground: "#d8dee9",
+    cursor: "#88c0d0",
+    cursorAccent: "#2e3440",
+    selectionBackground: "rgba(67, 76, 94, 0.8)",
+    black: "#3b4252",
+    red: "#bf616a",
+    green: "#a3be8c",
+    yellow: "#ebcb8b",
+    blue: "#81a1c1",
+    magenta: "#b48ead",
+    cyan: "#88c0d0",
+    white: "#e5e9f0",
+    brightBlack: "#4c566a",
+    brightRed: "#bf616a",
+    brightGreen: "#a3be8c",
+    brightYellow: "#ebcb8b",
+    brightBlue: "#81a1c1",
+    brightMagenta: "#b48ead",
+    brightCyan: "#8fbcbb",
+    brightWhite: "#eceff4"
+  },
+  "dracula": {
+    background: "#282a36",
+    foreground: "#f8f8f2",
+    cursor: "#f8f8f2",
+    cursorAccent: "#282a36",
+    selectionBackground: "rgba(68, 71, 90, 0.8)",
+    black: "#21222c",
+    red: "#ff5555",
+    green: "#50fa7b",
+    yellow: "#f1fa8c",
+    blue: "#bd93f9",
+    magenta: "#ff79c6",
+    cyan: "#8be9fd",
+    white: "#f8f8f2",
+    brightBlack: "#6272a4",
+    brightRed: "#ff6e6e",
+    brightGreen: "#69ff94",
+    brightYellow: "#ffffa5",
+    brightBlue: "#d6acff",
+    brightMagenta: "#ff92df",
+    brightCyan: "#a4ffff",
+    brightWhite: "#ffffff"
+  },
+  "one-dark": {
+    background: "#1e1e1e",
+    foreground: "#abb2bf",
+    cursor: "#528bff",
+    cursorAccent: "#1e1e1e",
+    selectionBackground: "rgba(62, 68, 81, 0.8)",
+    black: "#282c34",
+    red: "#e06c75",
+    green: "#98c379",
+    yellow: "#e5c07b",
+    blue: "#61afef",
+    magenta: "#c678dd",
+    cyan: "#56b6c2",
+    white: "#abb2bf",
+    brightBlack: "#5c6370",
+    brightRed: "#e06c75",
+    brightGreen: "#98c379",
+    brightYellow: "#e5c07b",
+    brightBlue: "#61afef",
+    brightMagenta: "#c678dd",
+    brightCyan: "#56b6c2",
+    brightWhite: "#ffffff"
+  },
+  "matrix": {
+    background: "#031105",
+    foreground: "#22eb4f",
+    cursor: "#22eb4f",
+    cursorAccent: "#031105",
+    selectionBackground: "rgba(10, 60, 20, 0.8)",
+    black: "#002008",
+    red: "#00ff41",
+    green: "#00ff41",
+    yellow: "#5cff77",
+    blue: "#00cc33",
+    magenta: "#00aa2a",
+    cyan: "#00ff55",
+    white: "#d0ffd7",
+    brightBlack: "#005515",
+    brightRed: "#33ff66",
+    brightGreen: "#00ff41",
+    brightYellow: "#88ffa0",
+    brightBlue: "#00dd38",
+    brightMagenta: "#00bb2f",
+    brightCyan: "#44ff77",
+    brightWhite: "#ffffff"
+  },
+  "cyberpunk": {
+    background: "#0f051d",
+    foreground: "#00f0ff",
+    cursor: "#ff007f",
+    cursorAccent: "#0f051d",
+    selectionBackground: "rgba(255, 0, 127, 0.35)",
+    black: "#1a0b2e",
+    red: "#ff0055",
+    green: "#00ff9f",
+    yellow: "#ffe600",
+    blue: "#00f0ff",
+    magenta: "#ff007f",
+    cyan: "#7928ca",
+    white: "#ffffff",
+    brightBlack: "#2d1254",
+    brightRed: "#ff3377",
+    brightGreen: "#33ffb2",
+    brightYellow: "#ffeb33",
+    brightBlue: "#33f3ff",
+    brightMagenta: "#ff3399",
+    brightCyan: "#9b4dca",
+    brightWhite: "#ffffff"
+  },
+  "avisys-navy": {
+    background: "#0b1528",
+    foreground: "#e2e8f0",
+    cursor: "#38bdf8",
+    cursorAccent: "#0b1528",
+    selectionBackground: "rgba(14, 165, 233, 0.35)",
+    black: "#0f172a",
+    red: "#f87171",
+    green: "#4ade80",
+    yellow: "#facc15",
+    blue: "#38bdf8",
+    magenta: "#c084fc",
+    cyan: "#22d3ee",
+    white: "#f8fafc",
+    brightBlack: "#334155",
+    brightRed: "#fca5a5",
+    brightGreen: "#86efac",
+    brightYellow: "#fde047",
+    brightBlue: "#7dd3fc",
+    brightMagenta: "#d8b4fe",
+    brightCyan: "#67e8f9",
+    brightWhite: "#ffffff"
+  },
+  "light-modern": {
+    background: "#f8fafc",
+    foreground: "#0f172a",
+    cursor: "#0284c7",
+    cursorAccent: "#f8fafc",
+    selectionBackground: "rgba(2, 132, 199, 0.2)",
+    black: "#0f172a",
+    red: "#dc2626",
+    green: "#16a34a",
+    yellow: "#d97706",
+    blue: "#0284c7",
+    magenta: "#9333ea",
+    cyan: "#0891b2",
+    white: "#ffffff",
+    brightBlack: "#64748b",
+    brightRed: "#ef4444",
+    brightGreen: "#22c55e",
+    brightYellow: "#f59e0b",
+    brightBlue: "#38bdf8",
+    brightMagenta: "#a855f7",
+    brightCyan: "#06b6d4",
+    brightWhite: "#ffffff"
   }
 };
 
@@ -911,7 +1118,32 @@ function showSFTPContextMenu(x, y, item) {
         }
       }
     }
+function showModal(htmlContent, extraClass = "") {
+  if (!modalOverlayEl || !modalBoxEl) return null;
+  modalBoxEl.className = "modal-card " + extraClass;
+  modalBoxEl.innerHTML = htmlContent;
+  modalOverlayEl.classList.remove("hidden");
+  modalOverlayEl.style.display = "flex";
+
+  // Backdrop click to close
+  modalOverlayEl.onclick = (e) => {
+    if (e.target === modalOverlayEl) hideModal();
   };
+
+  // Close buttons
+  const closeBtn = modalBoxEl.querySelector("#modalClose") || modalBoxEl.querySelector(".modal-close-btn") || modalBoxEl.querySelector("#modalCloseBtn");
+  if (closeBtn) closeBtn.onclick = hideModal;
+  const cancelBtn = modalBoxEl.querySelector("#modalCancel");
+  if (cancelBtn) cancelBtn.onclick = hideModal;
+
+  return modalBoxEl;
+}
+
+function hideModal() {
+  if (!modalOverlayEl) return;
+  modalOverlayEl.classList.add("hidden");
+  modalOverlayEl.style.display = "none";
+  if (modalBoxEl) modalBoxEl.innerHTML = "";
 }
 
 async function openRemoteFileEditor(remotePath) {
@@ -1782,52 +2014,73 @@ function showNewSessionDialog(parentFolderId = "", editProfile = null) {
 async function showSettingsDialog() {
   const box = showModal(`
     <div class="modal-header">
-      <div class="modal-title">NexTerm Professional Settings & Enterprise Customizer</div>
+      <div class="modal-title">⚙️ NexTerm Professional Settings & Preferences</div>
       <button class="modal-close-btn" id="modalClose">&times;</button>
     </div>
     <div class="modal-tabs">
-      <button class="modal-tab-btn active" data-tab="tab-settings-term">Terminal & UI</button>
-      <button class="modal-tab-btn" data-tab="tab-settings-pwd">Password Vault (DPAPI)</button>
-      <button class="modal-tab-btn" data-tab="tab-settings-sec">Security Policies</button>
-      <button class="modal-tab-btn" data-tab="tab-settings-custom">Enterprise Customizer</button>
+      <button class="modal-tab-btn active" data-tab="tab-settings-term">🖥️ Terminal & UI</button>
+      <button class="modal-tab-btn" data-tab="tab-settings-pwd">🔑 Password Vault</button>
+      <button class="modal-tab-btn" data-tab="tab-settings-sec">🛡️ Security Policies</button>
+      <button class="modal-tab-btn" data-tab="tab-settings-custom">🏢 Customizer</button>
     </div>
-    <div class="modal-body">
+    <div class="modal-body" style="max-height: 480px; overflow-y: auto;">
       <!-- 1. Terminal & UI Settings Tab -->
       <div id="tab-settings-term" class="tab-content">
         <div class="form-group">
           <label>Terminal Color Scheme</label>
           <select id="cfgTheme">
-            <option value="dark-modern">Dark Modern (MobaXterm)</option>
+            <option value="dark-modern" ${userSettings.theme === 'dark-modern' ? 'selected' : ''}>Dark Modern (MobaXterm Default)</option>
+            <option value="solarized-dark" ${userSettings.theme === 'solarized-dark' ? 'selected' : ''}>Solarized Dark</option>
+            <option value="monokai" ${userSettings.theme === 'monokai' ? 'selected' : ''}>Monokai Pro</option>
+            <option value="nord" ${userSettings.theme === 'nord' ? 'selected' : ''}>Nordic Frost</option>
+            <option value="dracula" ${userSettings.theme === 'dracula' ? 'selected' : ''}>Dracula</option>
+            <option value="one-dark" ${userSettings.theme === 'one-dark' ? 'selected' : ''}>Atom One Dark</option>
+            <option value="matrix" ${userSettings.theme === 'matrix' ? 'selected' : ''}>Matrix Green CRT</option>
+            <option value="cyberpunk" ${userSettings.theme === 'cyberpunk' ? 'selected' : ''}>Cyberpunk Neon</option>
+            <option value="avisys-navy" ${userSettings.theme === 'avisys-navy' ? 'selected' : ''}>Avisys Corporate Navy</option>
+            <option value="light-modern" ${userSettings.theme === 'light-modern' ? 'selected' : ''}>Modern Light</option>
           </select>
         </div>
-        <div class="form-row">
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div class="form-group">
             <label>Font Size (px)</label>
-            <input type="number" id="cfgFontSize" value="${userSettings.fontSize}" min="10" max="24" />
+            <input type="number" id="cfgFontSize" value="${userSettings.fontSize || 13}" min="9" max="28" />
           </div>
           <div class="form-group">
             <label>Cursor Style</label>
             <select id="cfgCursor">
-              <option value="block" ${userSettings.cursorStyle === 'block' ? 'selected' : ''}>Block</option>
-              <option value="underline" ${userSettings.cursorStyle === 'underline' ? 'selected' : ''}>Underline</option>
-              <option value="bar" ${userSettings.cursorStyle === 'bar' ? 'selected' : ''}>Vertical Bar</option>
+              <option value="block" ${userSettings.cursorStyle === 'block' ? 'selected' : ''}>Block (█)</option>
+              <option value="underline" ${userSettings.cursorStyle === 'underline' ? 'selected' : ''}>Underline (_)</option>
+              <option value="bar" ${userSettings.cursorStyle === 'bar' ? 'selected' : ''}>Vertical Bar (|)</option>
             </select>
           </div>
         </div>
         <div class="form-group">
           <label>Font Family</label>
-          <input type="text" id="cfgFont" value="${escapeHtml(userSettings.fontFamily)}" />
+          <input type="text" id="cfgFont" value="${escapeHtml(userSettings.fontFamily || 'Cascadia Mono, Consolas, Fira Code, monospace')}" />
         </div>
-        <div class="form-group" style="margin-top: 6px;">
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label>Scrollback History (Lines)</label>
+            <input type="number" id="cfgScrollback" value="${userSettings.scrollback || 10000}" min="1000" max="100000" step="1000" />
+          </div>
+          <div class="form-group" style="justify-content: flex-end; padding-bottom: 6px;">
+            <label class="checkbox-label">
+              <input type="checkbox" id="cfgCursorBlink" ${userSettings.cursorBlink !== false ? 'checked' : ''} />
+              <span>Cursor Blinking</span>
+            </label>
+          </div>
+        </div>
+        <div class="form-group" style="margin-top: 4px;">
           <label class="checkbox-label">
             <input type="checkbox" id="cfgRightClickPaste" ${userSettings.rightClickPaste !== false ? 'checked' : ''} />
-            <span>Paste clipboard content on right mouse click (MobaXterm style)</span>
+            <span>Right-Click Quick Paste (MobaXterm behavior)</span>
           </label>
         </div>
         <div class="form-group">
           <label class="checkbox-label">
             <input type="checkbox" id="cfgAutoCopy" ${userSettings.autoCopySelection !== false ? 'checked' : ''} />
-            <span>Automatically copy highlighted/selected text to clipboard</span>
+            <span>Auto-Copy Highlighted Selection to Clipboard</span>
           </label>
         </div>
       </div>
@@ -1835,7 +2088,7 @@ async function showSettingsDialog() {
       <!-- 2. Password Management Vault Tab -->
       <div id="tab-settings-pwd" class="tab-content hidden">
         <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.4;">
-          Stored server passwords securely encrypted using <b>Windows DPAPI (CryptProtectData)</b>. You can reveal, copy, or remove saved credentials.
+          🔒 Stored passwords are hardware-encrypted with <b>Windows DPAPI (CryptProtectData)</b>. Passwords are never saved in plaintext on disk.
         </div>
         <div id="pwdVaultList" style="display: flex; flex-direction: column; gap: 8px; max-height: 280px; overflow-y: auto; padding-right: 2px;">
           <div style="text-align: center; padding: 20px; color: var(--text-dim);">Loading vault credentials...</div>
@@ -1847,12 +2100,16 @@ async function showSettingsDialog() {
         <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
           Enterprise protocol restrictions and credential management controls:
         </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <label class="checkbox-label"><input type="checkbox" id="secSSH" checked /> <span>Allow SSH Sessions</span></label>
           <label class="checkbox-label"><input type="checkbox" id="secSFTP" checked /> <span>Allow SFTP Browser</span></label>
-          <label class="checkbox-label"><input type="checkbox" id="secRDP" checked /> <span>Allow RDP Desktop</span></label>
-          <label class="checkbox-label"><input type="checkbox" id="secSerial" checked /> <span>Allow Serial / COM</span></label>
-          <label class="checkbox-label"><input type="checkbox" id="secPwdSave" checked /> <span>Allow Password Saving</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="secRDP" checked /> <span>Allow Remote Desktop (RDP)</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="secSerial" checked /> <span>Allow Serial / COM Ports</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="secVNC" checked /> <span>Allow VNC Sessions</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="secTelnet" /> <span>Allow Telnet Sessions</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="secPwdSave" checked /> <span>Allow Password Saving in DPAPI</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="secClipboard" checked /> <span>Allow Clipboard Sharing</span></label>
+          <label class="checkbox-label"><input type="checkbox" id="secTransfers" checked /> <span>Allow File Transfers</span></label>
           <label class="checkbox-label"><input type="checkbox" id="secAudit" /> <span>Require Audit Logging</span></label>
         </div>
       </div>
@@ -1860,38 +2117,85 @@ async function showSettingsDialog() {
       <!-- 4. Enterprise Customizer Tab -->
       <div id="tab-settings-custom" class="tab-content hidden">
         <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-          Customize application branding and generate customized corporate distribution profiles:
+          Customize enterprise application identity, branding, and corporate defaults:
         </div>
         <div class="form-group">
-          <label>Application Title</label>
-          <input type="text" id="custAppTitle" value="Nexterm Professional" />
+          <label>Application Name</label>
+          <input type="text" id="custAppTitle" value="NexTerm Professional" placeholder="e.g. Avisys NexTerm Pro" />
         </div>
         <div class="form-group">
           <label>Company / Organization Name</label>
-          <input type="text" id="custCompany" value="Enterprise IT" />
+          <input type="text" id="custCompany" value="Avisys Services" placeholder="e.g. Avisys Services" />
         </div>
         <div class="form-group">
           <label>Welcome Splash Message</label>
-          <input type="text" id="custSplash" value="Empowering Enterprise Cloud & Systems Engineering" />
+          <input type="text" id="custSplash" value="Enterprise Infrastructure & Systems Engineering Workspace" />
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label>Default SSH Port</label>
+            <input type="number" id="custDefaultPort" value="22" min="1" max="65535" />
+          </div>
+          <div class="form-group">
+            <label>Default Theme</label>
+            <select id="custDefaultTheme">
+              <option value="dark-modern">Dark Modern</option>
+              <option value="solarized-dark">Solarized Dark</option>
+              <option value="monokai">Monokai Pro</option>
+              <option value="dracula">Dracula</option>
+              <option value="nord">Nordic Frost</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
 
     <div class="modal-footer">
       <button class="btn-secondary" id="modalCancel">Cancel</button>
-      <button class="btn-primary" id="cfgSave">Save All Settings</button>
+      <button class="btn-primary" id="cfgSave">💾 Save All Settings</button>
     </div>
-  `);
+  `, "modal-lg");
 
-  // Tab switching
+  // Tab switching inside modal
   box.querySelectorAll(".modal-tab-btn").forEach(btn => {
     btn.onclick = () => {
       box.querySelectorAll(".modal-tab-btn").forEach(b => b.classList.remove("active"));
       box.querySelectorAll(".tab-content").forEach(c => c.classList.add("hidden"));
       btn.classList.add("active");
-      box.querySelector(`#${btn.dataset.tab}`).classList.remove("hidden");
+      const target = box.querySelector(`#${btn.dataset.tab}`);
+      if (target) target.classList.remove("hidden");
     };
   });
+
+  // Load Security Policy from Go backend
+  if (window.go && window.go.main && window.go.main.App) {
+    try {
+      const pol = await window.go.main.App.GetSecurityPolicy();
+      if (pol) {
+        if (box.querySelector("#secSSH")) box.querySelector("#secSSH").checked = pol.allowSSH !== false;
+        if (box.querySelector("#secSFTP")) box.querySelector("#secSFTP").checked = pol.allowSFTP !== false;
+        if (box.querySelector("#secRDP")) box.querySelector("#secRDP").checked = pol.allowRDP !== false;
+        if (box.querySelector("#secSerial")) box.querySelector("#secSerial").checked = pol.allowSerial !== false;
+        if (box.querySelector("#secVNC")) box.querySelector("#secVNC").checked = pol.allowVNC !== false;
+        if (box.querySelector("#secTelnet")) box.querySelector("#secTelnet").checked = !!pol.allowTelnet;
+        if (box.querySelector("#secPwdSave")) box.querySelector("#secPwdSave").checked = pol.allowPasswordSaving !== false;
+        if (box.querySelector("#secClipboard")) box.querySelector("#secClipboard").checked = pol.allowClipboardSharing !== false;
+        if (box.querySelector("#secTransfers")) box.querySelector("#secTransfers").checked = pol.allowFileTransfers !== false;
+        if (box.querySelector("#secAudit")) box.querySelector("#secAudit").checked = !!pol.requireAuditLog;
+      }
+    } catch (_) {}
+
+    try {
+      const cust = await window.go.main.App.GetCustomizerConfig();
+      if (cust) {
+        if (box.querySelector("#custAppTitle") && cust.appName) box.querySelector("#custAppTitle").value = cust.appName;
+        if (box.querySelector("#custCompany") && cust.companyName) box.querySelector("#custCompany").value = cust.companyName;
+        if (box.querySelector("#custSplash") && cust.splashMessage) box.querySelector("#custSplash").value = cust.splashMessage;
+        if (box.querySelector("#custDefaultPort") && cust.defaultSSHPort) box.querySelector("#custDefaultPort").value = cust.defaultSSHPort;
+        if (box.querySelector("#custDefaultTheme") && cust.defaultTheme) box.querySelector("#custDefaultTheme").value = cust.defaultTheme;
+      }
+    } catch (_) {}
+  }
 
   // Load vault passwords
   const loadVaultPasswords = async () => {
@@ -1975,26 +2279,77 @@ async function showSettingsDialog() {
   };
   loadVaultPasswords();
 
-  box.querySelector("#cfgSave").onclick = () => {
+  box.querySelector("#cfgSave").onclick = async () => {
+    // 1. Terminal & UI Preferences
+    userSettings.theme = box.querySelector("#cfgTheme").value || "dark-modern";
     userSettings.fontSize = parseInt(box.querySelector("#cfgFontSize").value, 10) || 13;
-    userSettings.cursorStyle = box.querySelector("#cfgCursor").value;
-    userSettings.fontFamily = box.querySelector("#cfgFont").value;
-    if (box.querySelector("#cfgRightClickPaste")) {
-      userSettings.rightClickPaste = box.querySelector("#cfgRightClickPaste").checked;
-    }
-    if (box.querySelector("#cfgAutoCopy")) {
-      userSettings.autoCopySelection = box.querySelector("#cfgAutoCopy").checked;
-    }
-    localStorage.setItem("nexterm_settings", JSON.stringify(userSettings));
-    hideModal();
-    showToast("Settings and enterprise preferences saved", "success");
+    userSettings.cursorStyle = box.querySelector("#cfgCursor").value || "block";
+    userSettings.fontFamily = box.querySelector("#cfgFont").value.trim() || "Cascadia Mono, Consolas, Fira Code, monospace";
+    userSettings.scrollback = parseInt(box.querySelector("#cfgScrollback").value, 10) || 10000;
+    userSettings.cursorBlink = box.querySelector("#cfgCursorBlink").checked;
+    userSettings.rightClickPaste = box.querySelector("#cfgRightClickPaste").checked;
+    userSettings.autoCopySelection = box.querySelector("#cfgAutoCopy").checked;
 
+    localStorage.setItem("nexterm_settings", JSON.stringify(userSettings));
+
+    // 2. Security Policy to Go backend
+    if (window.go && window.go.main && window.go.main.App) {
+      try {
+        const updatedPolicy = {
+          allowSSH: box.querySelector("#secSSH").checked,
+          allowSFTP: box.querySelector("#secSFTP").checked,
+          allowRDP: box.querySelector("#secRDP").checked,
+          allowSerial: box.querySelector("#secSerial").checked,
+          allowVNC: box.querySelector("#secVNC").checked,
+          allowTelnet: box.querySelector("#secTelnet").checked,
+          allowPasswordSaving: box.querySelector("#secPwdSave").checked,
+          allowClipboardSharing: box.querySelector("#secClipboard").checked,
+          allowFileTransfers: box.querySelector("#secTransfers").checked,
+          requireAuditLog: box.querySelector("#secAudit").checked
+        };
+        await window.go.main.App.SaveSecurityPolicy(updatedPolicy);
+      } catch (err) {
+        console.error("Failed to save security policy:", err);
+      }
+
+      // 3. Customizer Config to Go backend
+      try {
+        const updatedCustomizer = {
+          appName: box.querySelector("#custAppTitle").value.trim() || "NexTerm Professional",
+          companyName: box.querySelector("#custCompany").value.trim() || "Enterprise IT",
+          companyLogoText: "NexTerm",
+          splashMessage: box.querySelector("#custSplash").value.trim(),
+          defaultSSHPort: parseInt(box.querySelector("#custDefaultPort").value, 10) || 22,
+          defaultTheme: box.querySelector("#custDefaultTheme").value || "dark-modern",
+          defaultFontSize: userSettings.fontSize
+        };
+        await window.go.main.App.SaveCustomizerConfig(updatedCustomizer);
+
+        // Update document title dynamically
+        document.title = updatedCustomizer.appName;
+      } catch (err) {
+        console.error("Failed to save customizer:", err);
+      }
+    }
+
+    // 4. Live update all open terminals
+    const activeTheme = THEMES[userSettings.theme] || THEMES["dark-modern"];
     Object.values(tabs).forEach(t => {
-      t.term.options.fontSize = userSettings.fontSize;
-      t.term.options.cursorStyle = userSettings.cursorStyle;
-      t.term.options.fontFamily = userSettings.fontFamily;
-      if (t.fitAddon) t.fitAddon.fit();
+      if (t.term) {
+        t.term.options.theme = activeTheme;
+        t.term.options.fontSize = userSettings.fontSize;
+        t.term.options.cursorStyle = userSettings.cursorStyle;
+        t.term.options.cursorBlink = userSettings.cursorBlink;
+        t.term.options.fontFamily = userSettings.fontFamily;
+        t.term.options.scrollback = userSettings.scrollback;
+        if (t.fitAddon) {
+          try { t.fitAddon.fit(); } catch (_) {}
+        }
+      }
     });
+
+    hideModal();
+    showToast("Settings and enterprise preferences saved successfully", "success");
   };
 
   box.querySelector("#modalCancel").onclick = hideModal;
