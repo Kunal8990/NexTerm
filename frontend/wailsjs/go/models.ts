@@ -338,6 +338,7 @@ export namespace sftpmanager {
 	    isDir: boolean;
 	    modTime: string;
 	    permissions: string;
+	    octalPerm: string;
 	    extension: string;
 	
 	    static createFrom(source: any = {}) {
@@ -353,6 +354,7 @@ export namespace sftpmanager {
 	        this.isDir = source["isDir"];
 	        this.modTime = source["modTime"];
 	        this.permissions = source["permissions"];
+	        this.octalPerm = source["octalPerm"];
 	        this.extension = source["extension"];
 	    }
 	}

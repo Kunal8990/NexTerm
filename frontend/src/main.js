@@ -952,6 +952,9 @@ function syncSFTPToCurrentTerminalCwd(tabId = activeTabId) {
   tab.sftpPath = target;
   currentSFTPPath = target;
   refreshSFTP(target);
+  if (tab.loadRemoteList) {
+    tab.loadRemoteList(target);
+  }
 }
 
 let cdNavDebounceTimer = null;
@@ -977,6 +980,9 @@ function handleTerminalCdCommand(tabId, cmd) {
     if (tabs[tabId] && activeTabId === tabId && isFollowTerminalFolderEnabled()) {
       tab.sftpPath = newPath;
       await refreshSFTP(newPath);
+      if (tab.loadRemoteList) {
+        tab.loadRemoteList(newPath);
+      }
     }
   }, 350);
 }
@@ -1158,6 +1164,673 @@ async function connectToSession(profile) {
   }
 }
 
+function openChmodModal(tabId, item) {
+  if (!item) return;
+
+  let currentOctal = item.octalPerm || "0755";
+  if (currentOctal.length === 3) currentOctal = "0" + currentOctal;
+
+  const box = showModal(`
+    <div class="modal-header">
+      <div class="modal-title" style="display: flex; align-items: center; gap: 6px;">
+        <span>🔑</span> Change File Permissions (chmod)
+      </div>
+      <button class="modal-close-btn" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 16px 18px;">
+      <div class="chmod-target-info">
+        <span class="chmod-filename">${escapeHtml(item.name)}</span>
+        <span class="chmod-path">${escapeHtml(item.path)}</span>
+      </div>
+
+      <div class="chmod-grid">
+        <div class="chmod-col">
+          <div class="chmod-col-title">👤 Owner</div>
+          <label><input type="checkbox" id="permOwnerR" /> Read (r)</label>
+          <label><input type="checkbox" id="permOwnerW" /> Write (w)</label>
+          <label><input type="checkbox" id="permOwnerX" /> Execute (x)</label>
+        </div>
+        <div class="chmod-col">
+          <div class="chmod-col-title">👥 Group</div>
+          <label><input type="checkbox" id="permGroupR" /> Read (r)</label>
+          <label><input type="checkbox" id="permGroupW" /> Write (w)</label>
+          <label><input type="checkbox" id="permGroupX" /> Execute (x)</label>
+        </div>
+        <div class="chmod-col">
+          <div class="chmod-col-title">🌍 Others</div>
+          <label><input type="checkbox" id="permOtherR" /> Read (r)</label>
+          <label><input type="checkbox" id="permOtherW" /> Write (w)</label>
+          <label><input type="checkbox" id="permOtherX" /> Execute (x)</label>
+        </div>
+      </div>
+
+      <div class="chmod-octal-row">
+        <label>Octal Value:</label>
+        <input type="text" id="chmodOctalInput" value="${currentOctal}" maxlength="4" />
+        <div class="chmod-presets">
+          <button type="button" class="btn-preset" data-octal="0755">0755</button>
+          <button type="button" class="btn-preset" data-octal="0644">0644</button>
+          <button type="button" class="btn-preset" data-octal="0700">0700</button>
+          <button type="button" class="btn-preset" data-octal="0777">0777</button>
+        </div>
+      </div>
+
+      <div class="hostkey-actions" style="margin-top: 14px;">
+        <button class="btn btn-secondary" id="chmodCancel">Cancel</button>
+        <button class="btn btn-primary" id="chmodApply">Apply Permissions</button>
+      </div>
+    </div>
+  `, "modal-chmod");
+
+  if (!box) return;
+
+  const oR = box.querySelector("#permOwnerR");
+  const oW = box.querySelector("#permOwnerW");
+  const oX = box.querySelector("#permOwnerX");
+  const gR = box.querySelector("#permGroupR");
+  const gW = box.querySelector("#permGroupW");
+  const gX = box.querySelector("#permGroupX");
+  const tR = box.querySelector("#permOtherR");
+  const tW = box.querySelector("#permOtherW");
+  const tX = box.querySelector("#permOtherX");
+  const octalInput = box.querySelector("#chmodOctalInput");
+
+  function updateCheckboxesFromOctal(val) {
+    const num = parseInt(val, 8);
+    if (isNaN(num)) return;
+    const u = (num >> 6) & 7;
+    const g = (num >> 3) & 7;
+    const o = num & 7;
+
+    oR.checked = !!(u & 4);
+    oW.checked = !!(u & 2);
+    oX.checked = !!(u & 1);
+
+    gR.checked = !!(g & 4);
+    gW.checked = !!(g & 2);
+    gX.checked = !!(g & 1);
+
+    tR.checked = !!(o & 4);
+    tW.checked = !!(o & 2);
+    tX.checked = !!(o & 1);
+  }
+
+  function computeOctalFromCheckboxes() {
+    let u = 0;
+    if (oR.checked) u += 4;
+    if (oW.checked) u += 2;
+    if (oX.checked) u += 1;
+
+    let g = 0;
+    if (gR.checked) g += 4;
+    if (gW.checked) g += 2;
+    if (gX.checked) g += 1;
+
+    let o = 0;
+    if (tR.checked) o += 4;
+    if (tW.checked) o += 2;
+    if (tX.checked) o += 1;
+
+    const res = `0${u}${g}${o}`;
+    octalInput.value = res;
+    return res;
+  }
+
+  updateCheckboxesFromOctal(currentOctal);
+
+  [oR, oW, oX, gR, gW, gX, tR, tW, tX].forEach(cb => {
+    cb.onchange = computeOctalFromCheckboxes;
+  });
+
+  octalInput.oninput = () => {
+    updateCheckboxesFromOctal(octalInput.value);
+  };
+
+  box.querySelectorAll(".btn-preset").forEach(btn => {
+    btn.onclick = () => {
+      octalInput.value = btn.dataset.octal;
+      updateCheckboxesFromOctal(btn.dataset.octal);
+    };
+  });
+
+  const cancelBtn = box.querySelector("#chmodCancel");
+  if (cancelBtn) cancelBtn.onclick = hideModal;
+
+  const applyBtn = box.querySelector("#chmodApply");
+  if (applyBtn) {
+    applyBtn.onclick = async () => {
+      const mode = octalInput.value.trim();
+      hideModal();
+      showToast(`Applying permissions ${mode} to ${item.name}...`, "info");
+      try {
+        if (window.go && window.go.main && window.go.main.App) {
+          await window.go.main.App.SFTPChmodRemote(tabId, item.path, mode);
+          showToast(`Permissions updated to ${mode}`, "success");
+          if (tabs[tabId] && tabs[tabId].refreshRemoteList) {
+            tabs[tabId].refreshRemoteList();
+          }
+          if (typeof refreshSFTP === "function") refreshSFTP();
+        }
+      } catch (err) {
+        showToast(`Failed to change permissions: ${err}`, "error");
+      }
+    };
+  }
+}
+
+function setupDualPaneSFTP(tabId, profile, paneEl, fitAddon, term) {
+  const localListEl = paneEl.querySelector(`#sftpLocalList_${tabId}`);
+  const remoteListEl = paneEl.querySelector(`#sftpRemoteList_${tabId}`);
+  const localPathInput = paneEl.querySelector(`#sftpLocalPath_${tabId}`);
+  const remotePathInput = paneEl.querySelector(`#sftpRemotePath_${tabId}`);
+  const driveSelect = paneEl.querySelector(`#sftpDriveSel_${tabId}`);
+  const splitHandle = paneEl.querySelector(`#splitHandle_${tabId}`);
+  const sftpBottom = paneEl.querySelector(`#sftpBottom_${tabId}`);
+  const toggleBtn = paneEl.querySelector(`#sftpToggleBtn_${tabId}`);
+  const uploadBtn = paneEl.querySelector(`#sftpUploadBtn_${tabId}`);
+  const downloadBtn = paneEl.querySelector(`#sftpDownloadBtn_${tabId}`);
+
+  let curLocalPath = "";
+  let curRemotePath = profile.initialDir || "~";
+  let selectedLocalItem = null;
+  let selectedRemoteItem = null;
+  let localItems = [];
+  let remoteItems = [];
+
+  // Toggle button for SFTP dual pane
+  if (toggleBtn && sftpBottom) {
+    toggleBtn.onclick = (e) => {
+      e.stopPropagation();
+      sftpBottom.classList.toggle("is-collapsed");
+      const collapsed = sftpBottom.classList.contains("is-collapsed");
+      toggleBtn.innerHTML = collapsed
+        ? `<span class="split-icon">📂</span> Show SFTP Dual File Manager`
+        : `<span class="split-icon">📂</span> SFTP Dual File Manager`;
+      setTimeout(() => {
+        if (fitAddon) fitAddon.fit();
+      }, 50);
+    };
+  }
+
+  // Split resize handle
+  if (splitHandle && sftpBottom) {
+    let isDragging = false;
+    let startY = 0;
+    let startH = 0;
+
+    splitHandle.onmousedown = (e) => {
+      if (e.target === toggleBtn || (toggleBtn && toggleBtn.contains(e.target))) return;
+      isDragging = true;
+      startY = e.clientY;
+      startH = sftpBottom.offsetHeight;
+      document.body.style.cursor = "row-resize";
+      e.preventDefault();
+    };
+
+    window.addEventListener("mousemove", (e) => {
+      if (!isDragging) return;
+      const deltaY = startY - e.clientY;
+      const newH = Math.max(100, Math.min(window.innerHeight * 0.75, startH + deltaY));
+      sftpBottom.style.height = `${newH}px`;
+      if (fitAddon) fitAddon.fit();
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (isDragging) {
+        isDragging = false;
+        document.body.style.cursor = "";
+        if (fitAddon) fitAddon.fit();
+      }
+    });
+  }
+
+  // Drives initialization
+  async function loadDrives() {
+    if (!driveSelect) return;
+    try {
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.SFTPGetLocalDrives) {
+        const drives = await window.go.main.App.SFTPGetLocalDrives();
+        driveSelect.innerHTML = "";
+        drives.forEach(d => {
+          const opt = document.createElement("option");
+          opt.value = d;
+          opt.textContent = d;
+          driveSelect.appendChild(opt);
+        });
+      }
+    } catch (_) {}
+  }
+
+  if (driveSelect) {
+    driveSelect.onchange = () => {
+      curLocalPath = driveSelect.value;
+      loadLocalList(curLocalPath);
+    };
+  }
+
+  // Load Local Files
+  async function loadLocalList(targetPath) {
+    if (!localListEl) return;
+    localListEl.innerHTML = `<div style="color: #64748b; padding: 12px; font-size: 11px;">Loading local files...</div>`;
+    selectedLocalItem = null;
+
+    try {
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.SFTPListLocal) {
+        const res = await window.go.main.App.SFTPListLocal(targetPath || curLocalPath);
+        if (!res) return;
+        curLocalPath = res.path;
+        if (localPathInput) localPathInput.value = curLocalPath;
+        localItems = res.items || [];
+        renderLocalTable();
+      }
+    } catch (err) {
+      localListEl.innerHTML = `<div style="color: #ef4444; padding: 10px; font-size: 11px;">Error: ${escapeHtml(err)}</div>`;
+    }
+  }
+
+  function renderLocalTable() {
+    localListEl.innerHTML = "";
+
+    // Parent directory row `..`
+    const parentRow = document.createElement("div");
+    parentRow.className = "sftp-row";
+    parentRow.innerHTML = `
+      <div class="col-name" style="color: #a7f3d0; font-weight: 700;">
+        <span class="file-icon">📁</span>
+        <span>..</span>
+      </div>
+      <div class="col-size"></div>
+      <div class="col-date"></div>
+    `;
+    parentRow.ondblclick = () => {
+      const parent = curLocalPath.substring(0, Math.max(curLocalPath.lastIndexOf("\\"), curLocalPath.lastIndexOf("/")));
+      if (parent) loadLocalList(parent);
+      else loadLocalList(curLocalPath.substring(0, 3));
+    };
+    localListEl.appendChild(parentRow);
+
+    if (localItems.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.cssText = "color: #64748b; padding: 12px; font-size: 11px; text-align: center;";
+      empty.textContent = "Folder is empty";
+      localListEl.appendChild(empty);
+      return;
+    }
+
+    localItems.forEach(item => {
+      const row = document.createElement("div");
+      row.className = `sftp-row ${selectedLocalItem && selectedLocalItem.path === item.path ? 'selected' : ''}`;
+      row.draggable = true;
+      row.ondragstart = (e) => {
+        e.dataTransfer.setData("text/plain", JSON.stringify({ type: "local", path: item.path, name: item.name }));
+      };
+
+      row.innerHTML = `
+        <div class="col-name">
+          <span class="file-icon">${item.isDir ? '📁' : '📄'}</span>
+          <span>${escapeHtml(item.name)}</span>
+        </div>
+        <div class="col-size">${escapeHtml(item.formattedSize || '')}</div>
+        <div class="col-date">${escapeHtml(item.modTime || '')}</div>
+      `;
+
+      row.onclick = () => {
+        selectedLocalItem = item;
+        localListEl.querySelectorAll(".sftp-row").forEach(r => r.classList.remove("selected"));
+        row.classList.add("selected");
+      };
+
+      row.ondblclick = () => {
+        if (item.isDir) {
+          loadLocalList(item.path);
+        } else {
+          if (confirm(`Upload "${item.name}" to remote server folder (${curRemotePath})?`)) {
+            triggerUpload(item.path);
+          }
+        }
+      };
+
+      localListEl.appendChild(row);
+    });
+  }
+
+  // Load Remote Files
+  async function loadRemoteList(targetPath) {
+    if (!remoteListEl) return;
+    remoteListEl.innerHTML = `<div style="color: #64748b; padding: 12px; font-size: 11px;">Loading remote files...</div>`;
+    selectedRemoteItem = null;
+
+    try {
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.SFTPList) {
+        const res = await window.go.main.App.SFTPList(tabId, targetPath || curRemotePath);
+        if (!res) return;
+        curRemotePath = res.path;
+        if (remotePathInput) remotePathInput.value = curRemotePath;
+        remoteItems = res.items || [];
+        renderRemoteTable();
+
+        if (tabs[tabId]) {
+          tabs[tabId].sftpPath = curRemotePath;
+        }
+      }
+    } catch (err) {
+      remoteListEl.innerHTML = `<div style="color: #ef4444; padding: 10px; font-size: 11px;">Error: ${escapeHtml(err)}</div>`;
+    }
+  }
+
+  function renderRemoteTable() {
+    remoteListEl.innerHTML = "";
+
+    // Parent directory row `..`
+    if (curRemotePath !== "/" && curRemotePath !== "") {
+      const parentRow = document.createElement("div");
+      parentRow.className = "sftp-row";
+      parentRow.innerHTML = `
+        <div class="col-name" style="color: #4ade80; font-weight: 700;">
+          <span class="file-icon">📁</span>
+          <span>..</span>
+        </div>
+        <div class="col-size"></div>
+        <div class="col-perm"></div>
+        <div class="col-date"></div>
+      `;
+      parentRow.ondblclick = () => {
+        const idx = curRemotePath.lastIndexOf("/");
+        const parent = idx > 0 ? curRemotePath.substring(0, idx) : "/";
+        loadRemoteList(parent);
+      };
+      remoteListEl.appendChild(parentRow);
+    }
+
+    if (remoteItems.length === 0) {
+      const empty = document.createElement("div");
+      empty.style.cssText = "color: #64748b; padding: 12px; font-size: 11px; text-align: center;";
+      empty.textContent = "Directory is empty";
+      remoteListEl.appendChild(empty);
+      return;
+    }
+
+    remoteItems.forEach(item => {
+      const row = document.createElement("div");
+      row.className = `sftp-row ${selectedRemoteItem && selectedRemoteItem.path === item.path ? 'selected' : ''}`;
+      row.draggable = true;
+      row.ondragstart = (e) => {
+        e.dataTransfer.setData("text/plain", JSON.stringify({ type: "remote", path: item.path, name: item.name }));
+      };
+
+      row.innerHTML = `
+        <div class="col-name">
+          <span class="file-icon">${item.isDir ? '📁' : '📄'}</span>
+          <span>${escapeHtml(item.name)}</span>
+        </div>
+        <div class="col-size">${escapeHtml(item.formattedSize || '')}</div>
+        <div class="col-perm">${escapeHtml(item.octalPerm || item.permissions || '')}</div>
+        <div class="col-date">${escapeHtml(item.modTime || '')}</div>
+      `;
+
+      row.onclick = () => {
+        selectedRemoteItem = item;
+        remoteListEl.querySelectorAll(".sftp-row").forEach(r => r.classList.remove("selected"));
+        row.classList.add("selected");
+      };
+
+      row.ondblclick = () => {
+        if (item.isDir) {
+          loadRemoteList(item.path);
+        } else {
+          openRemoteFileEditor(item.path);
+        }
+      };
+
+      remoteListEl.appendChild(row);
+    });
+  }
+
+  // Drag & Drop handlers
+  if (remoteListEl) {
+    remoteListEl.ondragover = (e) => e.preventDefault();
+    remoteListEl.ondrop = (e) => {
+      e.preventDefault();
+      try {
+        const d = JSON.parse(e.dataTransfer.getData("text/plain"));
+        if (d && d.type === "local") {
+          triggerUpload(d.path);
+        }
+      } catch (_) {}
+    };
+  }
+
+  if (localListEl) {
+    localListEl.ondragover = (e) => e.preventDefault();
+    localListEl.ondrop = (e) => {
+      e.preventDefault();
+      try {
+        const d = JSON.parse(e.dataTransfer.getData("text/plain"));
+        if (d && d.type === "remote") {
+          triggerDownload(d.path);
+        }
+      } catch (_) {}
+    };
+  }
+
+  // Upload helper
+  async function triggerUpload(srcPath) {
+    const p = srcPath || (selectedLocalItem ? selectedLocalItem.path : null);
+    if (!p) {
+      showToast("Please select a local file or folder to upload", "warning");
+      return;
+    }
+    showToast(`Uploading ${p} ➔ ${curRemotePath}...`, "info");
+    try {
+      if (window.go && window.go.main && window.go.main.App) {
+        await window.go.main.App.SFTPUpload(tabId, p, curRemotePath);
+        showToast("Upload completed successfully", "success");
+        loadRemoteList(curRemotePath);
+        if (typeof refreshSFTP === "function") refreshSFTP();
+      }
+    } catch (err) {
+      showToast(`Upload failed: ${err}`, "error");
+    }
+  }
+
+  // Download helper
+  async function triggerDownload(srcPath) {
+    const p = srcPath || (selectedRemoteItem ? selectedRemoteItem.path : null);
+    if (!p) {
+      showToast("Please select a remote file or folder to download", "warning");
+      return;
+    }
+    showToast(`Downloading ${p} ➔ ${curLocalPath}...`, "info");
+    try {
+      if (window.go && window.go.main && window.go.main.App) {
+        await window.go.main.App.SFTPDownload(tabId, p, curLocalPath);
+        showToast("Download completed successfully", "success");
+        loadLocalList(curLocalPath);
+      }
+    } catch (err) {
+      showToast(`Download failed: ${err}`, "error");
+    }
+  }
+
+  if (uploadBtn) uploadBtn.onclick = () => triggerUpload();
+  if (downloadBtn) downloadBtn.onclick = () => triggerDownload();
+
+  // Local Path Input Enter key
+  if (localPathInput) {
+    localPathInput.onkeydown = (e) => {
+      if (e.key === "Enter") loadLocalList(localPathInput.value.trim());
+    };
+  }
+
+  // Remote Path Input Enter key
+  if (remotePathInput) {
+    remotePathInput.onkeydown = (e) => {
+      if (e.key === "Enter") loadRemoteList(remotePathInput.value.trim());
+    };
+  }
+
+  // Local Action buttons
+  const btnLocalUp = paneEl.querySelector(`#sftpLocalUp_${tabId}`);
+  if (btnLocalUp) {
+    btnLocalUp.onclick = () => {
+      const parent = curLocalPath.substring(0, Math.max(curLocalPath.lastIndexOf("\\"), curLocalPath.lastIndexOf("/")));
+      if (parent) loadLocalList(parent);
+    };
+  }
+
+  const btnLocalRef = paneEl.querySelector(`#sftpLocalRefresh_${tabId}`);
+  if (btnLocalRef) btnLocalRef.onclick = () => loadLocalList(curLocalPath);
+
+  const btnLocalMkdir = paneEl.querySelector(`#sftpLocalMkdir_${tabId}`);
+  if (btnLocalMkdir) {
+    btnLocalMkdir.onclick = async () => {
+      const name = prompt("Enter new local folder name:");
+      if (!name) return;
+      try {
+        const full = `${curLocalPath}\\${name}`;
+        await window.go.main.App.SFTPMkdirLocal(full);
+        showToast(`Created folder ${name}`, "success");
+        loadLocalList(curLocalPath);
+      } catch (err) {
+        showToast(`Failed: ${err}`, "error");
+      }
+    };
+  }
+
+  const btnLocalMkfile = paneEl.querySelector(`#sftpLocalMkfile_${tabId}`);
+  if (btnLocalMkfile) {
+    btnLocalMkfile.onclick = async () => {
+      const name = prompt("Enter new local file name:");
+      if (!name) return;
+      try {
+        const full = `${curLocalPath}\\${name}`;
+        await window.go.main.App.SFTPCreateFileLocal(full);
+        showToast(`Created file ${name}`, "success");
+        loadLocalList(curLocalPath);
+      } catch (err) {
+        showToast(`Failed: ${err}`, "error");
+      }
+    };
+  }
+
+  const btnLocalDel = paneEl.querySelector(`#sftpLocalDel_${tabId}`);
+  if (btnLocalDel) {
+    btnLocalDel.onclick = async () => {
+      if (!selectedLocalItem) {
+        showToast("Select a local file or folder to delete", "warning");
+        return;
+      }
+      if (confirm(`Delete local "${selectedLocalItem.name}"?`)) {
+        try {
+          await window.go.main.App.SFTPDeleteLocal(selectedLocalItem.path);
+          showToast(`Deleted ${selectedLocalItem.name}`, "info");
+          loadLocalList(curLocalPath);
+        } catch (err) {
+          showToast(`Delete failed: ${err}`, "error");
+        }
+      }
+    };
+  }
+
+  // Remote Action buttons
+  const btnRemoteUp = paneEl.querySelector(`#sftpRemoteUp_${tabId}`);
+  if (btnRemoteUp) {
+    btnRemoteUp.onclick = () => {
+      const idx = curRemotePath.lastIndexOf("/");
+      const parent = idx > 0 ? curRemotePath.substring(0, idx) : "/";
+      loadRemoteList(parent);
+    };
+  }
+
+  const btnRemoteRef = paneEl.querySelector(`#sftpRemoteRefresh_${tabId}`);
+  if (btnRemoteRef) btnRemoteRef.onclick = () => loadRemoteList(curRemotePath);
+
+  const btnRemoteMkdir = paneEl.querySelector(`#sftpRemoteMkdir_${tabId}`);
+  if (btnRemoteMkdir) {
+    btnRemoteMkdir.onclick = async () => {
+      const name = prompt("Enter new remote folder name:");
+      if (!name) return;
+      try {
+        const full = `${curRemotePath === '/' ? '' : curRemotePath}/${name}`;
+        await window.go.main.App.SFTPMkdir(tabId, full);
+        showToast(`Created remote folder ${name}`, "success");
+        loadRemoteList(curRemotePath);
+      } catch (err) {
+        showToast(`Failed: ${err}`, "error");
+      }
+    };
+  }
+
+  const btnRemoteMkfile = paneEl.querySelector(`#sftpRemoteMkfile_${tabId}`);
+  if (btnRemoteMkfile) {
+    btnRemoteMkfile.onclick = async () => {
+      const name = prompt("Enter new remote file name:");
+      if (!name) return;
+      try {
+        const full = `${curRemotePath === '/' ? '' : curRemotePath}/${name}`;
+        await window.go.main.App.SFTPCreateFile(tabId, full);
+        showToast(`Created remote file ${name}`, "success");
+        loadRemoteList(curRemotePath);
+      } catch (err) {
+        showToast(`Failed: ${err}`, "error");
+      }
+    };
+  }
+
+  const btnRemoteEdit = paneEl.querySelector(`#sftpRemoteEdit_${tabId}`);
+  if (btnRemoteEdit) {
+    btnRemoteEdit.onclick = () => {
+      if (!selectedRemoteItem || selectedRemoteItem.isDir) {
+        showToast("Select a remote file to edit", "warning");
+        return;
+      }
+      openRemoteFileEditor(selectedRemoteItem.path);
+    };
+  }
+
+  const btnRemoteChmod = paneEl.querySelector(`#sftpRemoteChmod_${tabId}`);
+  if (btnRemoteChmod) {
+    btnRemoteChmod.onclick = () => {
+      if (!selectedRemoteItem) {
+        showToast("Select a remote file or folder to change permissions", "warning");
+        return;
+      }
+      openChmodModal(tabId, selectedRemoteItem);
+    };
+  }
+
+  const btnRemoteDel = paneEl.querySelector(`#sftpRemoteDel_${tabId}`);
+  if (btnRemoteDel) {
+    btnRemoteDel.onclick = async () => {
+      if (!selectedRemoteItem) {
+        showToast("Select a remote file or folder to delete", "warning");
+        return;
+      }
+      if (confirm(`Delete remote "${selectedRemoteItem.name}"?`)) {
+        try {
+          await window.go.main.App.SFTPDelete(tabId, selectedRemoteItem.path);
+          showToast(`Deleted ${selectedRemoteItem.name}`, "info");
+          loadRemoteList(curRemotePath);
+        } catch (err) {
+          showToast(`Delete failed: ${err}`, "error");
+        }
+      }
+    };
+  }
+
+  // Register in tabs dictionary
+  if (tabs[tabId]) {
+    tabs[tabId].refreshRemoteList = () => loadRemoteList(curRemotePath);
+    tabs[tabId].refreshLocalList = () => loadLocalList(curLocalPath);
+    tabs[tabId].loadRemoteList = loadRemoteList;
+  }
+
+  // Initial loads
+  loadDrives();
+  loadLocalList();
+  setTimeout(() => loadRemoteList(curRemotePath), 400);
+}
+
 function createTab(tabId, profile, isLocal = false) {
   welcomeStateEl.classList.remove("active");
   homeTabBtnEl.classList.remove("active");
@@ -1185,6 +1858,95 @@ function createTab(tabId, profile, isLocal = false) {
   paneEl.dataset.tabId = tabId;
   panesEl.appendChild(paneEl);
 
+  let termCanvas = paneEl;
+  if (!isLocal) {
+    paneEl.innerHTML = `
+      <div class="pane-split-wrap">
+        <div class="pane-terminal-top">
+          <div class="terminal-canvas-wrap" id="termCanvas_${tabId}"></div>
+        </div>
+        <div class="pane-split-divider" id="splitDivider_${tabId}">
+          <div class="pane-split-handle" id="splitHandle_${tabId}" title="Drag to resize / Click toggle button to collapse SFTP">
+            <span class="split-drag-bar"></span>
+            <button class="split-toggle-btn" id="sftpToggleBtn_${tabId}" type="button">
+              <span class="split-icon">📂</span> SFTP Dual File Manager
+            </button>
+          </div>
+        </div>
+        <div class="pane-sftp-bottom" id="sftpBottom_${tabId}">
+          <div class="sftp-dual-container" id="sftpDual_${tabId}">
+            <!-- Local Files Half -->
+            <div class="sftp-half-pane sftp-pane-local" id="sftpLocalHalf_${tabId}">
+              <div class="sftp-pane-header">
+                <div class="sftp-header-left">
+                  <span class="sftp-pane-badge local">💻 Local PC</span>
+                  <select class="sftp-drive-select" id="sftpDriveSel_${tabId}" title="Select Drive"></select>
+                  <input type="text" class="sftp-path-bar" id="sftpLocalPath_${tabId}" spellcheck="false" autocomplete="off" />
+                </div>
+                <div class="sftp-pane-actions">
+                  <button class="sftp-mini-btn" id="sftpLocalUp_${tabId}" title="Up one folder">⬆</button>
+                  <button class="sftp-mini-btn" id="sftpLocalRefresh_${tabId}" title="Refresh local files">↻</button>
+                  <button class="sftp-mini-btn" id="sftpLocalMkdir_${tabId}" title="New local folder">📁+</button>
+                  <button class="sftp-mini-btn" id="sftpLocalMkfile_${tabId}" title="New local file">📄+</button>
+                  <button class="sftp-mini-btn" id="sftpLocalDel_${tabId}" title="Delete local file/folder">🗑️</button>
+                </div>
+              </div>
+              <div class="sftp-table-head">
+                <div class="sftp-col name">Name</div>
+                <div class="sftp-col size">Size</div>
+                <div class="sftp-col date">Modified</div>
+              </div>
+              <div class="sftp-file-tbody" id="sftpLocalList_${tabId}">
+                <div style="color: #64748b; padding: 12px; font-size: 11px;">Loading local files...</div>
+              </div>
+            </div>
+
+            <!-- Transfer Center Controls -->
+            <div class="sftp-transfer-divider">
+              <button class="btn-sftp-transfer btn-transfer-upload" id="sftpUploadBtn_${tabId}" title="Upload selected local file to remote server">
+                <span class="arrow">➔</span>
+                <span class="label">Upload</span>
+              </button>
+              <button class="btn-sftp-transfer btn-transfer-download" id="sftpDownloadBtn_${tabId}" title="Download selected remote file to local PC">
+                <span class="arrow">⬅</span>
+                <span class="label">Download</span>
+              </button>
+            </div>
+
+            <!-- Remote Files Half -->
+            <div class="sftp-half-pane sftp-pane-remote" id="sftpRemoteHalf_${tabId}">
+              <div class="sftp-pane-header">
+                <div class="sftp-header-left">
+                  <span class="sftp-pane-badge remote">🌐 Remote Server</span>
+                  <input type="text" class="sftp-path-bar" id="sftpRemotePath_${tabId}" spellcheck="false" autocomplete="off" />
+                </div>
+                <div class="sftp-pane-actions">
+                  <button class="sftp-mini-btn" id="sftpRemoteUp_${tabId}" title="Up one folder">⬆</button>
+                  <button class="sftp-mini-btn" id="sftpRemoteRefresh_${tabId}" title="Refresh remote files">↻</button>
+                  <button class="sftp-mini-btn" id="sftpRemoteMkdir_${tabId}" title="New remote folder">📁+</button>
+                  <button class="sftp-mini-btn" id="sftpRemoteMkfile_${tabId}" title="New remote file">📄+</button>
+                  <button class="sftp-mini-btn" id="sftpRemoteEdit_${tabId}" title="Edit in NexTerm Editor">📝</button>
+                  <button class="sftp-mini-btn" id="sftpRemoteChmod_${tabId}" title="Change Permissions (chmod)">🔑</button>
+                  <button class="sftp-mini-btn" id="sftpRemoteDel_${tabId}" title="Delete remote file/folder">🗑️</button>
+                </div>
+              </div>
+              <div class="sftp-table-head">
+                <div class="sftp-col name">Name</div>
+                <div class="sftp-col size">Size</div>
+                <div class="sftp-col perm">Perms</div>
+                <div class="sftp-col date">Modified</div>
+              </div>
+              <div class="sftp-file-tbody" id="sftpRemoteList_${tabId}">
+                <div style="color: #64748b; padding: 12px; font-size: 11px;">Loading remote files...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    termCanvas = paneEl.querySelector(`#termCanvas_${tabId}`);
+  }
+
   const selectedTheme = THEMES[profile.theme] || THEMES[userSettings.theme] || THEMES["dark-modern"];
   const term = new Terminal({
     fontFamily: userSettings.fontFamily,
@@ -1206,7 +1968,11 @@ function createTab(tabId, profile, isLocal = false) {
     console.warn("FitAddon error:", e);
   }
 
-  term.open(paneEl);
+  term.open(termCanvas);
+
+  if (!isLocal) {
+    setupDualPaneSFTP(tabId, profile, paneEl, fitAddon, term);
+  }
 
   setTimeout(() => {
     try {
@@ -1808,6 +2574,7 @@ function showSFTPContextMenu(x, y, item) {
     <div class="context-menu-separator"></div>
     <div class="context-menu-item" id="sftpCopyPath">📋 Copy file path</div>
     <div class="context-menu-item" id="sftpCopyPathTerm">💻 Copy file path to terminal</div>
+    <div class="context-menu-item" id="sftpChmod">🔑 Permissions (chmod)</div>
     <div class="context-menu-item" id="sftpProperties">ℹ️ Properties / Permissions</div>
   `;
   posMenu(x, y);
@@ -1855,6 +2622,14 @@ function showSFTPContextMenu(x, y, item) {
       showToast("Pasted file path to terminal", "info");
     }
   };
+
+  const chmodBtn = contextMenuEl.querySelector("#sftpChmod");
+  if (chmodBtn) {
+    chmodBtn.onclick = () => {
+      hideContextMenu();
+      openChmodModal(activeTabId, item);
+    };
+  }
 
   contextMenuEl.querySelector("#sftpProperties").onclick = () => {
     hideContextMenu();
@@ -1944,10 +2719,21 @@ async function showSFTPPropertiesDialog(item) {
         <span class="prop-val">${escapeHtml(stats.modTime || 'N/A')}</span>
       </div>
     </div>
-    <div class="modal-footer">
+    <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+      <button class="btn-secondary" id="propChmodBtn" type="button" style="display: inline-flex; align-items: center; gap: 6px;">
+        <span>🔑</span> Change Permissions (chmod)
+      </button>
       <button class="btn-primary" id="modalClose">OK</button>
     </div>
   `);
+
+  const propChmodBtn = modalBoxEl.querySelector("#propChmodBtn");
+  if (propChmodBtn) {
+    propChmodBtn.onclick = () => {
+      hideModal();
+      openChmodModal(activeTabId, stats);
+    };
+  }
 }
 
 async function openRemoteFileExternal(remotePath, chooseApp = false) {

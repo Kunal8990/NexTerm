@@ -705,6 +705,60 @@ func (a *App) SelectUploadFile() (string, error) {
 	})
 }
 
+// SFTPListLocal lists files and folders on the local machine.
+func (a *App) SFTPListLocal(localPath string) (*SFTPListResult, error) {
+	items, cleanPath, err := sftpmanager.ListLocal(localPath)
+	if err != nil {
+		return nil, err
+	}
+	return &SFTPListResult{
+		Path:  cleanPath,
+		Items: items,
+	}, nil
+}
+
+// SFTPGetLocalDrives returns available drive letters (e.g. C:\, D:\) on Windows.
+func (a *App) SFTPGetLocalDrives() ([]string, error) {
+	return sftpmanager.GetLocalDrives()
+}
+
+// SFTPMkdirLocal creates a directory on the local machine.
+func (a *App) SFTPMkdirLocal(localPath string) error {
+	return sftpmanager.MkdirLocal(localPath)
+}
+
+// SFTPCreateFileLocal creates an empty file on the local machine.
+func (a *App) SFTPCreateFileLocal(localPath string) error {
+	return sftpmanager.CreateFileLocal(localPath)
+}
+
+// SFTPRenameLocal renames a local file or directory.
+func (a *App) SFTPRenameLocal(oldPath, newPath string) error {
+	return sftpmanager.RenameLocal(oldPath, newPath)
+}
+
+// SFTPDeleteLocal deletes a local file or directory.
+func (a *App) SFTPDeleteLocal(localPath string) error {
+	return sftpmanager.DeleteLocal(localPath)
+}
+
+// SFTPChmodLocal changes permissions of a local file.
+func (a *App) SFTPChmodLocal(localPath, octalMode string) error {
+	return sftpmanager.ChmodLocal(localPath, octalMode)
+}
+
+// SFTPChmodRemote changes permissions of a remote file or folder.
+func (a *App) SFTPChmodRemote(tabID, remotePath, octalMode string) error {
+	a.mu.Lock()
+	sess, ok := a.tabs[tabID]
+	a.mu.Unlock()
+
+	if !ok || sess == nil {
+		return fmt.Errorf("active SSH session not found")
+	}
+	return a.sftpMgr.Chmod(tabID, sess.Client(), remotePath, octalMode)
+}
+
 // SFTPOpenExternal downloads a remote file to a local temp cache directory,
 // launches it with the system default program (or Windows "Open With" dialog),
 // and watches the local cached file for modifications to notify or auto-commit to the server.

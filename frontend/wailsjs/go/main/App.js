@@ -138,6 +138,14 @@ export function RespondHostKey(arg1, arg2) {
   return window['go']['main']['App']['RespondHostKey'](arg1, arg2);
 }
 
+export function SFTPChmodLocal(arg1, arg2) {
+  return window['go']['main']['App']['SFTPChmodLocal'](arg1, arg2);
+}
+
+export function SFTPChmodRemote(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SFTPChmodRemote'](arg1, arg2, arg3);
+}
+
 export function SFTPCommitExternalChange(arg1, arg2, arg3) {
   return window['go']['main']['App']['SFTPCommitExternalChange'](arg1, arg2, arg3);
 }
@@ -146,8 +154,16 @@ export function SFTPCreateFile(arg1, arg2) {
   return window['go']['main']['App']['SFTPCreateFile'](arg1, arg2);
 }
 
+export function SFTPCreateFileLocal(arg1) {
+  return window['go']['main']['App']['SFTPCreateFileLocal'](arg1);
+}
+
 export function SFTPDelete(arg1, arg2) {
   return window['go']['main']['App']['SFTPDelete'](arg1, arg2);
+}
+
+export function SFTPDeleteLocal(arg1) {
+  return window['go']['main']['App']['SFTPDeleteLocal'](arg1);
 }
 
 export function SFTPDownload(arg1, arg2, arg3) {
@@ -158,12 +174,24 @@ export function SFTPGetFileProperties(arg1, arg2) {
   return window['go']['main']['App']['SFTPGetFileProperties'](arg1, arg2);
 }
 
+export function SFTPGetLocalDrives() {
+  return window['go']['main']['App']['SFTPGetLocalDrives']();
+}
+
 export function SFTPList(arg1, arg2) {
   return window['go']['main']['App']['SFTPList'](arg1, arg2);
 }
 
+export function SFTPListLocal(arg1) {
+  return window['go']['main']['App']['SFTPListLocal'](arg1);
+}
+
 export function SFTPMkdir(arg1, arg2) {
   return window['go']['main']['App']['SFTPMkdir'](arg1, arg2);
+}
+
+export function SFTPMkdirLocal(arg1) {
+  return window['go']['main']['App']['SFTPMkdirLocal'](arg1);
 }
 
 export function SFTPOpenExternal(arg1, arg2, arg3) {
@@ -176,6 +204,10 @@ export function SFTPReadFile(arg1, arg2) {
 
 export function SFTPRename(arg1, arg2, arg3) {
   return window['go']['main']['App']['SFTPRename'](arg1, arg2, arg3);
+}
+
+export function SFTPRenameLocal(arg1, arg2) {
+  return window['go']['main']['App']['SFTPRenameLocal'](arg1, arg2);
 }
 
 export function SFTPUpload(arg1, arg2, arg3) {

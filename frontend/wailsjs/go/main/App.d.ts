@@ -77,25 +77,41 @@ export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void
 
 export function RespondHostKey(arg1:string,arg2:string):Promise<void>;
 
+export function SFTPChmodLocal(arg1:string,arg2:string):Promise<void>;
+
+export function SFTPChmodRemote(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function SFTPCommitExternalChange(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SFTPCreateFile(arg1:string,arg2:string):Promise<void>;
 
+export function SFTPCreateFileLocal(arg1:string):Promise<void>;
+
 export function SFTPDelete(arg1:string,arg2:string):Promise<void>;
+
+export function SFTPDeleteLocal(arg1:string):Promise<void>;
 
 export function SFTPDownload(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function SFTPGetFileProperties(arg1:string,arg2:string):Promise<sftpmanager.SFTPItem>;
 
+export function SFTPGetLocalDrives():Promise<Array<string>>;
+
 export function SFTPList(arg1:string,arg2:string):Promise<main.SFTPListResult>;
 
+export function SFTPListLocal(arg1:string):Promise<main.SFTPListResult>;
+
 export function SFTPMkdir(arg1:string,arg2:string):Promise<void>;
+
+export function SFTPMkdirLocal(arg1:string):Promise<void>;
 
 export function SFTPOpenExternal(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function SFTPReadFile(arg1:string,arg2:string):Promise<string>;
 
 export function SFTPRename(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SFTPRenameLocal(arg1:string,arg2:string):Promise<void>;
 
 export function SFTPUpload(arg1:string,arg2:string,arg3:string):Promise<void>;
 
