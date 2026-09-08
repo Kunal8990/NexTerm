@@ -1118,6 +1118,9 @@ function showSFTPContextMenu(x, y, item) {
         }
       }
     }
+  };
+}
+
 function showModal(htmlContent, extraClass = "") {
   if (!modalOverlayEl || !modalBoxEl) return null;
   modalBoxEl.className = "modal-card " + extraClass;
