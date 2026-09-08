@@ -82,6 +82,10 @@ export function GetSecurityPolicy() {
   return window['go']['main']['App']['GetSecurityPolicy']();
 }
 
+export function GetSessionPassword(arg1) {
+  return window['go']['main']['App']['GetSessionPassword'](arg1);
+}
+
 export function GetSessionTree() {
   return window['go']['main']['App']['GetSessionTree']();
 }

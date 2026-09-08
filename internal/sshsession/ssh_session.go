@@ -42,6 +42,18 @@ type ConnectOptions struct {
 	Cols              int
 	Rows              int
 
+	// Terminal & Startup
+	WorkingDirectory  string
+
+	// SSH Advanced
+	ConnectionTimeout int // in seconds
+	Compression       bool
+	ProxyType         string
+	ProxyHost         string
+	ProxyPort         int
+	ProxyUsername     string
+	ProxyPassword     string
+
 	// HostKeyCallback for verifying server identities against known_hosts.
 	HostKeyCallback   ssh.HostKeyCallback
 
@@ -92,11 +104,16 @@ func Connect(opts ConnectOptions) (*Session, error) {
 		}
 	}
 
+	timeout := 15 * time.Second
+	if opts.ConnectionTimeout > 0 {
+		timeout = time.Duration(opts.ConnectionTimeout) * time.Second
+	}
+
 	config := &ssh.ClientConfig{
 		User:            opts.Username,
 		Auth:            authMethods,
 		HostKeyCallback: hkcb,
-		Timeout:         15 * time.Second,
+		Timeout:         timeout,
 	}
 
 	addr := net.JoinHostPort(opts.Host, strconv.Itoa(opts.Port))
@@ -209,6 +226,8 @@ func Connect(opts ConnectOptions) (*Session, error) {
 
 	if opts.StartupCommand != "" {
 		_, _ = stdin.Write([]byte(opts.StartupCommand + "\r\n"))
+	} else if opts.WorkingDirectory != "" {
+		_, _ = stdin.Write([]byte(fmt.Sprintf("cd %q\r\n", opts.WorkingDirectory)))
 	}
 
 	// Start reading stdout and stderr

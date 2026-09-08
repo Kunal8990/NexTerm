@@ -2127,14 +2127,24 @@ function createTab(tabId, profile, isLocal = false) {
     termCanvas = paneEl.querySelector(`#termCanvas_${tabId}`);
   }
 
-  const selectedTheme = THEMES[profile.theme] || THEMES[userSettings.theme] || THEMES["dark-modern"];
+  let themeObj = { ...(THEMES[profile.theme] || THEMES[userSettings.theme] || THEMES["dark-modern"]) };
+  if (profile.foreground) themeObj.foreground = profile.foreground;
+  if (profile.background) themeObj.background = profile.background;
+  if (profile.cursorColor) themeObj.cursor = profile.cursorColor;
+  if (profile.selectionColor) themeObj.selectionBackground = profile.selectionColor;
+  if (profile.ansiColors && typeof profile.ansiColors === "object") {
+    Object.assign(themeObj, profile.ansiColors);
+  }
+
   const term = new Terminal({
-    fontFamily: userSettings.fontFamily,
+    fontFamily: profile.fontFamily || userSettings.fontFamily,
     fontSize: profile.fontSize || userSettings.fontSize,
-    cursorBlink: userSettings.cursorBlink,
-    cursorStyle: userSettings.cursorStyle,
-    scrollback: userSettings.scrollback,
-    theme: selectedTheme,
+    cursorBlink: profile.cursorBlink !== undefined ? profile.cursorBlink : userSettings.cursorBlink,
+    cursorStyle: profile.cursorStyle || userSettings.cursorStyle || "block",
+    scrollback: profile.scrollback || userSettings.scrollback || 10000,
+    cols: profile.cols > 0 ? profile.cols : 80,
+    rows: profile.rows > 0 ? profile.rows : 24,
+    theme: themeObj,
     allowTransparency: true,
   });
 
@@ -4419,8 +4429,15 @@ function showHashDialog() {
 // Multi-Protocol New Session Dialog (SSH, SFTP, RDP, VNC, Telnet, Serial, Local)
 // --------------------------------------------------------------------------
 
-function showNewSessionDialog(parentFolderId = "", editProfile = null) {
+async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
   const isEdit = !!editProfile;
+  let savedPassword = "";
+  if (isEdit && editProfile.vaultKey && window.go && window.go.main && window.go.main.App && window.go.main.App.GetSessionPassword) {
+    try {
+      savedPassword = await window.go.main.App.GetSessionPassword(editProfile.vaultKey);
+    } catch (_) {}
+  }
+
   const p = editProfile || {
     id: "",
     name: "New Server",
@@ -4430,279 +4447,762 @@ function showNewSessionDialog(parentFolderId = "", editProfile = null) {
     username: "root",
     authType: "password",
     privateKeyPath: "",
+    keyPassphrase: "",
+    useAgent: false,
+    terminalType: "xterm-256color",
+    fontFamily: userSettings.fontFamily || "Cascadia Mono, Consolas, monospace",
+    fontSize: userSettings.fontSize || 13,
+    rows: 24,
+    cols: 80,
+    cursorStyle: userSettings.cursorStyle || "block",
+    cursorBlink: userSettings.cursorBlink !== undefined ? userSettings.cursorBlink : true,
+    encoding: "utf-8",
+    scrollback: userSettings.scrollback || 10000,
     startupCommand: "",
-    theme: userSettings.theme,
-    fontSize: userSettings.fontSize,
+    workingDirectory: "",
     keepAliveInterval: 15,
+    connectionTimeout: 10,
+    compression: false,
+    proxyType: "none",
+    proxyHost: "",
+    proxyPort: 1080,
+    proxyUsername: "",
+    proxyPassword: "",
     useJumpHost: false,
     jumpHost: "",
     jumpPort: 22,
     jumpUsername: "bastion",
     jumpAuthType: "password",
+    theme: userSettings.theme || "dark-modern",
+    foreground: "",
+    background: "",
+    cursorColor: "",
+    selectionColor: "",
+    ansiColors: {},
     serialPort: "COM1",
     baudRate: 115200,
+    dataBits: 8,
+    stopBits: 1,
+    parity: "none",
     rdpDomain: "",
     rdpFullScreen: false
   };
 
+  const currentThemeData = THEMES[p.theme] || THEMES["dark-modern"];
+  const fgVal = p.foreground || currentThemeData.foreground;
+  const bgVal = p.background || currentThemeData.background;
+  const curVal = p.cursorColor || currentThemeData.cursor;
+  const selVal = p.selectionColor || currentThemeData.selectionBackground || "rgba(59, 130, 246, 0.4)";
+  const ansi = p.ansiColors || {};
+
   const box = showModal(`
     <div class="modal-header">
-      <div class="modal-title">${isEdit ? "Edit Session" : "New Session Wizard — Nexterm"}</div>
+      <div class="modal-title">${isEdit ? "⚙️ Edit Session — " + escapeHtml(p.name) : "✨ New Session Configuration"}</div>
       <button class="modal-close-btn" id="modalClose">&times;</button>
     </div>
 
-    <!-- Protocol Selection Cards -->
-    <div class="proto-picker-grid" style="padding: 10px 14px 0 14px;">
-      <div class="proto-card ${p.protocol === 'ssh' || !p.protocol ? 'active' : ''}" data-proto="ssh">
-        <div class="proto-card-icon">🔒</div>
-        <div class="proto-card-title">SSH</div>
-      </div>
-      <div class="proto-card ${p.protocol === 'sftp' ? 'active' : ''}" data-proto="sftp">
-        <div class="proto-card-icon">📁</div>
-        <div class="proto-card-title">SFTP</div>
-      </div>
-      <div class="proto-card ${p.protocol === 'rdp' ? 'active' : ''}" data-proto="rdp">
-        <div class="proto-card-icon">🖥️</div>
-        <div class="proto-card-title">RDP</div>
-      </div>
-      <div class="proto-card ${p.protocol === 'serial' ? 'active' : ''}" data-proto="serial">
-        <div class="proto-card-icon">🔌</div>
-        <div class="proto-card-title">Serial</div>
-      </div>
+    <!-- Top Protocol Chips Bar -->
+    <div class="sess-proto-bar">
+      ${[
+        { id: "ssh", label: "SSH", icon: "🔒", port: 22 },
+        { id: "sftp", label: "SFTP", icon: "📁", port: 22 },
+        { id: "rdp", label: "RDP", icon: "🖥️", port: 3389 },
+        { id: "vnc", label: "VNC", icon: "📺", port: 5900 },
+        { id: "telnet", label: "Telnet", icon: "📡", port: 23 },
+        { id: "serial", label: "Serial", icon: "🔌", port: 0 },
+        { id: "local", label: "Local Terminal", icon: "💻", port: 0 }
+      ].map(pr => `
+        <div class="sess-proto-chip ${p.protocol === pr.id ? 'active' : ''}" data-proto="${pr.id}" data-default-port="${pr.port}">
+          <span>${pr.icon}</span>
+          <span>${pr.label}</span>
+        </div>
+      `).join('')}
     </div>
 
-    <div class="modal-tabs">
-      <button class="modal-tab-btn active" data-tab="tab-gen">General</button>
-      <button class="modal-tab-btn" data-tab="tab-auth" id="tabAuthBtn">Authentication</button>
-      <button class="modal-tab-btn" data-tab="tab-jump" id="tabJumpBtn">Jump Host (Bastion)</button>
-      <button class="modal-tab-btn" data-tab="tab-adv">Advanced</button>
-    </div>
-
-    <div class="modal-body">
-      <!-- General Tab -->
-      <div id="tab-gen" class="tab-content">
-        <div class="form-group">
-          <label>Session Name</label>
-          <input type="text" id="sName" value="${escapeHtml(p.name)}" placeholder="e.g. Oracle BRM Production 01" />
+    <!-- Main Two-Column Body -->
+    <div class="sess-editor-body">
+      <!-- Left Navigation Sidebar -->
+      <div class="sess-nav-sidebar">
+        <div class="sess-nav-item active" data-tab="tab-sess-gen">
+          <span class="nav-icon">🌐</span>
+          <span>General</span>
         </div>
-        <div id="networkFieldsGroup">
-          <div class="form-row">
-            <div class="form-group" style="flex: 2;">
-              <label>Remote Host / IP *</label>
-              <input type="text" id="sHost" value="${escapeHtml(p.host)}" placeholder="192.168.1.100 or server.company.com" />
+        <div class="sess-nav-item" data-tab="tab-sess-auth" id="navItemAuth">
+          <span class="nav-icon">🔐</span>
+          <span>Authentication</span>
+        </div>
+        <div class="sess-nav-item" data-tab="tab-sess-term">
+          <span class="nav-icon">💻</span>
+          <span>Terminal</span>
+        </div>
+        <div class="sess-nav-item" data-tab="tab-sess-start">
+          <span class="nav-icon">🚀</span>
+          <span>Startup</span>
+        </div>
+        <div class="sess-nav-item" data-tab="tab-sess-ssh" id="navItemSSH">
+          <span class="nav-icon">🛡️</span>
+          <span>SSH Settings</span>
+        </div>
+        <div class="sess-nav-item" data-tab="tab-sess-app">
+          <span class="nav-icon">🎨</span>
+          <span>Appearance</span>
+        </div>
+      </div>
+
+      <!-- Right Content Pane -->
+      <div class="sess-content-pane">
+
+        <!-- 1. GENERAL TAB -->
+        <div id="tab-sess-gen" class="sess-tab-content">
+          <div class="sess-section-heading">🌐 General Session Settings</div>
+
+          <div class="sess-form-group">
+            <label>Session Name *</label>
+            <input type="text" id="sName" value="${escapeHtml(p.name)}" placeholder="e.g. Oracle BRM Production 01" autocomplete="off" />
+          </div>
+
+          <div id="generalNetworkFields">
+            <div class="sess-form-row">
+              <div class="sess-form-group" style="flex: 2;">
+                <label>Remote Host / IP *</label>
+                <input type="text" id="sHost" value="${escapeHtml(p.host)}" placeholder="192.168.1.100 or server.company.com" autocomplete="off" />
+              </div>
+              <div class="sess-form-group" style="flex: 1;">
+                <label>Port</label>
+                <input type="number" id="sPort" value="${p.port || 22}" />
+              </div>
             </div>
-            <div class="form-group" style="flex: 1;">
-              <label>Port</label>
-              <input type="number" id="sPort" value="${p.port || 22}" />
+            <div class="sess-form-group">
+              <label>Username</label>
+              <input type="text" id="sUser" value="${escapeHtml(p.username)}" placeholder="root" autocomplete="off" />
             </div>
           </div>
-          <div class="form-group">
-            <label>Username</label>
-            <input type="text" id="sUser" value="${escapeHtml(p.username)}" placeholder="root" />
+
+          <div class="sess-form-group">
+            <label>Protocol</label>
+            <select id="sProtoSelect">
+              <option value="ssh" ${p.protocol === 'ssh' ? 'selected' : ''}>SSH — Secure Shell</option>
+              <option value="sftp" ${p.protocol === 'sftp' ? 'selected' : ''}>SFTP — Secure File Transfer</option>
+              <option value="rdp" ${p.protocol === 'rdp' ? 'selected' : ''}>RDP — Remote Desktop</option>
+              <option value="vnc" ${p.protocol === 'vnc' ? 'selected' : ''}>VNC — Virtual Network Computing</option>
+              <option value="telnet" ${p.protocol === 'telnet' ? 'selected' : ''}>Telnet — Unencrypted Terminal</option>
+              <option value="serial" ${p.protocol === 'serial' ? 'selected' : ''}>Serial — COM Port</option>
+              <option value="local" ${p.protocol === 'local' ? 'selected' : ''}>Local — PowerShell / CMD</option>
+            </select>
+          </div>
+
+          <!-- Serial Specific Section -->
+          <div id="generalSerialFields" class="${p.protocol === 'serial' ? '' : 'hidden'}">
+            <div class="sess-form-row">
+              <div class="sess-form-group">
+                <label>Serial Port (COM)</label>
+                <select id="sSerialPort">
+                  ${["COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8"].map(c => `
+                    <option value="${c}" ${p.serialPort === c ? 'selected' : ''}>${c}</option>
+                  `).join('')}
+                </select>
+              </div>
+              <div class="sess-form-group">
+                <label>Baud Rate</label>
+                <select id="sBaudRate">
+                  ${[9600, 19200, 38400, 57600, 115200, 230400].map(b => `
+                    <option value="${b}" ${p.baudRate === b ? 'selected' : ''}>${b}</option>
+                  `).join('')}
+                </select>
+              </div>
+            </div>
+            <div class="sess-form-row">
+              <div class="sess-form-group">
+                <label>Data Bits</label>
+                <select id="sDataBits">
+                  <option value="8" ${p.dataBits === 8 ? 'selected' : ''}>8</option>
+                  <option value="7" ${p.dataBits === 7 ? 'selected' : ''}>7</option>
+                </select>
+              </div>
+              <div class="sess-form-group">
+                <label>Stop Bits</label>
+                <select id="sStopBits">
+                  <option value="1" ${p.stopBits === 1 ? 'selected' : ''}>1</option>
+                  <option value="2" ${p.stopBits === 2 ? 'selected' : ''}>2</option>
+                </select>
+              </div>
+              <div class="sess-form-group">
+                <label>Parity</label>
+                <select id="sParity">
+                  <option value="none" ${p.parity === 'none' ? 'selected' : ''}>None</option>
+                  <option value="odd" ${p.parity === 'odd' ? 'selected' : ''}>Odd</option>
+                  <option value="even" ${p.parity === 'even' ? 'selected' : ''}>Even</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- RDP Specific Section -->
+          <div id="generalRdpFields" class="${p.protocol === 'rdp' ? '' : 'hidden'}">
+            <div class="sess-form-group">
+              <label>Windows Domain (Optional)</label>
+              <input type="text" id="sRDPDomain" value="${escapeHtml(p.rdpDomain || '')}" placeholder="e.g. CORP" />
+            </div>
+            <div class="sess-form-group">
+              <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="sRDPFullScreen" ${p.rdpFullScreen ? 'checked' : ''} />
+                <span>Open in Fullscreen Mode</span>
+              </label>
+            </div>
           </div>
         </div>
 
-        <!-- Serial Specific Fields -->
-        <div id="serialFieldsGroup" class="hidden">
-          <div class="form-row">
-            <div class="form-group">
-              <label>Serial Port (COM)</label>
-              <select id="sSerialPort">
-                <option value="COM1">COM1</option>
-                <option value="COM2">COM2</option>
-                <option value="COM3">COM3</option>
-                <option value="COM4">COM4</option>
+        <!-- 2. AUTHENTICATION TAB -->
+        <div id="tab-sess-auth" class="sess-tab-content hidden">
+          <div class="sess-section-heading">🔐 Authentication Credentials</div>
+
+          <div class="sess-form-group">
+            <label>Authentication Method</label>
+            <select id="sAuthType">
+              <option value="password" ${p.authType === 'password' || !p.privateKeyPath ? 'selected' : ''}>Password (Encrypted in DPAPI Vault)</option>
+              <option value="key" ${p.authType === 'key' || p.privateKeyPath ? 'selected' : ''}>Private Key (RSA / Ed25519 / PEM)</option>
+              <option value="agent" ${p.authType === 'agent' ? 'selected' : ''}>SSH Agent / Pageant</option>
+            </select>
+          </div>
+
+          <div id="sessPassFields" class="${p.authType === 'key' ? 'hidden' : ''}">
+            <div class="sess-form-group">
+              <label>Password</label>
+              <div class="sess-password-wrap">
+                <input type="password" id="sPassword" value="${escapeHtml(savedPassword)}" placeholder="Enter password (stored encrypted in DPAPI vault)" autocomplete="off" />
+                <button type="button" class="sess-password-toggle" id="togglePwBtn" title="Toggle visibility">👁️</button>
+              </div>
+              <div style="font-size: 10.5px; color: var(--text-dim); margin-top: 4px;">
+                🔐 Encrypted using Windows DPAPI. Leave blank to prompt on connection.
+              </div>
+            </div>
+          </div>
+
+          <div id="sessKeyFields" class="${p.authType === 'key' ? '' : 'hidden'}">
+            <div class="sess-form-group">
+              <label>Private Key File</label>
+              <div class="file-input-group" style="display: flex; gap: 8px;">
+                <input type="text" id="sKeyPath" value="${escapeHtml(p.privateKeyPath || '')}" placeholder="C:\\Users\\...\\.ssh\\id_rsa" />
+                <button class="btn-secondary" id="browseKeyBtn" type="button">Browse...</button>
+              </div>
+            </div>
+            <div class="sess-form-group">
+              <label>Passphrase (Optional for encrypted private keys)</label>
+              <input type="password" id="sKeyPassphrase" value="${escapeHtml(p.keyPassphrase || '')}" placeholder="Key passphrase if encrypted" />
+            </div>
+          </div>
+
+          <div class="sess-form-group" style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #232838;">
+            <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="sUseAgent" ${p.useAgent ? 'checked' : ''} />
+              <span><b>Enable SSH Agent / Pageant authentication forwarding</b></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 3. TERMINAL TAB -->
+        <div id="tab-sess-term" class="sess-tab-content hidden">
+          <div class="sess-section-heading">💻 Terminal & Display Options</div>
+
+          <div class="sess-form-row">
+            <div class="sess-form-group">
+              <label>Terminal Type (TERM)</label>
+              <select id="sTermType">
+                <option value="xterm-256color" ${p.terminalType === 'xterm-256color' ? 'selected' : ''}>xterm-256color (Recommended)</option>
+                <option value="xterm" ${p.terminalType === 'xterm' ? 'selected' : ''}>xterm</option>
+                <option value="vt100" ${p.terminalType === 'vt100' ? 'selected' : ''}>vt100</option>
+                <option value="linux" ${p.terminalType === 'linux' ? 'selected' : ''}>linux</option>
+                <option value="ansi" ${p.terminalType === 'ansi' ? 'selected' : ''}>ansi</option>
               </select>
             </div>
-            <div class="form-group">
-              <label>Baud Rate</label>
-              <select id="sBaudRate">
-                <option value="115200">115200</option>
-                <option value="9600">9600</option>
-                <option value="57600">57600</option>
-                <option value="38400">38400</option>
+            <div class="sess-form-group">
+              <label>Encoding</label>
+              <select id="sEncoding">
+                <option value="utf-8" ${p.encoding === 'utf-8' || !p.encoding ? 'selected' : ''}>UTF-8 (Universal)</option>
+                <option value="iso-8859-1" ${p.encoding === 'iso-8859-1' ? 'selected' : ''}>ISO-8859-1 (Latin-1)</option>
+                <option value="windows-1252" ${p.encoding === 'windows-1252' ? 'selected' : ''}>Windows-1252</option>
+                <option value="gbk" ${p.encoding === 'gbk' ? 'selected' : ''}>GBK (Chinese)</option>
+                <option value="shift-jis" ${p.encoding === 'shift-jis' ? 'selected' : ''}>Shift-JIS (Japanese)</option>
               </select>
             </div>
           </div>
-        </div>
 
-        <!-- RDP Specific Fields -->
-        <div id="rdpFieldsGroup" class="hidden">
-          <div class="form-group">
-            <label>Windows Domain (Optional)</label>
-            <input type="text" id="sRDPDomain" value="${escapeHtml(p.rdpDomain || '')}" placeholder="e.g. CORP" />
+          <div class="sess-form-row">
+            <div class="sess-form-group" style="flex: 2;">
+              <label>Font Family</label>
+              <select id="sFontFamily">
+                <option value="Cascadia Mono, Consolas, monospace" ${p.fontFamily?.includes('Cascadia') ? 'selected' : ''}>Cascadia Mono (Modern)</option>
+                <option value="Fira Code, Consolas, monospace" ${p.fontFamily?.includes('Fira') ? 'selected' : ''}>Fira Code (Ligatures)</option>
+                <option value="JetBrains Mono, monospace" ${p.fontFamily?.includes('JetBrains') ? 'selected' : ''}>JetBrains Mono</option>
+                <option value="Consolas, monospace" ${p.fontFamily === 'Consolas, monospace' ? 'selected' : ''}>Consolas</option>
+                <option value="Courier New, monospace" ${p.fontFamily?.includes('Courier') ? 'selected' : ''}>Courier New</option>
+                <option value="monospace" ${p.fontFamily === 'monospace' ? 'selected' : ''}>System Monospace</option>
+              </select>
+            </div>
+            <div class="sess-form-group" style="flex: 1;">
+              <label>Font Size (px)</label>
+              <input type="number" id="sFontSize" value="${p.fontSize || 13}" min="9" max="28" />
+            </div>
           </div>
-          <label class="checkbox-label">
-            <input type="checkbox" id="sRDPFullScreen" ${p.rdpFullScreen ? 'checked' : ''} />
-            <span>Open in Fullscreen Mode</span>
-          </label>
-        </div>
-      </div>
 
-      <!-- Authentication Tab -->
-      <div id="tab-auth" class="tab-content hidden">
-        <div class="form-group">
-          <label>Authentication Type</label>
-          <select id="sAuthType">
-            <option value="password" ${p.authType === 'password' || !p.privateKeyPath ? 'selected' : ''}>Password (DPAPI Vault)</option>
-            <option value="key" ${p.authType === 'key' || p.privateKeyPath ? 'selected' : ''}>Private Key (RSA / PEM)</option>
-          </select>
-        </div>
-        <div id="keyFields" class="${p.privateKeyPath ? '' : 'hidden'}">
-          <div class="form-group">
-            <label>Private Key File</label>
-            <div class="file-input-group">
-              <input type="text" id="sKeyPath" value="${p.privateKeyPath || ''}" placeholder="C:\\keys\\id_rsa" />
-              <button class="btn-secondary" id="browseKeyBtn">Browse...</button>
+          <div class="sess-form-row">
+            <div class="sess-form-group">
+              <label>Columns (0 = Auto-fit)</label>
+              <input type="number" id="sCols" value="${p.cols || 80}" min="0" max="400" />
+            </div>
+            <div class="sess-form-group">
+              <label>Rows (0 = Auto-fit)</label>
+              <input type="number" id="sRows" value="${p.rows || 24}" min="0" max="200" />
+            </div>
+            <div class="sess-form-group">
+              <label>Scrollback (lines)</label>
+              <select id="sScrollback">
+                <option value="5000" ${p.scrollback === 5000 ? 'selected' : ''}>5,000</option>
+                <option value="10000" ${p.scrollback === 10000 || !p.scrollback ? 'selected' : ''}>10,000</option>
+                <option value="25000" ${p.scrollback === 25000 ? 'selected' : ''}>25,000</option>
+                <option value="50000" ${p.scrollback === 50000 ? 'selected' : ''}>50,000</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="sess-form-row" style="align-items: center; margin-top: 6px;">
+            <div class="sess-form-group">
+              <label>Cursor Style</label>
+              <select id="sCursorStyle">
+                <option value="block" ${p.cursorStyle === 'block' ? 'selected' : ''}>Block (█)</option>
+                <option value="underline" ${p.cursorStyle === 'underline' ? 'selected' : ''}>Underline (_)</option>
+                <option value="bar" ${p.cursorStyle === 'bar' ? 'selected' : ''}>Vertical Bar (|)</option>
+              </select>
+            </div>
+            <div class="sess-form-group" style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+              <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="sCursorBlink" ${p.cursorBlink !== false ? 'checked' : ''} />
+                <span>Cursor Blink</span>
+              </label>
             </div>
           </div>
         </div>
-        <div id="passFields" class="${p.privateKeyPath ? 'hidden' : ''}">
-          <div class="form-group">
-            <label>Password (Encrypted in DPAPI Vault)</label>
-            <input type="password" id="sPassword" placeholder="Leave blank to prompt on connect" />
-          </div>
-        </div>
-      </div>
 
-      <!-- Jump Host (Bastion Gateway) Tab -->
-      <div id="tab-jump" class="tab-content hidden">
-        <label class="checkbox-label" style="margin-bottom: 10px;">
-          <input type="checkbox" id="sUseJump" ${p.useJumpHost ? 'checked' : ''} />
-          <span><b>Connect through SSH Gateway (Jump Host / Bastion Proxy)</b></span>
-        </label>
-        <div id="jumpFields" class="${p.useJumpHost ? '' : 'hidden'}">
-          <div class="form-row">
-            <div class="form-group" style="flex: 2;">
-              <label>Gateway Host / IP</label>
-              <input type="text" id="sJumpHost" value="${escapeHtml(p.jumpHost || '')}" placeholder="bastion.company.com" />
-            </div>
-            <div class="form-group" style="flex: 1;">
-              <label>Gateway Port</label>
-              <input type="number" id="sJumpPort" value="${p.jumpPort || 22}" />
+        <!-- 4. STARTUP TAB -->
+        <div id="tab-sess-start" class="sess-tab-content hidden">
+          <div class="sess-section-heading">🚀 Startup Automation & Environment</div>
+
+          <div class="sess-form-group">
+            <label>Startup Command (Automatically executed upon connection)</label>
+            <input type="text" id="sStartup" value="${escapeHtml(p.startupCommand || '')}" placeholder="e.g. cd /opt/brm && ./pin_ctl status" />
+            <div style="font-size: 10.5px; color: var(--text-dim); margin-top: 4px;">
+              Command will be transmitted directly to the remote shell session once connected.
             </div>
           </div>
-          <div class="form-group">
-            <label>Gateway Username</label>
-            <input type="text" id="sJumpUser" value="${escapeHtml(p.jumpUsername || 'bastion')}" />
-          </div>
-          <div class="form-group">
-            <label>Gateway Password</label>
-            <input type="password" id="sJumpPassword" placeholder="Leave blank if using SSH key or prompted" />
-          </div>
-        </div>
-      </div>
 
-      <!-- Advanced Tab -->
-      <div id="tab-adv" class="tab-content hidden">
-        <div class="form-group">
-          <label>Startup Command (Executes on login)</label>
-          <input type="text" id="sStartup" value="${escapeHtml(p.startupCommand || '')}" placeholder="e.g. cd /opt/brm && ./pin_ctl status" />
-        </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Font Size</label>
-            <input type="number" id="sFontSize" value="${p.fontSize || 13}" />
-          </div>
-          <div class="form-group">
-            <label>Keep-Alive Heartbeat (s)</label>
-            <input type="number" id="sKeepAlive" value="${p.keepAliveInterval || 15}" />
+          <div class="sess-form-group" style="margin-top: 14px;">
+            <label>Working Directory (Initial directory upon login)</label>
+            <input type="text" id="sWorkDir" value="${escapeHtml(p.workingDirectory || '')}" placeholder="e.g. /home/kunal/projects or ~" />
+            <div style="font-size: 10.5px; color: var(--text-dim); margin-top: 4px;">
+              Remote working directory to navigate into immediately after shell startup.
+            </div>
           </div>
         </div>
+
+        <!-- 5. SSH SETTINGS TAB -->
+        <div id="tab-sess-ssh" class="sess-tab-content hidden">
+          <div class="sess-section-heading">🛡️ Advanced SSH, Tunneling & Proxies</div>
+
+          <div class="sess-form-row">
+            <div class="sess-form-group">
+              <label>Keep-Alive Heartbeat (seconds)</label>
+              <input type="number" id="sKeepAlive" value="${p.keepAliveInterval || 15}" min="0" max="300" />
+            </div>
+            <div class="sess-form-group">
+              <label>Connection Timeout (seconds)</label>
+              <input type="number" id="sTimeout" value="${p.connectionTimeout || 10}" min="3" max="120" />
+            </div>
+          </div>
+
+          <div class="sess-form-group">
+            <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="sCompression" ${p.compression ? 'checked' : ''} />
+              <span><b>Enable SSH payload compression (zlib)</b> — improves speed over slow links</span>
+            </label>
+          </div>
+
+          <!-- Jump Host Box -->
+          <div style="background: #11141d; border: 1px solid #252b3b; border-radius: 6px; padding: 12px; margin-top: 12px;">
+            <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 8px;">
+              <input type="checkbox" id="sUseJump" ${p.useJumpHost ? 'checked' : ''} />
+              <span><b>Connect via SSH Jump Host (Bastion Gateway Proxy)</b></span>
+            </label>
+            <div id="jumpFields" class="${p.useJumpHost ? '' : 'hidden'}">
+              <div class="sess-form-row">
+                <div class="sess-form-group" style="flex: 2;">
+                  <label>Gateway Host / IP</label>
+                  <input type="text" id="sJumpHost" value="${escapeHtml(p.jumpHost || '')}" placeholder="bastion.company.com" />
+                </div>
+                <div class="sess-form-group" style="flex: 1;">
+                  <label>Gateway Port</label>
+                  <input type="number" id="sJumpPort" value="${p.jumpPort || 22}" />
+                </div>
+              </div>
+              <div class="sess-form-row">
+                <div class="sess-form-group">
+                  <label>Gateway Username</label>
+                  <input type="text" id="sJumpUser" value="${escapeHtml(p.jumpUsername || 'bastion')}" />
+                </div>
+                <div class="sess-form-group">
+                  <label>Gateway Password / Passphrase</label>
+                  <input type="password" id="sJumpPassword" placeholder="Optional" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Proxy Configuration Box -->
+          <div style="background: #11141d; border: 1px solid #252b3b; border-radius: 6px; padding: 12px; margin-top: 12px;">
+            <div class="sess-form-group">
+              <label>Network Proxy Type</label>
+              <select id="sProxyType">
+                <option value="none" ${p.proxyType === 'none' || !p.proxyType ? 'selected' : ''}>Direct Connection (No Proxy)</option>
+                <option value="socks5" ${p.proxyType === 'socks5' ? 'selected' : ''}>SOCKS5 Proxy</option>
+                <option value="http" ${p.proxyType === 'http' ? 'selected' : ''}>HTTP CONNECT Proxy</option>
+              </select>
+            </div>
+            <div id="proxyFields" class="${p.proxyType && p.proxyType !== 'none' ? '' : 'hidden'}">
+              <div class="sess-form-row">
+                <div class="sess-form-group" style="flex: 2;">
+                  <label>Proxy Host</label>
+                  <input type="text" id="sProxyHost" value="${escapeHtml(p.proxyHost || '')}" placeholder="127.0.0.1" />
+                </div>
+                <div class="sess-form-group" style="flex: 1;">
+                  <label>Proxy Port</label>
+                  <input type="number" id="sProxyPort" value="${p.proxyPort || 1080}" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. APPEARANCE TAB -->
+        <div id="tab-sess-app" class="sess-tab-content hidden">
+          <div class="sess-section-heading">🎨 Terminal Color Palette & Theme</div>
+
+          <div class="sess-form-row">
+            <div class="sess-form-group" style="flex: 2;">
+              <label>Preset Color Theme</label>
+              <select id="sTheme">
+                ${Object.keys(THEMES).map(th => `
+                  <option value="${th}" ${p.theme === th ? 'selected' : ''}>${th.replace(/-/g, ' ').toUpperCase()}</option>
+                `).join('')}
+              </select>
+            </div>
+            <div class="sess-form-group" style="flex: 1; display: flex; align-items: flex-end;">
+              <button class="btn-secondary" id="resetColorsBtn" type="button" style="width: 100%; height: 32px;">Reset to Defaults</button>
+            </div>
+          </div>
+
+          <div class="sess-color-grid">
+            <div class="sess-color-item">
+              <input type="color" id="sFgColor" value="${fgVal.startsWith('#') ? fgVal : '#d9e0ea'}" />
+              <span>Foreground</span>
+            </div>
+            <div class="sess-color-item">
+              <input type="color" id="sBgColor" value="${bgVal.startsWith('#') ? bgVal : '#090c11'}" />
+              <span>Background</span>
+            </div>
+            <div class="sess-color-item">
+              <input type="color" id="sCursorColor" value="${curVal.startsWith('#') ? curVal : '#60a5fa'}" />
+              <span>Cursor</span>
+            </div>
+            <div class="sess-color-item">
+              <input type="color" id="sSelColor" value="#3b82f6" />
+              <span>Selection</span>
+            </div>
+          </div>
+
+          <div style="font-size: 11px; font-weight: 600; color: #94a3b8; margin-top: 14px; text-transform: uppercase;">
+            Standard ANSI Colors (8 Regular + 8 Bright)
+          </div>
+          <div class="sess-color-grid" style="grid-template-columns: repeat(8, 1fr); gap: 4px; margin-top: 6px;">
+            ${[
+              { name: "black", def: currentThemeData.black || "#1e2233" },
+              { name: "red", def: currentThemeData.red || "#f43f5e" },
+              { name: "green", def: currentThemeData.green || "#10b981" },
+              { name: "yellow", def: currentThemeData.yellow || "#f59e0b" },
+              { name: "blue", def: currentThemeData.blue || "#3b82f6" },
+              { name: "magenta", def: currentThemeData.magenta || "#8b5cf6" },
+              { name: "cyan", def: currentThemeData.cyan || "#06b6d4" },
+              { name: "white", def: currentThemeData.white || "#f8fafc" },
+              { name: "brightBlack", def: currentThemeData.brightBlack || "#475569" },
+              { name: "brightRed", def: currentThemeData.brightRed || "#fb7185" },
+              { name: "brightGreen", def: currentThemeData.brightGreen || "#34d399" },
+              { name: "brightYellow", def: currentThemeData.brightYellow || "#fbbf24" },
+              { name: "brightBlue", def: currentThemeData.brightBlue || "#60a5fa" },
+              { name: "brightMagenta", def: currentThemeData.brightMagenta || "#a78bfa" },
+              { name: "brightCyan", def: currentThemeData.brightCyan || "#22d3ee" },
+              { name: "brightWhite", def: currentThemeData.brightWhite || "#ffffff" },
+            ].map(c => `
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                <input type="color" class="ansi-color-picker" data-ansi="${c.name}" value="${(ansi[c.name] && ansi[c.name].startsWith('#')) ? ansi[c.name] : (c.def.startsWith('#') ? c.def : '#ffffff')}" style="width: 24px; height: 24px; border: none; cursor: pointer; border-radius: 3px; background: transparent;" title="${c.name}" />
+                <span style="font-size: 8px; color: #64748b; text-transform: uppercase;">${c.name.slice(0, 4)}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <!-- Live Terminal Preview -->
+          <div class="sess-terminal-preview" id="sessTermPreview" style="background: ${bgVal}; color: ${fgVal};">
+            <div><span style="color: #10b981; font-weight: bold;">root@server</span>:<span style="color: #60a5fa;">~</span># ls -la --color=auto</div>
+            <div style="color: #94a3b8;">total 48</div>
+            <div>drwxr-xr-x  6 root root  4096 Sep  8 12:00 <span style="color: #60a5fa; font-weight: bold;">.</span></div>
+            <div>drwxr-xr-x 19 root root  4096 Aug 15 08:30 <span style="color: #3b82f6; font-weight: bold;">..</span></div>
+            <div>-rw-------  1 root root  1420 Sep  8 11:20 .bash_history</div>
+            <div>-rwxr-xr-x  1 root root 18432 Sep  8 14:45 <span style="color: #10b981; font-weight: bold;">nexterm-daemon</span></div>
+            <div>-rw-r--r--  1 root root   852 Sep  8 10:15 <span style="color: #f59e0b;">config.json</span></div>
+          </div>
+        </div>
+
       </div>
     </div>
 
-    <div class="modal-footer">
-      <button class="btn-secondary" id="modalCancel">Cancel</button>
-      <button class="btn-primary" id="modalSave">${isEdit ? "Save Changes" : "Save & Connect"}</button>
+    <!-- Modal Footer Actions -->
+    <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center;">
+      <button class="btn-secondary" id="modalCancel" type="button">Cancel</button>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-secondary" id="modalSaveOnly" type="button">${isEdit ? "Save Changes" : "Save Only"}</button>
+        <button class="btn-primary" id="modalSaveConnect" type="button">⚡ ${isEdit ? "Save & Reconnect" : "Save & Connect"}</button>
+      </div>
     </div>
-  `);
+  `, "modal-session-editor");
 
+  // Navigation tabs switching
+  box.querySelectorAll(".sess-nav-item").forEach(item => {
+    item.onclick = () => {
+      box.querySelectorAll(".sess-nav-item").forEach(i => i.classList.remove("active"));
+      box.querySelectorAll(".sess-tab-content").forEach(c => c.classList.add("hidden"));
+      item.classList.add("active");
+      const target = box.querySelector(`#${item.dataset.tab}`);
+      if (target) target.classList.remove("hidden");
+    };
+  });
+
+  // Top Protocol Chips
   let currentProto = p.protocol || "ssh";
+  const protoSelect = box.querySelector("#sProtoSelect");
 
-  // Protocol selection switcher
-  box.querySelectorAll(".proto-card").forEach(c => {
-    c.onclick = () => {
-      box.querySelectorAll(".proto-card").forEach(pc => pc.classList.remove("active"));
-      c.classList.add("active");
-      currentProto = c.dataset.proto;
+  const syncProtoUI = (proto) => {
+    currentProto = proto;
+    if (protoSelect) protoSelect.value = proto;
 
-      const isSerial = currentProto === "serial";
-      const isRDP = currentProto === "rdp";
+    box.querySelectorAll(".sess-proto-chip").forEach(chip => {
+      chip.classList.toggle("active", chip.dataset.proto === proto);
+    });
 
-      box.querySelector("#serialFieldsGroup").classList.toggle("hidden", !isSerial);
-      box.querySelector("#networkFieldsGroup").classList.toggle("hidden", isSerial);
-      box.querySelector("#rdpFieldsGroup").classList.toggle("hidden", !isRDP);
-      box.querySelector("#tabJumpBtn").classList.toggle("hidden", isSerial || isRDP);
+    const isSerial = proto === "serial";
+    const isRDP = proto === "rdp";
+    const isLocal = proto === "local";
 
-      const portInput = box.querySelector("#sPort");
-      if (isRDP && portInput.value === "22") portInput.value = "3389";
-      else if (currentProto === "ssh" && portInput.value === "3389") portInput.value = "22";
-    };
+    const serialFields = box.querySelector("#generalSerialFields");
+    if (serialFields) serialFields.classList.toggle("hidden", !isSerial);
+
+    const rdpFields = box.querySelector("#generalRdpFields");
+    if (rdpFields) rdpFields.classList.toggle("hidden", !isRDP);
+
+    const netFields = box.querySelector("#generalNetworkFields");
+    if (netFields) netFields.classList.toggle("hidden", isSerial || isLocal);
+
+    const navSSH = box.querySelector("#navItemSSH");
+    if (navSSH) navSSH.classList.toggle("hidden", isSerial || isRDP || isLocal);
+
+    const navAuth = box.querySelector("#navItemAuth");
+    if (navAuth) navAuth.classList.toggle("hidden", isLocal);
+
+    const portInput = box.querySelector("#sPort");
+    if (portInput) {
+      if (proto === "rdp" && portInput.value === "22") portInput.value = "3389";
+      else if (proto === "vnc" && portInput.value === "22") portInput.value = "5900";
+      else if (proto === "telnet" && portInput.value === "22") portInput.value = "23";
+      else if ((proto === "ssh" || proto === "sftp") && (portInput.value === "3389" || portInput.value === "5900")) portInput.value = "22";
+    }
+  };
+
+  box.querySelectorAll(".sess-proto-chip").forEach(chip => {
+    chip.onclick = () => syncProtoUI(chip.dataset.proto);
   });
 
-  // Tab switching
-  box.querySelectorAll(".modal-tab-btn").forEach(btn => {
-    btn.onclick = () => {
-      box.querySelectorAll(".modal-tab-btn").forEach(b => b.classList.remove("active"));
-      box.querySelectorAll(".tab-content").forEach(c => c.classList.add("hidden"));
-      btn.classList.add("active");
-      box.querySelector(`#${btn.dataset.tab}`).classList.remove("hidden");
-    };
-  });
+  if (protoSelect) {
+    protoSelect.onchange = () => syncProtoUI(protoSelect.value);
+  }
 
-  const jumpCheckbox = box.querySelector("#sUseJump");
-  if (jumpCheckbox) {
-    jumpCheckbox.onchange = () => {
-      box.querySelector("#jumpFields").classList.toggle("hidden", !jumpCheckbox.checked);
+  // Password visibility eye toggle
+  const togglePwBtn = box.querySelector("#togglePwBtn");
+  const pwInput = box.querySelector("#sPassword");
+  if (togglePwBtn && pwInput) {
+    togglePwBtn.onclick = () => {
+      const isPw = pwInput.type === "password";
+      pwInput.type = isPw ? "text" : "password";
+      togglePwBtn.textContent = isPw ? "🔒" : "👁️";
     };
   }
 
+  // Auth type dropdown
   const authSelect = box.querySelector("#sAuthType");
-  authSelect.onchange = () => {
-    const isKey = authSelect.value === "key";
-    box.querySelector("#keyFields").classList.toggle("hidden", !isKey);
-    box.querySelector("#passFields").classList.toggle("hidden", isKey);
+  const passFields = box.querySelector("#sessPassFields");
+  const keyFields = box.querySelector("#sessKeyFields");
+  if (authSelect) {
+    authSelect.onchange = () => {
+      const isKey = authSelect.value === "key";
+      if (passFields) passFields.classList.toggle("hidden", isKey);
+      if (keyFields) keyFields.classList.toggle("hidden", !isKey);
+    };
+  }
+
+  // Browse key button
+  const browseKeyBtn = box.querySelector("#browseKeyBtn");
+  if (browseKeyBtn) {
+    browseKeyBtn.onclick = async () => {
+      if (window.go && window.go.main && window.go.main.App) {
+        try {
+          const path = await window.go.main.App.SelectPrivateKeyFile();
+          if (path) {
+            box.querySelector("#sKeyPath").value = path;
+          }
+        } catch (_) {}
+      }
+    };
+  }
+
+  // Jump Host checkbox toggle
+  const jumpCheck = box.querySelector("#sUseJump");
+  const jumpFields = box.querySelector("#jumpFields");
+  if (jumpCheck && jumpFields) {
+    jumpCheck.onchange = () => jumpFields.classList.toggle("hidden", !jumpCheck.checked);
+  }
+
+  // Proxy type dropdown toggle
+  const proxySelect = box.querySelector("#sProxyType");
+  const proxyFields = box.querySelector("#proxyFields");
+  if (proxySelect && proxyFields) {
+    proxySelect.onchange = () => proxyFields.classList.toggle("hidden", proxySelect.value === "none");
+  }
+
+  // Theme & Appearance live preview synchronization
+  const themeSelect = box.querySelector("#sTheme");
+  const fgPicker = box.querySelector("#sFgColor");
+  const bgPicker = box.querySelector("#sBgColor");
+  const termPreview = box.querySelector("#sessTermPreview");
+
+  const updatePreview = () => {
+    if (!termPreview) return;
+    termPreview.style.background = bgPicker ? bgPicker.value : "#090c11";
+    termPreview.style.color = fgPicker ? fgPicker.value : "#d9e0ea";
+    const fontVal = box.querySelector("#sFontFamily") ? box.querySelector("#sFontFamily").value : "Cascadia Mono, monospace";
+    termPreview.style.fontFamily = fontVal;
   };
 
-  box.querySelector("#browseKeyBtn").onclick = async () => {
-    if (window.go && window.go.main && window.go.main.App) {
-      try {
-        const path = await window.go.main.App.SelectPrivateKeyFile();
-        if (path) box.querySelector("#sKeyPath").value = path;
-      } catch (_) {}
-    }
-  };
+  if (fgPicker) fgPicker.oninput = updatePreview;
+  if (bgPicker) bgPicker.oninput = updatePreview;
 
-  box.querySelector("#modalCancel").onclick = hideModal;
+  if (themeSelect) {
+    themeSelect.onchange = () => {
+      const th = THEMES[themeSelect.value];
+      if (th) {
+        if (fgPicker && th.foreground) fgPicker.value = th.foreground.startsWith('#') ? th.foreground : '#d9e0ea';
+        if (bgPicker && th.background) bgPicker.value = th.background.startsWith('#') ? th.background : '#090c11';
+        box.querySelectorAll(".ansi-color-picker").forEach(inp => {
+          const name = inp.dataset.ansi;
+          if (th[name] && th[name].startsWith('#')) inp.value = th[name];
+        });
+        updatePreview();
+      }
+    };
+  }
+
+  const resetColorsBtn = box.querySelector("#resetColorsBtn");
+  if (resetColorsBtn) {
+    resetColorsBtn.onclick = () => {
+      const th = THEMES["dark-modern"];
+      if (fgPicker) fgPicker.value = th.foreground;
+      if (bgPicker) bgPicker.value = th.background;
+      box.querySelectorAll(".ansi-color-picker").forEach(inp => {
+        const name = inp.dataset.ansi;
+        if (th[name]) inp.value = th[name];
+      });
+      updatePreview();
+    };
+  }
+
   box.querySelector("#modalClose").onclick = hideModal;
+  box.querySelector("#modalCancel").onclick = hideModal;
 
-  box.querySelector("#modalSave").onclick = async () => {
+  // Save handler
+  const handleSaveSession = async (andConnect = false) => {
     const host = box.querySelector("#sHost").value.trim();
     const username = box.querySelector("#sUser").value.trim();
-    if (currentProto !== "serial" && !host) {
-      showToast("Remote Host is required", "error");
+    if (currentProto !== "serial" && currentProto !== "local" && !host) {
+      showToast("Remote Host / IP is required", "error");
       return;
     }
 
+    const ansiColorsObj = {};
+    box.querySelectorAll(".ansi-color-picker").forEach(inp => {
+      ansiColorsObj[inp.dataset.ansi] = inp.value;
+    });
+
     const profile = {
       id: isEdit ? editProfile.id : "",
-      name: box.querySelector("#sName").value.trim() || host || "Serial Session",
+      name: box.querySelector("#sName").value.trim() || host || "New Session",
       protocol: currentProto,
       host,
       port: parseInt(box.querySelector("#sPort").value, 10) || (currentProto === "rdp" ? 3389 : 22),
       username,
-      authType: authSelect.value,
-      privateKeyPath: authSelect.value === "key" ? box.querySelector("#sKeyPath").value.trim() : "",
-      startupCommand: box.querySelector("#sStartup").value.trim(),
+      authType: authSelect ? authSelect.value : "password",
+      privateKeyPath: authSelect && authSelect.value === "key" ? box.querySelector("#sKeyPath").value.trim() : "",
+      keyPassphrase: box.querySelector("#sKeyPassphrase") ? box.querySelector("#sKeyPassphrase").value : "",
+      useAgent: box.querySelector("#sUseAgent") ? box.querySelector("#sUseAgent").checked : false,
+
+      // Terminal
+      terminalType: box.querySelector("#sTermType") ? box.querySelector("#sTermType").value : "xterm-256color",
+      fontFamily: box.querySelector("#sFontFamily") ? box.querySelector("#sFontFamily").value : "Cascadia Mono, Consolas, monospace",
       fontSize: parseInt(box.querySelector("#sFontSize").value, 10) || 13,
+      rows: parseInt(box.querySelector("#sRows").value, 10) || 24,
+      cols: parseInt(box.querySelector("#sCols").value, 10) || 80,
+      cursorStyle: box.querySelector("#sCursorStyle") ? box.querySelector("#sCursorStyle").value : "block",
+      cursorBlink: box.querySelector("#sCursorBlink") ? box.querySelector("#sCursorBlink").checked : true,
+      encoding: box.querySelector("#sEncoding") ? box.querySelector("#sEncoding").value : "utf-8",
+      scrollback: parseInt(box.querySelector("#sScrollback").value, 10) || 10000,
+
+      // Startup
+      startupCommand: box.querySelector("#sStartup") ? box.querySelector("#sStartup").value.trim() : "",
+      workingDirectory: box.querySelector("#sWorkDir") ? box.querySelector("#sWorkDir").value.trim() : "",
+
+      // SSH Advanced
       keepAliveInterval: parseInt(box.querySelector("#sKeepAlive").value, 10) || 15,
+      connectionTimeout: parseInt(box.querySelector("#sTimeout").value, 10) || 10,
+      compression: box.querySelector("#sCompression") ? box.querySelector("#sCompression").checked : false,
+      proxyType: box.querySelector("#sProxyType") ? box.querySelector("#sProxyType").value : "none",
+      proxyHost: box.querySelector("#sProxyHost") ? box.querySelector("#sProxyHost").value.trim() : "",
+      proxyPort: parseInt(box.querySelector("#sProxyPort")?.value, 10) || 1080,
+
+      // Jump Host
       useJumpHost: box.querySelector("#sUseJump") ? box.querySelector("#sUseJump").checked : false,
       jumpHost: box.querySelector("#sJumpHost") ? box.querySelector("#sJumpHost").value.trim() : "",
-      jumpPort: box.querySelector("#sJumpPort") ? parseInt(box.querySelector("#sJumpPort").value, 10) || 22 : 22,
-      jumpUsername: box.querySelector("#sJumpUser") ? box.querySelector("#sJumpUser").value.trim() : "",
+      jumpPort: parseInt(box.querySelector("#sJumpPort")?.value, 10) || 22,
+      jumpUsername: box.querySelector("#sJumpUser") ? box.querySelector("#sJumpUser").value.trim() : "bastion",
+
+      // Appearance
+      theme: themeSelect ? themeSelect.value : "dark-modern",
+      foreground: fgPicker ? fgPicker.value : "",
+      background: bgPicker ? bgPicker.value : "",
+      cursorColor: box.querySelector("#sCursorColor") ? box.querySelector("#sCursorColor").value : "",
+      selectionColor: box.querySelector("#sSelColor") ? box.querySelector("#sSelColor").value : "",
+      ansiColors: ansiColorsObj,
+
+      // Serial
       serialPort: box.querySelector("#sSerialPort") ? box.querySelector("#sSerialPort").value : "COM1",
-      baudRate: box.querySelector("#sBaudRate") ? parseInt(box.querySelector("#sBaudRate").value, 10) || 115200 : 115200,
+      baudRate: parseInt(box.querySelector("#sBaudRate")?.value, 10) || 115200,
+      dataBits: parseInt(box.querySelector("#sDataBits")?.value, 10) || 8,
+      stopBits: parseInt(box.querySelector("#sStopBits")?.value, 10) || 1,
+      parity: box.querySelector("#sParity") ? box.querySelector("#sParity").value : "none",
+
+      // RDP
       rdpDomain: box.querySelector("#sRDPDomain") ? box.querySelector("#sRDPDomain").value.trim() : "",
       rdpFullScreen: box.querySelector("#sRDPFullScreen") ? box.querySelector("#sRDPFullScreen").checked : false
     };
@@ -4714,8 +5214,10 @@ function showNewSessionDialog(parentFolderId = "", editProfile = null) {
     if (window.go && window.go.main && window.go.main.App) {
       if (isEdit) {
         await window.go.main.App.UpdateSession(profile);
+        showToast(`Updated "${profile.name}"`, "success");
       } else {
         await window.go.main.App.AddSession(parentFolderId, profile);
+        showToast(`Saved session "${profile.name}"`, "success");
       }
       if (enteredPw && profile.vaultKey) {
         await window.go.main.App.SaveSessionPassword(profile.vaultKey, enteredPw);
@@ -4726,15 +5228,20 @@ function showNewSessionDialog(parentFolderId = "", editProfile = null) {
     }
     await refreshTree();
 
-    if (currentProto === "rdp") {
-      showToast(`Launching native RDP session to ${profile.host}...`, "info");
-      if (window.go && window.go.main && window.go.main.App) {
-        await window.go.main.App.LaunchRDPSession(profile, enteredPw);
+    if (andConnect) {
+      if (currentProto === "rdp") {
+        showToast(`Launching native RDP session to ${profile.host}...`, "info");
+        if (window.go && window.go.main && window.go.main.App) {
+          await window.go.main.App.LaunchRDPSession(profile, enteredPw);
+        }
+      } else {
+        connectToSession(profile);
       }
-    } else {
-      connectToSession(profile);
     }
   };
+
+  box.querySelector("#modalSaveOnly").onclick = () => handleSaveSession(false);
+  box.querySelector("#modalSaveConnect").onclick = () => handleSaveSession(true);
 }
 
 // --------------------------------------------------------------------------

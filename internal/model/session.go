@@ -21,6 +21,35 @@ type SessionProfile struct {
 	// Protocol: "ssh", "sftp", "rdp", "vnc", "telnet", "serial", "local"
 	Protocol string `json:"protocol,omitempty"`
 
+	// Terminal Configuration
+	FontFamily   string `json:"fontFamily,omitempty"`   // e.g. "Cascadia Mono", "Fira Code"
+	Rows         int    `json:"rows,omitempty"`         // default terminal rows
+	Cols         int    `json:"cols,omitempty"`         // default terminal columns
+	CursorStyle  string `json:"cursorStyle,omitempty"`  // "block", "underline", "bar"
+	CursorBlink  bool   `json:"cursorBlink,omitempty"`
+	Encoding     string `json:"encoding,omitempty"`     // "utf-8", "iso-8859-1", etc.
+	Scrollback   int    `json:"scrollback,omitempty"`   // scrollback buffer size
+
+	// Startup Configuration
+	WorkingDirectory string `json:"workingDirectory,omitempty"`
+
+	// SSH Advanced Configuration
+	ConnectionTimeout int    `json:"connectionTimeout,omitempty"` // in seconds, default 10
+	Compression       bool   `json:"compression,omitempty"`
+	UseAgent          bool   `json:"useAgent,omitempty"`
+	ProxyType         string `json:"proxyType,omitempty"`         // "none", "socks5", "http"
+	ProxyHost         string `json:"proxyHost,omitempty"`
+	ProxyPort         int    `json:"proxyPort,omitempty"`
+	ProxyUsername     string `json:"proxyUsername,omitempty"`
+	ProxyPassword     string `json:"proxyPassword,omitempty"`
+
+	// Terminal Appearance Customization
+	Foreground     string            `json:"foreground,omitempty"`
+	Background     string            `json:"background,omitempty"`
+	CursorColor    string            `json:"cursorColor,omitempty"`
+	SelectionColor string            `json:"selectionColor,omitempty"`
+	AnsiColors     map[string]string `json:"ansiColors,omitempty"`
+
 	// Jump Host / Bastion Gateway Configuration
 	UseJumpHost        bool   `json:"useJumpHost,omitempty"`
 	JumpHost           string `json:"jumpHost,omitempty"`

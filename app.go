@@ -481,6 +481,18 @@ func (a *App) DeleteSavedPassword(vaultKey string) error {
 	return a.vault.Delete(vaultKey)
 }
 
+// GetSessionPassword retrieves a stored password from the DPAPI vault for editing.
+func (a *App) GetSessionPassword(vaultKey string) (string, error) {
+	if a.vault == nil || vaultKey == "" {
+		return "", nil
+	}
+	pwd, ok, err := a.vault.Load(vaultKey)
+	if err != nil || !ok {
+		return "", nil
+	}
+	return pwd, nil
+}
+
 // OpenSession connects a saved (or ad-hoc) session and returns a tabID.
 func (a *App) OpenSession(profile model.SessionProfile, password string) (string, error) {
 	opts := sshsession.ConnectOptions{
@@ -491,6 +503,16 @@ func (a *App) OpenSession(profile model.SessionProfile, password string) (string
 		TerminalType:      profile.TerminalType,
 		KeepAliveInterval: profile.KeepAliveInterval,
 		KeyPassphrase:     profile.KeyPassphrase,
+		WorkingDirectory:  profile.WorkingDirectory,
+		ConnectionTimeout: profile.ConnectionTimeout,
+		Compression:       profile.Compression,
+		ProxyType:         profile.ProxyType,
+		ProxyHost:         profile.ProxyHost,
+		ProxyPort:         profile.ProxyPort,
+		ProxyUsername:     profile.ProxyUsername,
+		ProxyPassword:     profile.ProxyPassword,
+		Cols:              profile.Cols,
+		Rows:              profile.Rows,
 	}
 
 	if profile.PrivateKeyPath != "" {

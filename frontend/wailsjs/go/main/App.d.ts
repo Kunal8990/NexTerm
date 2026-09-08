@@ -49,6 +49,8 @@ export function GetSavedPasswords():Promise<Array<main.SavedCredential>>;
 
 export function GetSecurityPolicy():Promise<security.SecurityPolicy>;
 
+export function GetSessionPassword(arg1:string):Promise<string>;
+
 export function GetSessionTree():Promise<model.TreeNode>;
 
 export function GetTunnels():Promise<Array<tunnel.TunnelConfig>>;
