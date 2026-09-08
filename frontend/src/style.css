@@ -821,6 +821,66 @@ html, body, #app {
   border: 1px dashed #3b82f6 !important;
 }
 
+.tree-node-row.drag-insert-above {
+  position: relative;
+}
+.tree-node-row.drag-insert-above::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #38bdf8;
+  border-radius: 2px;
+  box-shadow: 0 0 6px #38bdf8;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.tree-node-row.drag-insert-below {
+  position: relative;
+}
+.tree-node-row.drag-insert-below::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #38bdf8;
+  border-radius: 2px;
+  box-shadow: 0 0 6px #38bdf8;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.tree-container.drag-target-root {
+  background: rgba(56, 189, 248, 0.05);
+  outline: 1px dashed rgba(56, 189, 248, 0.4);
+  outline-offset: -2px;
+}
+
+.tree-node-proto-badge {
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-left: 4px;
+  margin-right: 2px;
+  letter-spacing: 0.5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+.tree-node-proto-badge.ssh { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
+.tree-node-proto-badge.sftp { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.tree-node-proto-badge.rdp { background: rgba(168, 85, 247, 0.15); color: #c084fc; }
+.tree-node-proto-badge.vnc { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+.tree-node-proto-badge.telnet { background: rgba(236, 72, 153, 0.15); color: #f472b6; }
+.tree-node-proto-badge.serial { background: rgba(20, 184, 166, 0.15); color: #2dd4bf; }
+.tree-node-proto-badge.local { background: rgba(100, 116, 139, 0.2); color: #cbd5e1; }
+
 .tree-node-row .chevron {
   width: 14px;
   height: 14px;

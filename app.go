@@ -129,14 +129,25 @@ func (a *App) AddFolder(parentID, name string) (*model.TreeNode, error) {
 	return a.root, a.store.Save(a.root)
 }
 
-// UpdateFolder renames an existing folder.
-func (a *App) UpdateFolder(id, name string) (*model.TreeNode, error) {
+// RenameNode renames either a folder or a session node.
+func (a *App) RenameNode(id, newName string) (*model.TreeNode, error) {
+	if newName == "" {
+		return a.root, fmt.Errorf("name cannot be empty")
+	}
 	node := findNode(a.root, id)
 	if node == nil {
-		return a.root, fmt.Errorf("folder not found: %s", id)
+		return a.root, fmt.Errorf("node not found: %s", id)
 	}
-	node.Name = name
+	node.Name = newName
+	if node.Session != nil {
+		node.Session.Name = newName
+	}
 	return a.root, a.store.Save(a.root)
+}
+
+// UpdateFolder renames an existing folder (alias for RenameNode).
+func (a *App) UpdateFolder(id, name string) (*model.TreeNode, error) {
+	return a.RenameNode(id, name)
 }
 
 // ToggleFolder toggles expanded/collapsed state of a folder node.
@@ -233,9 +244,17 @@ func (a *App) DuplicateSession(id string) (*model.TreeNode, error) {
 		parent = a.root
 	}
 	cloneProfile := *node.Session
+	oldVaultKey := cloneProfile.VaultKey
 	cloneProfile.ID = uuid.NewString()
 	cloneProfile.VaultKey = cloneProfile.ID
 	cloneProfile.Name = cloneProfile.Name + " (Copy)"
+
+	// Duplicate password in vault if present
+	if a.vault != nil && oldVaultKey != "" {
+		if pwd, ok, err := a.vault.Load(oldVaultKey); err == nil && ok && pwd != "" {
+			_ = a.vault.Save(cloneProfile.VaultKey, pwd)
+		}
+	}
 
 	newNode := &model.TreeNode{
 		ID:      uuid.NewString(),
@@ -246,6 +265,153 @@ func (a *App) DuplicateSession(id string) (*model.TreeNode, error) {
 	return a.root, a.store.Save(a.root)
 }
 
+// DuplicateFolder creates a deep recursive copy of a folder, its subfolders, and sessions.
+func (a *App) DuplicateFolder(folderID string) (*model.TreeNode, error) {
+	node := findNode(a.root, folderID)
+	if node == nil || !node.IsFolder() {
+		return a.root, fmt.Errorf("folder not found: %s", folderID)
+	}
+	parent := findParentNode(a.root, folderID)
+	if parent == nil {
+		parent = a.root
+	}
+
+	cloned := a.cloneFolderRecursive(node)
+	cloned.Name = node.Name + " (Copy)"
+	parent.Children = append(parent.Children, cloned)
+	return a.root, a.store.Save(a.root)
+}
+
+func (a *App) cloneFolderRecursive(src *model.TreeNode) *model.TreeNode {
+	if src == nil {
+		return nil
+	}
+	clone := &model.TreeNode{
+		ID:       uuid.NewString(),
+		Name:     src.Name,
+		Expanded: src.Expanded,
+		Children: make([]*model.TreeNode, 0, len(src.Children)),
+	}
+
+	if src.Session != nil {
+		profCopy := *src.Session
+		oldVaultKey := profCopy.VaultKey
+		profCopy.ID = uuid.NewString()
+		profCopy.VaultKey = profCopy.ID
+		clone.Session = &profCopy
+
+		if a.vault != nil && oldVaultKey != "" {
+			if pwd, ok, err := a.vault.Load(oldVaultKey); err == nil && ok && pwd != "" {
+				_ = a.vault.Save(profCopy.VaultKey, pwd)
+			}
+		}
+	}
+
+	for _, child := range src.Children {
+		clonedChild := a.cloneFolderRecursive(child)
+		if clonedChild != nil {
+			clone.Children = append(clone.Children, clonedChild)
+		}
+	}
+	return clone
+}
+
+// ExpandAllFolders expands or collapses all folders in the session tree.
+func (a *App) ExpandAllFolders(expanded bool) (*model.TreeNode, error) {
+	var walk func(n *model.TreeNode)
+	walk = func(n *model.TreeNode) {
+		if n == nil {
+			return
+		}
+		if n.IsFolder() {
+			n.Expanded = expanded
+		}
+		for _, c := range n.Children {
+			walk(c)
+		}
+	}
+	walk(a.root)
+	_ = a.store.Save(a.root)
+	return a.root, nil
+}
+
+// MoveNode moves any node (folder or session) to targetParentID at targetIndex.
+// If targetIndex is < 0 or >= len(targetParent.Children), it is appended.
+// Enforces cycle prevention so folders cannot be moved into themselves or their descendants.
+func (a *App) MoveNode(sourceID, targetParentID string, targetIndex int) (*model.TreeNode, error) {
+	if sourceID == a.root.ID {
+		return a.root, fmt.Errorf("cannot move root node")
+	}
+	sourceNode := findNode(a.root, sourceID)
+	if sourceNode == nil {
+		return a.root, fmt.Errorf("source node not found: %s", sourceID)
+	}
+
+	// Resolve target parent node
+	var targetParent *model.TreeNode
+	if targetParentID == "" || targetParentID == a.root.ID {
+		targetParent = a.root
+	} else {
+		targetParent = findNode(a.root, targetParentID)
+		if targetParent == nil {
+			targetParent = a.root
+		}
+	}
+
+	// If target parent is a session leaf, place alongside it in its parent folder
+	if targetParent.Session != nil {
+		actualParent := findParentNode(a.root, targetParent.ID)
+		if actualParent != nil {
+			targetParent = actualParent
+		} else {
+			targetParent = a.root
+		}
+	}
+
+	// Cycle detection: cannot move a folder into itself or its own descendants
+	if sourceNode.IsFolder() {
+		if sourceNode.ID == targetParent.ID || isDescendantNode(sourceNode, targetParent) {
+			return a.root, fmt.Errorf("cannot move folder '%s' into itself or its subfolder", sourceNode.Name)
+		}
+	}
+
+	// Detach sourceNode from its current parent
+	currentParent := findParentNode(a.root, sourceID)
+	if currentParent == nil {
+		return a.root, fmt.Errorf("current parent not found for node: %s", sourceID)
+	}
+
+	currentIndex := -1
+	for i, c := range currentParent.Children {
+		if c.ID == sourceID {
+			currentIndex = i
+			break
+		}
+	}
+
+	if currentIndex >= 0 {
+		currentParent.Children = append(currentParent.Children[:currentIndex], currentParent.Children[currentIndex+1:]...)
+	}
+
+	// Insert into target parent
+	if targetParent.Children == nil {
+		targetParent.Children = make([]*model.TreeNode, 0)
+	}
+
+	if targetIndex < 0 || targetIndex >= len(targetParent.Children) {
+		targetParent.Children = append(targetParent.Children, sourceNode)
+	} else {
+		targetParent.Children = append(targetParent.Children[:targetIndex], append([]*model.TreeNode{sourceNode}, targetParent.Children[targetIndex:]...)...)
+	}
+
+	return a.root, a.store.Save(a.root)
+}
+
+// MoveSession moves a session node to a new parent folder (alias for MoveNode with append).
+func (a *App) MoveSession(nodeID, targetFolderID string) (*model.TreeNode, error) {
+	return a.MoveNode(nodeID, targetFolderID, -1)
+}
+
 type SavedCredential struct {
 	SessionID   string `json:"sessionId"`
 	SessionName string `json:"sessionName"`
@@ -254,34 +420,6 @@ type SavedCredential struct {
 	Username    string `json:"username"`
 	VaultKey    string `json:"vaultKey"`
 	Password    string `json:"password"`
-}
-
-// MoveSession moves a session node to a new parent folder (for drag-and-drop).
-func (a *App) MoveSession(nodeID, targetFolderID string) (*model.TreeNode, error) {
-	node := findNode(a.root, nodeID)
-	if node == nil {
-		return a.root, fmt.Errorf("node not found: %s", nodeID)
-	}
-
-	targetFolder := findNode(a.root, targetFolderID)
-	if targetFolder == nil {
-		targetFolder = a.root
-	}
-
-	// Detach from current parent
-	parent := findParentNode(a.root, nodeID)
-	if parent != nil {
-		for i, c := range parent.Children {
-			if c.ID == nodeID {
-				parent.Children = append(parent.Children[:i], parent.Children[i+1:]...)
-				break
-			}
-		}
-	}
-
-	// Append to target folder
-	targetFolder.Children = append(targetFolder.Children, node)
-	return a.root, a.store.Save(a.root)
 }
 
 // GetSavedPasswords returns all stored credentials decrypted for Password Management.
@@ -1116,6 +1254,21 @@ func deleteNodeRecursive(parent *model.TreeNode, id string) bool {
 			return true
 		}
 		if deleteNodeRecursive(c, id) {
+			return true
+		}
+	}
+	return false
+}
+
+func isDescendantNode(ancestor, candidateChild *model.TreeNode) bool {
+	if ancestor == nil || candidateChild == nil {
+		return false
+	}
+	if ancestor.ID == candidateChild.ID {
+		return true
+	}
+	for _, c := range ancestor.Children {
+		if isDescendantNode(c, candidateChild) {
 			return true
 		}
 	}

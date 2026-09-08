@@ -621,33 +621,118 @@ async function refreshTree(filter = "") {
   }
 }
 
+function getSessionProtocolInfo(session) {
+  const proto = (session && session.protocol ? session.protocol.toLowerCase() : "ssh");
+  switch (proto) {
+    case "sftp":
+      return { icon: "📦", badge: "SFTP", cls: "sftp" };
+    case "rdp":
+      return { icon: "🪟", badge: "RDP", cls: "rdp" };
+    case "vnc":
+      return { icon: "🖥️", badge: "VNC", cls: "vnc" };
+    case "telnet":
+      return { icon: "📡", badge: "TELNET", cls: "telnet" };
+    case "serial":
+      return { icon: "🔌", badge: "SERIAL", cls: "serial" };
+    case "local":
+      return { icon: "💻", badge: "LOCAL", cls: "local" };
+    default:
+      return { icon: "🔑", badge: "SSH", cls: "ssh" };
+  }
+}
+
+function clearAllDragIndicators() {
+  document.querySelectorAll(".tree-node-row.drag-target-over").forEach(el => el.classList.remove("drag-target-over"));
+  document.querySelectorAll(".tree-node-row.drag-insert-above").forEach(el => el.classList.remove("drag-insert-above"));
+  document.querySelectorAll(".tree-node-row.drag-insert-below").forEach(el => el.classList.remove("drag-insert-below"));
+  if (treeEl) treeEl.classList.remove("drag-target-root");
+}
+
+function isDescendantInTree(ancestorId, childId) {
+  function searchSub(n) {
+    if (!n) return false;
+    if (n.id === childId) return true;
+    if (n.children) {
+      for (const c of n.children) {
+        if (searchSub(c)) return true;
+      }
+    }
+    return false;
+  }
+  function findAnc(n) {
+    if (!n) return null;
+    if (n.id === ancestorId) return n;
+    if (n.children) {
+      for (const c of n.children) {
+        const found = findAnc(c);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+  const anc = findAnc(rootNode);
+  return anc ? searchSub(anc) : false;
+}
+
 function renderTree(filter = "") {
   treeEl.innerHTML = "";
   if (!rootNode) return;
   const lowerFilter = filter.trim().toLowerCase();
 
-  // If root node has children, render its category folders directly under SAVED SESSIONS
+  // Root tree container accepts drops to move items to root level
+  if (!treeEl.dataset.hasDropListener) {
+    treeEl.dataset.hasDropListener = "true";
+    treeEl.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      treeEl.classList.add("drag-target-root");
+    });
+    treeEl.addEventListener("dragleave", (e) => {
+      if (!treeEl.contains(e.relatedTarget)) {
+        treeEl.classList.remove("drag-target-root");
+      }
+    });
+    treeEl.addEventListener("drop", async (e) => {
+      if (e.target.closest(".tree-node-row")) return;
+      e.preventDefault();
+      treeEl.classList.remove("drag-target-root");
+      try {
+        const raw = e.dataTransfer.getData("text/plain");
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!data.nodeId || data.nodeId === rootNode.id) return;
+        if (window.go && window.go.main && window.go.main.App) {
+          await window.go.main.App.MoveNode(data.nodeId, rootNode.id, -1);
+        }
+        await refreshTree();
+        showToast(`Moved "${data.nodeName}" to All Sessions`, "success");
+      } catch (err) {
+        console.error("Drop to root error:", err);
+      }
+    });
+  }
+
   if (rootNode.children && rootNode.children.length > 0) {
     rootNode.children.forEach(child => {
-      const el = renderNode(child, lowerFilter);
+      const el = renderNode(child, lowerFilter, rootNode, 0);
       if (el) treeEl.appendChild(el);
     });
   } else {
-    const el = renderNode(rootNode, lowerFilter);
+    const el = renderNode(rootNode, lowerFilter, null, 0);
     if (el) treeEl.appendChild(el);
   }
 }
 
-function renderNode(node, filter = "") {
+function renderNode(node, filter = "", parentNode = null, level = 0) {
   if (!node) return null;
   const isFolder = !node.session;
   const matches = !filter || node.name.toLowerCase().includes(filter) ||
-    (node.session && (node.session.host.toLowerCase().includes(filter) || node.session.username.toLowerCase().includes(filter)));
+    (node.session && ((node.session.host && node.session.host.toLowerCase().includes(filter)) || (node.session.username && node.session.username.toLowerCase().includes(filter))));
 
   let filteredChildren = [];
   if (isFolder && node.children) {
     filteredChildren = node.children
-      .map(child => renderNode(child, filter))
+      .map(child => renderNode(child, filter, node, level + 1))
       .filter(el => el !== null);
   }
 
@@ -657,11 +742,14 @@ function renderNode(node, filter = "") {
   const row = document.createElement("div");
   row.className = `tree-node-row ${isFolder ? "folder" : "session"}`;
   row.dataset.id = node.id;
+  row.dataset.level = level;
+  row.draggable = true;
 
   if (isFolder) {
+    const isExpanded = node.expanded !== false;
     row.innerHTML = `
-      <span class="chevron">${node.expanded !== false ? "▾" : "▸"}</span>
-      <span class="node-icon">📁</span>
+      <span class="chevron">${isExpanded ? "▾" : "▸"}</span>
+      <span class="node-icon">${isExpanded ? "📂" : "📁"}</span>
       <span class="node-name" title="${escapeHtml(node.name)}">${escapeHtml(node.name)}</span>
       <span class="node-badge">${node.children ? node.children.length : 0}</span>
     `;
@@ -681,53 +769,10 @@ function renderNode(node, filter = "") {
       showFolderContextMenu(e.clientX, e.clientY, node);
     });
 
-    // Folder is a drop target for drag-and-drop
-    row.addEventListener("dragover", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      e.dataTransfer.dropEffect = "move";
-      row.classList.add("drag-target-over");
-    });
-
-    row.addEventListener("dragleave", (e) => {
-      e.stopPropagation();
-      row.classList.remove("drag-target-over");
-    });
-
-    row.addEventListener("drop", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      row.classList.remove("drag-target-over");
-      try {
-        const raw = e.dataTransfer.getData("text/plain");
-        if (!raw) return;
-        const data = JSON.parse(raw);
-        if (!data.nodeId || data.nodeId === node.id) return;
-
-        if (window.go && window.go.main && window.go.main.App) {
-          await window.go.main.App.MoveSession(data.nodeId, node.id);
-        }
-        await refreshTree();
-        showToast(`Moved "${data.sessionName}" to "${node.name}"`, "success");
-      } catch (err) {
-        console.error("Drop error:", err);
-      }
-    });
-
-  } else {
-    const isConn = Object.values(tabs).some(t => t.profile && t.profile.id === node.session.id && t.isConnected);
-    row.innerHTML = `
-      <span style="width: 14px;"></span>
-      <span class="node-icon">🔑</span>
-      <span class="node-name" title="${escapeHtml(node.session.username)}@${escapeHtml(node.session.host)}">${escapeHtml(node.name)}</span>
-      ${isConn ? '<span class="status-dot"></span>' : ''}
-    `;
-
-    // Session is draggable
-    row.draggable = true;
+    // Drag-and-drop on folder
     row.addEventListener("dragstart", (e) => {
       e.stopPropagation();
-      e.dataTransfer.setData("text/plain", JSON.stringify({ nodeId: node.id, sessionName: node.name }));
+      e.dataTransfer.setData("text/plain", JSON.stringify({ nodeId: node.id, nodeName: node.name, isFolder: true }));
       e.dataTransfer.effectAllowed = "move";
       row.classList.add("dragging");
     });
@@ -735,7 +780,142 @@ function renderNode(node, filter = "") {
     row.addEventListener("dragend", (e) => {
       e.stopPropagation();
       row.classList.remove("dragging");
-      document.querySelectorAll(".tree-node-row.drag-target-over").forEach(el => el.classList.remove("drag-target-over"));
+      clearAllDragIndicators();
+    });
+
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      const rect = row.getBoundingClientRect();
+      const relY = (e.clientY - rect.top) / rect.height;
+
+      row.classList.remove("drag-insert-above", "drag-insert-below", "drag-target-over");
+      if (relY < 0.25) {
+        row.classList.add("drag-insert-above");
+      } else if (relY > 0.75) {
+        row.classList.add("drag-insert-below");
+      } else {
+        row.classList.add("drag-target-over");
+      }
+    });
+
+    row.addEventListener("dragleave", (e) => {
+      e.stopPropagation();
+      row.classList.remove("drag-insert-above", "drag-insert-below", "drag-target-over");
+    });
+
+    row.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isAbove = row.classList.contains("drag-insert-above");
+      const isBelow = row.classList.contains("drag-insert-below");
+      clearAllDragIndicators();
+
+      try {
+        const raw = e.dataTransfer.getData("text/plain");
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!data.nodeId || data.nodeId === node.id) return;
+
+        // Prevent cycle if moving a folder into its child
+        if (data.isFolder && isDescendantInTree(data.nodeId, node.id)) {
+          showToast(`Cannot move folder into itself or its subfolder`, "warning");
+          return;
+        }
+
+        let targetParentId = node.id;
+        let targetIndex = -1;
+
+        if (isAbove || isBelow) {
+          targetParentId = parentNode ? parentNode.id : rootNode.id;
+          const siblings = parentNode && parentNode.children ? parentNode.children : (rootNode.children || []);
+          const selfIdx = siblings.findIndex(c => c.id === node.id);
+          targetIndex = isAbove ? Math.max(0, selfIdx) : selfIdx + 1;
+        }
+
+        if (window.go && window.go.main && window.go.main.App) {
+          await window.go.main.App.MoveNode(data.nodeId, targetParentId, targetIndex);
+        }
+        await refreshTree();
+        showToast(`Moved "${data.nodeName}"`, "success");
+      } catch (err) {
+        console.error("Drop error:", err);
+        showToast(`Move failed: ${err}`, "error");
+      }
+    });
+
+  } else {
+    // Session Node
+    const protoInfo = getSessionProtocolInfo(node.session);
+    const isConn = Object.values(tabs).some(t => t.profile && t.profile.id === node.session.id && t.isConnected);
+    row.innerHTML = `
+      <span style="width: 14px;"></span>
+      <span class="node-icon">${protoInfo.icon}</span>
+      <span class="node-name" title="${escapeHtml(node.session.username || '')}@${escapeHtml(node.session.host || '')}">${escapeHtml(node.name)}</span>
+      <span class="tree-node-proto-badge ${protoInfo.cls}">${protoInfo.badge}</span>
+      ${isConn ? '<span class="status-dot"></span>' : ''}
+    `;
+
+    row.addEventListener("dragstart", (e) => {
+      e.stopPropagation();
+      e.dataTransfer.setData("text/plain", JSON.stringify({ nodeId: node.id, nodeName: node.name, isFolder: false }));
+      e.dataTransfer.effectAllowed = "move";
+      row.classList.add("dragging");
+    });
+
+    row.addEventListener("dragend", (e) => {
+      e.stopPropagation();
+      row.classList.remove("dragging");
+      clearAllDragIndicators();
+    });
+
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      const rect = row.getBoundingClientRect();
+      const relY = (e.clientY - rect.top) / rect.height;
+
+      row.classList.remove("drag-insert-above", "drag-insert-below", "drag-target-over");
+      if (relY < 0.5) {
+        row.classList.add("drag-insert-above");
+      } else {
+        row.classList.add("drag-insert-below");
+      }
+    });
+
+    row.addEventListener("dragleave", (e) => {
+      e.stopPropagation();
+      row.classList.remove("drag-insert-above", "drag-insert-below");
+    });
+
+    row.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isAbove = row.classList.contains("drag-insert-above");
+      clearAllDragIndicators();
+
+      try {
+        const raw = e.dataTransfer.getData("text/plain");
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (!data.nodeId || data.nodeId === node.id) return;
+
+        const targetParentId = parentNode ? parentNode.id : rootNode.id;
+        const siblings = parentNode && parentNode.children ? parentNode.children : (rootNode.children || []);
+        const selfIdx = siblings.findIndex(c => c.id === node.id);
+        const targetIndex = isAbove ? Math.max(0, selfIdx) : selfIdx + 1;
+
+        if (window.go && window.go.main && window.go.main.App) {
+          await window.go.main.App.MoveNode(data.nodeId, targetParentId, targetIndex);
+        }
+        await refreshTree();
+        showToast(`Moved "${data.nodeName}"`, "success");
+      } catch (err) {
+        console.error("Drop error:", err);
+        showToast(`Move failed: ${err}`, "error");
+      }
     });
 
     row.addEventListener("dblclick", () => connectToSession(node.session));
@@ -5257,25 +5437,171 @@ function showPortScannerDialog() {
 
 function hideContextMenu() { contextMenuEl.classList.add("hidden"); }
 
+function showRenameNodeDialog(nodeId, currentName, isFolder = false) {
+  const box = showModal(`
+    <div class="modal-header">
+      <div class="modal-title">✏️ Rename ${isFolder ? 'Folder' : 'Session'}</div>
+      <button class="modal-close-btn" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="renameNodeInput" value="${escapeHtml(currentName)}" autocomplete="off" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="modalCancel">Cancel</button>
+      <button class="btn-primary" id="modalSave">Save</button>
+    </div>
+  `);
+
+  const input = box.querySelector("#renameNodeInput");
+  input.focus();
+  input.select();
+
+  const doSave = async () => {
+    const name = input.value.trim();
+    if (!name || name === currentName) {
+      hideModal();
+      return;
+    }
+    hideModal();
+    try {
+      if (window.go && window.go.main && window.go.main.App) {
+        await window.go.main.App.RenameNode(nodeId, name);
+      }
+      await refreshTree();
+      showToast(`Renamed to "${name}"`, "success");
+    } catch (err) {
+      showToast("Rename failed: " + err, "error");
+    }
+  };
+
+  box.querySelector("#modalSave").onclick = doSave;
+  box.querySelector("#modalCancel").onclick = hideModal;
+  box.querySelector("#modalClose").onclick = hideModal;
+  input.onkeydown = (e) => { if (e.key === "Enter") doSave(); };
+}
+
+function showMoveNodeDialog(nodeId, nodeName, isFolder = false) {
+  const folders = [];
+  function collectFolders(n, path = "") {
+    if (!n || n.session) return;
+    if (isFolder && (n.id === nodeId || isDescendantInTree(nodeId, n.id))) return;
+    const curPath = path ? `${path} / ${n.name}` : n.name;
+    folders.push({ id: n.id, name: n.name, path: curPath });
+    if (n.children) {
+      n.children.forEach(c => collectFolders(c, curPath));
+    }
+  }
+  collectFolders(rootNode);
+
+  const box = showModal(`
+    <div class="modal-header">
+      <div class="modal-title">📦 Move "${escapeHtml(nodeName)}" to Folder</div>
+      <button class="modal-close-btn" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+        Select destination folder:
+      </div>
+      <div class="folder-picker-list" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;">
+        ${folders.map(f => `
+          <div class="folder-picker-item" data-id="${f.id}" style="padding: 8px 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-subtle); border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 12px; transition: background 0.12s;">
+            <span>📁</span>
+            <span style="font-weight: 500;">${escapeHtml(f.path)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" id="modalCancel">Cancel</button>
+    </div>
+  `);
+
+  box.querySelectorAll(".folder-picker-item").forEach(el => {
+    el.onmouseover = () => el.style.background = "rgba(59, 130, 246, 0.15)";
+    el.onmouseout = () => el.style.background = "rgba(255,255,255,0.03)";
+    el.onclick = async () => {
+      const targetId = el.dataset.id;
+      hideModal();
+      try {
+        if (window.go && window.go.main && window.go.main.App) {
+          await window.go.main.App.MoveNode(nodeId, targetId, -1);
+        }
+        await refreshTree();
+        showToast(`Moved "${nodeName}"`, "success");
+      } catch (err) {
+        showToast("Move failed: " + err, "error");
+      }
+    };
+  });
+
+  box.querySelector("#modalCancel").onclick = hideModal;
+  box.querySelector("#modalClose").onclick = hideModal;
+}
+
 function showFolderContextMenu(x, y, node) {
   contextMenuEl.innerHTML = `
     <div class="context-menu-item" id="cAddSess">＋ New Session in Folder</div>
     <div class="context-menu-item" id="cAddFold">📁 New Subfolder</div>
     <div class="context-menu-separator"></div>
     <div class="context-menu-item" id="cRenFold">✏️ Rename Folder</div>
-    ${node.id !== rootNode.id ? '<div class="context-menu-item danger" id="cDelFold">🗑️ Delete Folder</div>' : ''}
+    <div class="context-menu-item" id="cDupFold">📋 Duplicate Folder</div>
+    <div class="context-menu-item" id="cMoveFold">📦 Move Folder To...</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" id="cExpFold">⊞ Expand All</div>
+    <div class="context-menu-item" id="cColFold">⊟ Collapse All</div>
+    ${node.id !== rootNode.id ? `
+      <div class="context-menu-separator"></div>
+      <div class="context-menu-item danger" id="cDelFold">🗑️ Delete Folder</div>
+    ` : ''}
   `;
   posMenu(x, y);
 
   contextMenuEl.querySelector("#cAddSess").onclick = () => { hideContextMenu(); showNewSessionDialog(node.id); };
   contextMenuEl.querySelector("#cAddFold").onclick = () => { hideContextMenu(); showFolderDialog(node.id); };
-  contextMenuEl.querySelector("#cRenFold").onclick = () => { hideContextMenu(); showFolderDialog(node.id, node); };
+  contextMenuEl.querySelector("#cRenFold").onclick = () => { hideContextMenu(); showRenameNodeDialog(node.id, node.name, true); };
+  contextMenuEl.querySelector("#cDupFold").onclick = async () => {
+    hideContextMenu();
+    try {
+      if (window.go && window.go.main && window.go.main.App) {
+        await window.go.main.App.DuplicateFolder(node.id);
+        showToast(`Duplicated folder "${node.name}"`, "success");
+      }
+      await refreshTree();
+    } catch (err) {
+      showToast("Duplicate folder failed: " + err, "error");
+    }
+  };
+  contextMenuEl.querySelector("#cMoveFold").onclick = () => { hideContextMenu(); showMoveNodeDialog(node.id, node.name, true); };
+  contextMenuEl.querySelector("#cExpFold").onclick = async () => {
+    hideContextMenu();
+    if (window.go && window.go.main && window.go.main.App) await window.go.main.App.ExpandAllFolders(true);
+    await refreshTree();
+  };
+  contextMenuEl.querySelector("#cColFold").onclick = async () => {
+    hideContextMenu();
+    if (window.go && window.go.main && window.go.main.App) await window.go.main.App.ExpandAllFolders(false);
+    await refreshTree();
+  };
+
   const del = contextMenuEl.querySelector("#cDelFold");
   if (del) {
     del.onclick = async () => {
       hideContextMenu();
-      if (window.go && window.go.main && window.go.main.App) await window.go.main.App.DeleteNode(node.id);
-      await refreshTree();
+      const childCount = node.children ? node.children.length : 0;
+      const msg = childCount > 0
+        ? `Are you sure you want to delete folder "${node.name}" and its ${childCount} item(s)?`
+        : `Are you sure you want to delete folder "${node.name}"?`;
+      if (!confirm(msg)) return;
+      try {
+        if (window.go && window.go.main && window.go.main.App) await window.go.main.App.DeleteNode(node.id);
+        await refreshTree();
+        showToast(`Deleted folder "${node.name}"`, "info");
+      } catch (err) {
+        showToast("Delete failed: " + err, "error");
+      }
     };
   }
 }
@@ -5284,7 +5610,9 @@ function showSessionContextMenu(x, y, profile, nodeId) {
   contextMenuEl.innerHTML = `
     <div class="context-menu-item" id="cConn">⚡ Connect Session</div>
     <div class="context-menu-item" id="cEdit">✏️ Edit Session Profile</div>
+    <div class="context-menu-item" id="cRenSess">🏷️ Rename Session</div>
     <div class="context-menu-item" id="cDup">📋 Duplicate Session</div>
+    <div class="context-menu-item" id="cMoveSess">📦 Move Session To...</div>
     <div class="context-menu-separator"></div>
     <div class="context-menu-item danger" id="cDel">🗑️ Delete Session</div>
   `;
@@ -5292,15 +5620,28 @@ function showSessionContextMenu(x, y, profile, nodeId) {
 
   contextMenuEl.querySelector("#cConn").onclick = () => { hideContextMenu(); connectToSession(profile); };
   contextMenuEl.querySelector("#cEdit").onclick = () => { hideContextMenu(); showNewSessionDialog("", profile); };
+  contextMenuEl.querySelector("#cRenSess").onclick = () => { hideContextMenu(); showRenameNodeDialog(nodeId, profile.name, false); };
   contextMenuEl.querySelector("#cDup").onclick = async () => {
     hideContextMenu();
-    if (window.go && window.go.main && window.go.main.App) await window.go.main.App.DuplicateSession(nodeId);
-    await refreshTree();
+    try {
+      if (window.go && window.go.main && window.go.main.App) await window.go.main.App.DuplicateSession(nodeId);
+      await refreshTree();
+      showToast(`Duplicated "${profile.name}"`, "success");
+    } catch (err) {
+      showToast("Duplicate failed: " + err, "error");
+    }
   };
+  contextMenuEl.querySelector("#cMoveSess").onclick = () => { hideContextMenu(); showMoveNodeDialog(nodeId, profile.name, false); };
   contextMenuEl.querySelector("#cDel").onclick = async () => {
     hideContextMenu();
-    if (window.go && window.go.main && window.go.main.App) await window.go.main.App.DeleteNode(nodeId);
-    await refreshTree();
+    if (!confirm(`Are you sure you want to delete session "${profile.name}"?`)) return;
+    try {
+      if (window.go && window.go.main && window.go.main.App) await window.go.main.App.DeleteNode(nodeId);
+      await refreshTree();
+      showToast(`Deleted session "${profile.name}"`, "info");
+    } catch (err) {
+      showToast("Delete failed: " + err, "error");
+    }
   };
 }
 
@@ -5611,6 +5952,18 @@ function setupEventListeners() {
   // Sidebar tree tools
   safeClick("treeAddSessionBtn", () => showNewSessionDialog());
   safeClick("treeAddFolderBtn", () => showFolderDialog());
+  safeClick("treeExpandAllBtn", async () => {
+    if (window.go && window.go.main && window.go.main.App) {
+      await window.go.main.App.ExpandAllFolders(true);
+    }
+    await refreshTree();
+  });
+  safeClick("treeCollapseAllBtn", async () => {
+    if (window.go && window.go.main && window.go.main.App) {
+      await window.go.main.App.ExpandAllFolders(false);
+    }
+    await refreshTree();
+  });
   safeClick("treeRefreshBtn", () => refreshTree());
 
   // Quick connect in sidebar

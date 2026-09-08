@@ -38,12 +38,20 @@ export function DeleteTunnel(arg1) {
   return window['go']['main']['App']['DeleteTunnel'](arg1);
 }
 
+export function DuplicateFolder(arg1) {
+  return window['go']['main']['App']['DuplicateFolder'](arg1);
+}
+
 export function DuplicateSession(arg1) {
   return window['go']['main']['App']['DuplicateSession'](arg1);
 }
 
 export function ExecuteMacro(arg1, arg2) {
   return window['go']['main']['App']['ExecuteMacro'](arg1, arg2);
+}
+
+export function ExpandAllFolders(arg1) {
+  return window['go']['main']['App']['ExpandAllFolders'](arg1);
 }
 
 export function ExportSessions() {
@@ -98,6 +106,10 @@ export function LaunchSystemTool(arg1) {
   return window['go']['main']['App']['LaunchSystemTool'](arg1);
 }
 
+export function MoveNode(arg1, arg2, arg3) {
+  return window['go']['main']['App']['MoveNode'](arg1, arg2, arg3);
+}
+
 export function MoveSession(arg1, arg2) {
   return window['go']['main']['App']['MoveSession'](arg1, arg2);
 }
@@ -128,6 +140,10 @@ export function OpenSession(arg1, arg2) {
 
 export function QuickConnect(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['QuickConnect'](arg1, arg2, arg3, arg4, arg5);
+}
+
+export function RenameNode(arg1, arg2) {
+  return window['go']['main']['App']['RenameNode'](arg1, arg2);
 }
 
 export function ResizeTerminal(arg1, arg2, arg3) {

@@ -27,9 +27,13 @@ export function DeleteSavedPassword(arg1:string):Promise<void>;
 
 export function DeleteTunnel(arg1:string):Promise<void>;
 
+export function DuplicateFolder(arg1:string):Promise<model.TreeNode>;
+
 export function DuplicateSession(arg1:string):Promise<model.TreeNode>;
 
 export function ExecuteMacro(arg1:string,arg2:Array<string>):Promise<void>;
+
+export function ExpandAllFolders(arg1:boolean):Promise<model.TreeNode>;
 
 export function ExportSessions():Promise<string>;
 
@@ -57,6 +61,8 @@ export function LaunchRDPSession(arg1:model.SessionProfile,arg2:string):Promise<
 
 export function LaunchSystemTool(arg1:string):Promise<void>;
 
+export function MoveNode(arg1:string,arg2:string,arg3:number):Promise<model.TreeNode>;
+
 export function MoveSession(arg1:string,arg2:string):Promise<model.TreeNode>;
 
 export function NetCalculateHash(arg1:string,arg2:string):Promise<string>;
@@ -72,6 +78,8 @@ export function OpenLocalTerminal(arg1:string):Promise<string>;
 export function OpenSession(arg1:model.SessionProfile,arg2:string):Promise<string>;
 
 export function QuickConnect(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string):Promise<string>;
+
+export function RenameNode(arg1:string,arg2:string):Promise<model.TreeNode>;
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
 
