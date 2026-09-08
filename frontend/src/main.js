@@ -269,6 +269,154 @@ const THEMES = {
   }
 };
 
+const THEME_METADATA = {
+  "dark-modern": {
+    name: "Dark Modern",
+    desc: "MobaXterm professional compact dark theme with slate and azure accents",
+    icon: "🌌",
+    swatches: ["#1a1c23", "#232733", "#3b82f6", "#10b981", "#06b6d4"]
+  },
+  "nord": {
+    name: "Nordic Frost",
+    desc: "Arctic ice palette with calm polar slates, frosty cyan and soft snow",
+    icon: "❄️",
+    swatches: ["#2e3440", "#3b4252", "#88c0d0", "#81a1c1", "#a3be8c"]
+  },
+  "dracula": {
+    name: "Dracula",
+    desc: "Vampiric dark theme with midnight purple, electric pink and neon cyan",
+    icon: "🧛",
+    swatches: ["#282a36", "#21222c", "#bd93f9", "#ff79c6", "#50fa7b"]
+  },
+  "cyberpunk": {
+    name: "Cyberpunk Neon",
+    desc: "High-contrast synthwave neon palette with hot magenta, yellow and cyan",
+    icon: "🌆",
+    swatches: ["#0f051d", "#1a0b2e", "#ff007f", "#00f0ff", "#00ff9f"]
+  },
+  "monokai": {
+    name: "Monokai Pro",
+    desc: "Legendary warm charcoal code palette with vibrant lime and ruby tones",
+    icon: "🍃",
+    swatches: ["#272822", "#1e1f1c", "#a6e22e", "#f92672", "#66d9ef"]
+  },
+  "solarized-dark": {
+    name: "Solarized Dark",
+    desc: "Scientifically tailored low-contrast oceanic teal and warm amber",
+    icon: "🌊",
+    swatches: ["#002b36", "#073642", "#268bd2", "#2aa198", "#b58900"]
+  },
+  "matrix": {
+    name: "Matrix Green CRT",
+    desc: "Retro terminal phosphor green with pure pitch dark backgrounds",
+    icon: "🟩",
+    swatches: ["#031105", "#051c09", "#00ff41", "#00cc33", "#22eb4f"]
+  },
+  "one-dark": {
+    name: "Atom One Dark",
+    desc: "Refined deep obsidian with soft cornflower blue and pastel highlights",
+    icon: "⚛️",
+    swatches: ["#21252b", "#282c34", "#61afef", "#98c379", "#e5c07b"]
+  },
+  "avisys-navy": {
+    name: "Avisys Corporate Navy",
+    desc: "Professional enterprise midnight navy blue with sky blue accents",
+    icon: "⚓",
+    swatches: ["#0b1528", "#0f1f3d", "#38bdf8", "#4ade80", "#f8fafc"]
+  },
+  "light-modern": {
+    name: "Modern Light",
+    desc: "Clean porcelain white with high-contrast text and crisp cyan highlights",
+    icon: "☀️",
+    swatches: ["#f1f5f9", "#ffffff", "#0284c7", "#16a34a", "#0f172a"]
+  }
+};
+
+function applyUITheme(themeKey, persist = true) {
+  if (!THEMES[themeKey]) themeKey = "dark-modern";
+  userSettings.uiTheme = themeKey;
+  userSettings.theme = themeKey;
+
+  document.documentElement.setAttribute("data-theme", themeKey);
+  document.body.setAttribute("data-theme", themeKey);
+
+  if (persist) {
+    localStorage.setItem("nexterm_settings", JSON.stringify(userSettings));
+  }
+
+  // Synchronize all open terminals immediately
+  const activeTheme = THEMES[themeKey];
+  Object.values(tabs).forEach(t => {
+    if (t.term) {
+      t.term.options.theme = activeTheme;
+      if (t.fitAddon) {
+        try { t.fitAddon.fit(); } catch (_) {}
+      }
+    }
+  });
+}
+
+function showThemePickerDialog() {
+  const current = userSettings.uiTheme || userSettings.theme || "dark-modern";
+
+  const cardsHtml = Object.entries(THEME_METADATA).map(([key, meta]) => {
+    const isActive = key === current;
+    const swatchesHtml = meta.swatches.map(c => `<span class="theme-swatch" style="background: ${c};"></span>`).join("");
+
+    return `
+      <div class="theme-card ${isActive ? 'active' : ''}" data-theme="${key}">
+        <div class="theme-card-header">
+          <span class="theme-card-title">${meta.icon} ${meta.name}</span>
+          ${isActive ? `<span class="theme-card-badge">Active</span>` : ''}
+        </div>
+        <div class="theme-card-desc">${meta.desc}</div>
+        <div class="theme-preview-palette">
+          ${swatchesHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const box = showModal(`
+    <div class="modal-header">
+      <div class="modal-title">🎨 Application UI Theme Gallery</div>
+      <button class="modal-close-btn" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+        Choose a theme for the entire NexTerm workspace, menus, toolbars, sidebars, and terminals:
+      </div>
+      <div class="theme-picker-grid" id="themePickerGrid">
+        ${cardsHtml}
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" id="modalCloseBtn">Done</button>
+    </div>
+  `, "modal-lg");
+
+  box.querySelectorAll(".theme-card").forEach(card => {
+    card.onclick = () => {
+      const themeKey = card.dataset.theme;
+      applyUITheme(themeKey, true);
+      box.querySelectorAll(".theme-card").forEach(c => {
+        c.classList.remove("active");
+        const b = c.querySelector(".theme-card-badge");
+        if (b) b.remove();
+      });
+      card.classList.add("active");
+      const hdr = card.querySelector(".theme-card-header");
+      if (hdr && !hdr.querySelector(".theme-card-badge")) {
+        const badge = document.createElement("span");
+        badge.className = "theme-card-badge";
+        badge.textContent = "Active";
+        hdr.appendChild(badge);
+      }
+      showToast(`Switched theme to ${THEME_METADATA[themeKey].name}`, "success");
+    };
+  });
+}
+
 // --------------------------------------------------------------------------
 // Initialization & Lifecycle
 // --------------------------------------------------------------------------
@@ -277,6 +425,18 @@ async function init() {
   const savedSettings = localStorage.getItem("nexterm_settings");
   if (savedSettings) {
     try { userSettings = { ...userSettings, ...JSON.parse(savedSettings) }; } catch (e) {}
+  }
+
+  // Apply saved or default UI theme immediately
+  applyUITheme(userSettings.uiTheme || userSettings.theme || "dark-modern", false);
+
+  if (window.go && window.go.main && window.go.main.App) {
+    try {
+      const custom = await window.go.main.App.GetCustomizerConfig();
+      if (custom && custom.appName) {
+        document.title = custom.appName;
+      }
+    } catch (_) {}
   }
 
   setupEventListeners();
@@ -2735,6 +2895,7 @@ function setupEventListeners() {
   safeClick("mNewSession", () => showNewSessionDialog());
   safeClick("mNewFolder", () => showFolderDialog());
   safeClick("mToggleMultiExec", toggleMultiExec);
+  safeClick("mSwitchTheme", showThemePickerDialog);
   safeClick("mOpenTunneling", showTunnelingDialog);
   safeClick("mOpenSettings", showSettingsDialog);
   safeClick("mRecordMacro", showRecordMacroDialog);
@@ -2757,6 +2918,7 @@ function setupEventListeners() {
   safeClick("tbMacrosBtn", () => switchSidebarView("macros"));
   safeClick("tbTunnelingBtn", showTunnelingDialog);
   safeClick("tbPackagesBtn", showPkgMgrDialog);
+  safeClick("tbThemeBtn", showThemePickerDialog);
   safeClick("tbSettingsBtn", showSettingsDialog);
   safeClick("tbHelpBtn", () => showToast("Shortcuts: Ctrl+N (New Session), Ctrl+W (Close Tab), Ctrl+Shift+\\ (Split)", "info"));
   safeClick("tbExitBtn", () => { if (confirm("Exit Nexterm?")) window.close(); });
