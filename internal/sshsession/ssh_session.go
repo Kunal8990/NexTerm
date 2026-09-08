@@ -26,10 +26,11 @@ type Session struct {
 	stopChan   chan struct{}
 
 	OnData         func(data []byte)
-	OnDisconnected func(reason string)
+	OnDisconnected func(reason string, classified ClassifiedError)
 }
 
 type ConnectOptions struct {
+	OnStateChange     func(state ConnectionState, message string)
 	Host              string
 	Port              int
 	Username          string
@@ -82,6 +83,10 @@ func Connect(opts ConnectOptions) (*Session, error) {
 	}
 	if opts.KeepAliveInterval <= 0 {
 		opts.KeepAliveInterval = 15
+	}
+
+	if opts.OnStateChange != nil {
+		opts.OnStateChange(StateConnecting, fmt.Sprintf("Connecting to %s:%d...", opts.Host, opts.Port))
 	}
 
 	authMethods, err := buildAuthMethods(opts)
@@ -168,6 +173,10 @@ func Connect(opts ConnectOptions) (*Session, error) {
 		conn = directConn
 	}
 
+	if opts.OnStateChange != nil {
+		opts.OnStateChange(StateAuthenticating, fmt.Sprintf("Authenticating user '%s'...", opts.Username))
+	}
+
 	sshConn, chans, reqs, err := ssh.NewClientConn(conn, addr, config)
 	if err != nil {
 		_ = conn.Close()
@@ -230,6 +239,10 @@ func Connect(opts ConnectOptions) (*Session, error) {
 		_, _ = stdin.Write([]byte(fmt.Sprintf("cd %q\r\n", opts.WorkingDirectory)))
 	}
 
+	if opts.OnStateChange != nil {
+		opts.OnStateChange(StateConnected, "Connected")
+	}
+
 	// Start reading stdout and stderr
 	go s.readLoop(stdout)
 	go s.readLoop(stderr)
@@ -272,7 +285,8 @@ func (s *Session) readLoop(reader io.Reader) {
 				return
 			default:
 				if s.OnDisconnected != nil {
-					s.OnDisconnected(err.Error())
+					classified := ClassifyError(err)
+					s.OnDisconnected(classified.Message, classified)
 				}
 				s.Close()
 				return

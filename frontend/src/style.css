@@ -1034,12 +1034,144 @@ html, body, #app {
   border-radius: 50%;
   background: var(--accent-green);
   box-shadow: 0 0 5px var(--accent-green);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 
-.tab-dot.disconnected {
-  background: var(--accent-rose);
-  box-shadow: 0 0 5px var(--accent-rose);
+.tab-dot.disconnected,
+.tab-dot.state-disconnected,
+.pane-tab-dot.state-disconnected {
+  background: #64748b !important;
+  box-shadow: none !important;
 }
+
+.tab-dot.state-connected,
+.pane-tab-dot.state-connected,
+.connected-item-dot.state-connected {
+  background: #22c55e !important;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7) !important;
+}
+
+.tab-dot.state-connecting,
+.pane-tab-dot.state-connecting,
+.connected-item-dot.state-connecting {
+  background: #38bdf8 !important;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.8) !important;
+  animation: pulseDot 1.2s infinite ease-in-out;
+}
+
+.tab-dot.state-authenticating,
+.pane-tab-dot.state-authenticating,
+.connected-item-dot.state-authenticating {
+  background: #f59e0b !important;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.8) !important;
+  animation: pulseDot 1.0s infinite ease-in-out;
+}
+
+.tab-dot.state-reconnecting,
+.pane-tab-dot.state-reconnecting,
+.connected-item-dot.state-reconnecting {
+  background: #eab308 !important;
+  box-shadow: 0 0 6px rgba(234, 179, 8, 0.8) !important;
+  animation: pulseDot 0.8s infinite ease-in-out;
+}
+
+.tab-dot.state-failed,
+.tab-dot.state-auth-failed,
+.pane-tab-dot.state-failed,
+.pane-tab-dot.state-auth-failed,
+.connected-item-dot.state-failed,
+.connected-item-dot.state-auth-failed {
+  background: #ef4444 !important;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.8) !important;
+}
+
+.tab-dot.state-connection-lost,
+.pane-tab-dot.state-connection-lost,
+.connected-item-dot.state-connection-lost {
+  background: #f97316 !important;
+  box-shadow: 0 0 6px rgba(249, 115, 22, 0.8) !important;
+}
+
+.tab-dot.state-closing,
+.pane-tab-dot.state-closing,
+.connected-item-dot.state-closing {
+  background: #94a3b8 !important;
+  box-shadow: 0 0 4px rgba(148, 163, 184, 0.5) !important;
+}
+
+.tab-dot.state-closed,
+.tab-dot.state-disconnected,
+.pane-tab-dot.state-closed,
+.pane-tab-dot.state-disconnected,
+.connected-item-dot.state-closed,
+.connected-item-dot.state-disconnected {
+  background: #475569 !important;
+  box-shadow: none !important;
+}
+
+@keyframes pulseDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.connected-item-state {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 6px;
+  letter-spacing: 0.2px;
+}
+.connected-item-state.state-connecting {
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+.connected-item-state.state-authenticating {
+  background: rgba(245, 158, 11, 0.18);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+.connected-item-state.state-connected {
+  background: rgba(34, 197, 94, 0.18);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.connected-item-state.state-failed,
+.connected-item-state.state-auth-failed {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+.connected-item-state.state-connection-lost {
+  background: rgba(249, 115, 22, 0.18);
+  color: #f97316;
+  border: 1px solid rgba(249, 115, 22, 0.3);
+}
+.connected-item-state.state-reconnecting {
+  background: rgba(234, 179, 8, 0.18);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+.connected-item-state.state-closing {
+  background: rgba(148, 163, 184, 0.18);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+.connected-item-state.state-closed,
+.connected-item-state.state-disconnected {
+  background: rgba(71, 85, 105, 0.25);
+  color: #94a3b8;
+  border: 1px solid rgba(71, 85, 105, 0.4);
+}
+
 
 .tab-close {
   padding: 1px 4px;

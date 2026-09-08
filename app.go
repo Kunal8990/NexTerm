@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -497,6 +498,17 @@ func (a *App) GetSessionPassword(vaultKey string) (string, error) {
 
 // OpenSession connects a saved (or ad-hoc) session and returns a tabID.
 func (a *App) OpenSession(profile model.SessionProfile, password string) (string, error) {
+	tabID := uuid.NewString()
+	err := a.OpenSessionWithTabID(tabID, profile, password)
+	return tabID, err
+}
+
+// OpenSessionWithTabID connects a session using a pre-allocated tabID from the frontend.
+func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, password string) error {
+	if tabID == "" {
+		tabID = uuid.NewString()
+	}
+
 	opts := sshsession.ConnectOptions{
 		Host:              profile.Host,
 		Port:              profile.Port,
@@ -520,7 +532,7 @@ func (a *App) OpenSession(profile model.SessionProfile, password string) (string
 	if profile.PrivateKeyPath != "" {
 		keyBytes, err := sshsession.ReadPrivateKeyFile(profile.PrivateKeyPath)
 		if err != nil {
-			return "", fmt.Errorf("read private key: %w", err)
+			return fmt.Errorf("read private key: %w", err)
 		}
 		opts.PrivateKeyPEM = keyBytes
 	} else if password != "" {
@@ -551,20 +563,41 @@ func (a *App) OpenSession(profile model.SessionProfile, password string) (string
 		}
 	}
 
+	opts.OnStateChange = func(state sshsession.ConnectionState, message string) {
+		wailsruntime.EventsEmit(a.ctx, "terminal:state:"+tabID, map[string]interface{}{
+			"state":   string(state),
+			"message": message,
+		})
+	}
+
 	opts.HostKeyCallback = a.buildHostKeyCallback()
 
 	sess, err := sshsession.Connect(opts)
 	if err != nil {
-		return "", err
+		classified := sshsession.ClassifyError(err)
+		wailsruntime.EventsEmit(a.ctx, "terminal:state:"+tabID, map[string]interface{}{
+			"state":   string(sshsession.StateFailed),
+			"message": classified.Message,
+			"error":   classified,
+		})
+		return fmt.Errorf("[%s] %s: %s", classified.Category, classified.Message, classified.Description)
 	}
-
-	tabID := uuid.NewString()
 
 	sess.OnData = func(data []byte) {
 		wailsruntime.EventsEmit(a.ctx, "terminal:data:"+tabID, string(data))
 	}
-	sess.OnDisconnected = func(reason string) {
-		wailsruntime.EventsEmit(a.ctx, "terminal:closed:"+tabID, reason)
+	sess.OnDisconnected = func(reason string, classified sshsession.ClassifiedError) {
+		wailsruntime.EventsEmit(a.ctx, "terminal:closed:"+tabID, map[string]interface{}{
+			"reason":      reason,
+			"category":    string(classified.Category),
+			"description": classified.Description,
+			"rawError":    classified.RawError,
+		})
+		wailsruntime.EventsEmit(a.ctx, "terminal:state:"+tabID, map[string]interface{}{
+			"state":   string(sshsession.StateClosed),
+			"message": reason,
+			"error":   classified,
+		})
 		a.mu.Lock()
 		delete(a.tabs, tabID)
 		if a.workspace != nil {
@@ -587,7 +620,7 @@ func (a *App) OpenSession(profile model.SessionProfile, password string) (string
 	}
 	a.mu.Unlock()
 
-	return tabID, nil
+	return nil
 }
 
 // QuickConnect creates an immediate ad-hoc connection.
@@ -828,6 +861,11 @@ func (a *App) SetWorkspaceActiveTab(paneID, tabID string) error {
 		a.workspace = model.NewWorkspace("default", "Default Workspace")
 	}
 	return a.workspace.SetActiveTab(paneID, tabID)
+}
+
+// ClassifyConnectionError parses any raw error string into a structured ClassifiedError.
+func (a *App) ClassifyConnectionError(errString string) sshsession.ClassifiedError {
+	return sshsession.ClassifyError(errors.New(errString))
 }
 
 // =========================================================================

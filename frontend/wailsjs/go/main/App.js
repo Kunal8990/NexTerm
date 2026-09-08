@@ -18,6 +18,10 @@ export function BroadcastCommand(arg1) {
   return window['go']['main']['App']['BroadcastCommand'](arg1);
 }
 
+export function ClassifyConnectionError(arg1) {
+  return window['go']['main']['App']['ClassifyConnectionError'](arg1);
+}
+
 export function CloseTab(arg1) {
   return window['go']['main']['App']['CloseTab'](arg1);
 }
@@ -160,6 +164,10 @@ export function OpenLocalTerminal(arg1) {
 
 export function OpenSession(arg1, arg2) {
   return window['go']['main']['App']['OpenSession'](arg1, arg2);
+}
+
+export function OpenSessionWithTabID(arg1, arg2, arg3) {
+  return window['go']['main']['App']['OpenSessionWithTabID'](arg1, arg2, arg3);
 }
 
 export function QuickConnect(arg1, arg2, arg3, arg4, arg5) {

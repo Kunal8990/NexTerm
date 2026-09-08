@@ -456,6 +456,340 @@ async function init() {
   updateStatus();
 }
 
+// ==========================================================================
+// Connection State Management & Diagnostic Classification
+// States: Disconnected, Connecting, Authenticating, Connected, Reconnecting, Closing, Closed, Failed
+// Error Categories: Timeout, Connection refused, DNS failure, Authentication failure,
+//                   Host-key mismatch, Permission denied, Server closed connection
+// ==========================================================================
+
+function parseClassifiedError(err) {
+  if (!err) {
+    return {
+      category: "Unknown",
+      message: "Unknown connection error",
+      description: "No additional diagnostic information available.",
+      rawError: ""
+    };
+  }
+
+  if (typeof err === "object" && err !== null) {
+    if (err.category && err.message) {
+      return {
+        category: err.category,
+        message: err.message,
+        description: err.description || "",
+        rawError: err.rawError || err.message
+      };
+    }
+  }
+
+  const raw = String(err).trim();
+
+  // Check structured error "[Category] Message: Description"
+  const bracketMatch = raw.match(/^\[(.*?)\]\s*(.*?)(?::\s*(.*))?$/);
+  if (bracketMatch) {
+    return {
+      category: bracketMatch[1],
+      message: bracketMatch[2] || bracketMatch[1],
+      description: bracketMatch[3] || bracketMatch[2] || "",
+      rawError: raw
+    };
+  }
+
+  const lower = raw.toLowerCase();
+
+  // 1. Timeout
+  if (lower.includes("timeout") || lower.includes("timed out") || lower.includes("deadline exceeded") || lower.includes("connectex: a connection attempt failed")) {
+    return {
+      category: "Timeout",
+      message: "Connection timed out",
+      description: "The remote host did not respond within the connection timeout threshold. Check target IP/hostname, firewall, or network route.",
+      rawError: raw
+    };
+  }
+
+  // 2. Connection refused
+  if (lower.includes("connection refused") || lower.includes("refused") || lower.includes("no connection could be made")) {
+    return {
+      category: "Connection refused",
+      message: "Connection refused by host",
+      description: "The target host is active but rejected the connection. Verify that the SSH service is running on the specified port.",
+      rawError: raw
+    };
+  }
+
+  // 3. DNS failure
+  if (lower.includes("no such host") || lower.includes("getaddrinfow") || lower.includes("name resolution") || lower.includes("lookup")) {
+    return {
+      category: "DNS failure",
+      message: "DNS lookup failed",
+      description: "Could not resolve the domain name to an IP address. Check the hostname spelling and your network DNS settings.",
+      rawError: raw
+    };
+  }
+
+  // 4. Host-key mismatch
+  if (lower.includes("host key") || lower.includes("hostkey") || lower.includes("known_hosts") || lower.includes("fingerprint mismatch") || lower.includes("man-in-the-middle")) {
+    return {
+      category: "Host-key mismatch",
+      message: "Host-key verification failed",
+      description: "The remote server presented a host key that does not match your saved known_hosts record. Possible security threat or re-installed server.",
+      rawError: raw
+    };
+  }
+
+  // 5. Authentication failure
+  if (lower.includes("unable to authenticate") || lower.includes("auth fail") || lower.includes("authentication failure") || lower.includes("password change") || lower.includes("bad password")) {
+    return {
+      category: "Authentication failure",
+      message: "Authentication failed",
+      description: "The server rejected credentials. Verify your username, password, or SSH private key passphrase.",
+      rawError: raw
+    };
+  }
+
+  // 6. Permission denied
+  if (lower.includes("permission denied") || lower.includes("access denied") || lower.includes("forbidden")) {
+    return {
+      category: "Permission denied",
+      message: "Permission denied",
+      description: "The remote host refused permission to open a terminal session or subsystem for this user account.",
+      rawError: raw
+    };
+  }
+
+  // 7. Server closed connection
+  if (lower.includes("eof") || lower.includes("connection reset") || lower.includes("broken pipe") || lower.includes("closed by remote") || lower.includes("closed connection") || lower.includes("reset by peer")) {
+    return {
+      category: "Server closed connection",
+      message: "Server closed connection",
+      description: "The remote SSH server or intermediate gateway terminated the connection unexpectedly.",
+      rawError: raw
+    };
+  }
+
+  return {
+    category: "Unknown",
+    message: raw.replace(/^error:\s*/i, ""),
+    description: "An unexpected connection error occurred.",
+    rawError: raw
+  };
+}
+
+function getStateDotClass(tabObj) {
+  if (!tabObj) return "state-closed";
+  const st = tabObj.connectionState || (tabObj.isConnected ? "Connected" : "Closed");
+  const cat = tabObj.errorInfo?.category || "";
+
+  switch (st) {
+    case "Connected":
+      return "state-connected";
+    case "Connecting":
+      return "state-connecting";
+    case "Authenticating":
+      return "state-authenticating";
+    case "Reconnecting":
+      return "state-reconnecting";
+    case "Closing":
+      return "state-closing";
+    case "Closed":
+      if (cat === "Server closed connection" || (tabObj.stateMessage && tabObj.stateMessage.toLowerCase().includes("lost"))) {
+        return "state-connection-lost";
+      }
+      return "state-closed";
+    case "Failed":
+      if (cat === "Authentication failure") {
+        return "state-auth-failed";
+      }
+      if (cat === "Server closed connection") {
+        return "state-connection-lost";
+      }
+      return "state-failed";
+    case "Disconnected":
+      return "state-disconnected";
+    default:
+      return tabObj.isConnected ? "state-connected" : "state-closed";
+  }
+}
+
+function getStateTooltip(tabObj) {
+  if (!tabObj) return "● Disconnected";
+  const st = tabObj.connectionState || (tabObj.isConnected ? "Connected" : "Closed");
+  const cat = tabObj.errorInfo?.category || "";
+
+  switch (st) {
+    case "Connected":
+      return "● Connected";
+    case "Connecting":
+      return "● Connecting...";
+    case "Authenticating":
+      return "● Authenticating...";
+    case "Reconnecting":
+      return "● Reconnecting...";
+    case "Closing":
+      return "● Closing...";
+    case "Closed":
+      if (cat === "Server closed connection" || (tabObj.stateMessage && tabObj.stateMessage.toLowerCase().includes("lost"))) {
+        return "● Connection lost";
+      }
+      return "● Disconnected";
+    case "Failed":
+      if (cat === "Authentication failure") {
+        return "● Authentication failed";
+      }
+      if (cat === "Server closed connection") {
+        return "● Connection lost";
+      }
+      if (cat) {
+        return `● Connection failed: ${cat}`;
+      }
+      return "● Connection failed";
+    case "Disconnected":
+      return "● Disconnected";
+    default:
+      return tabObj.isConnected ? "● Connected" : "● Disconnected";
+  }
+}
+
+function getStateLabel(tabObj) {
+  if (!tabObj) return "Disconnected";
+  const st = tabObj.connectionState || (tabObj.isConnected ? "Connected" : "Closed");
+  const cat = tabObj.errorInfo?.category || "";
+
+  switch (st) {
+    case "Connected":
+      return "Connected";
+    case "Connecting":
+      return "Connecting...";
+    case "Authenticating":
+      return "Authenticating...";
+    case "Reconnecting":
+      return "Reconnecting...";
+    case "Closing":
+      return "Closing...";
+    case "Closed":
+      if (cat === "Server closed connection") return "Connection lost";
+      return "Disconnected";
+    case "Failed":
+      if (cat === "Authentication failure") return "Auth failed";
+      if (cat === "Server closed connection") return "Connection lost";
+      return cat || "Failed";
+    case "Disconnected":
+      return "Disconnected";
+    default:
+      return tabObj.isConnected ? "Connected" : "Disconnected";
+  }
+}
+
+function wrapTerminalText(str, maxLen = 66) {
+  if (!str) return [];
+  const words = String(str).split(" ");
+  const lines = [];
+  let current = "";
+  words.forEach(w => {
+    if ((current + " " + w).trim().length <= maxLen) {
+      current = (current + " " + w).trim();
+    } else {
+      if (current) lines.push(current);
+      current = w;
+    }
+  });
+  if (current) lines.push(current);
+  return lines;
+}
+
+function renderTerminalDiagnosticCard(term, profile, errInfo) {
+  if (!term) return;
+  const cat = errInfo?.category || "Unknown";
+  const msg = errInfo?.message || "Connection failed";
+  const desc = errInfo?.description || "An unexpected error occurred during connection.";
+  const raw = errInfo?.rawError || "";
+
+  term.write("\r\n");
+  term.write("\x1b[1;31m┌────────────────────────────────────────────────────────────────────────┐\x1b[0m\r\n");
+  term.write(`\x1b[1;31m│\x1b[0m \x1b[1;37;41m ❌ CONNECTION ERROR \x1b[0m \x1b[1;31m${(cat).padEnd(49).slice(0, 49)}\x1b[1;31m│\x1b[0m\r\n`);
+  term.write("\x1b[1;31m├────────────────────────────────────────────────────────────────────────┤\x1b[0m\r\n");
+  term.write(`\x1b[1;31m│\x1b[0m \x1b[1;36mTarget:\x1b[0m         ${(`${profile.host || 'unknown'}:${profile.port || 22}`).padEnd(56).slice(0, 56)}\x1b[1;31m│\x1b[0m\r\n`);
+  term.write(`\x1b[1;31m│\x1b[0m \x1b[1;36mUser:\x1b[0m           ${(profile.username || "n/a").padEnd(56).slice(0, 56)}\x1b[1;31m│\x1b[0m\r\n`);
+  term.write(`\x1b[1;31m│\x1b[0m \x1b[1;33mClassification:\x1b[0m ${cat.padEnd(56).slice(0, 56)}\x1b[1;31m│\x1b[0m\r\n`);
+  term.write(`\x1b[1;31m│\x1b[0m \x1b[1;31mReason:\x1b[0m         ${msg.padEnd(56).slice(0, 56)}\x1b[1;31m│\x1b[0m\r\n`);
+  term.write("\x1b[1;31m├────────────────────────────────────────────────────────────────────────┤\x1b[0m\r\n");
+  term.write(`\x1b[1;31m│\x1b[0m \x1b[1;33mDiagnostics:\x1b[0m                                                           \x1b[1;31m│\x1b[0m\r\n`);
+
+  const descLines = wrapTerminalText(desc, 68);
+  descLines.forEach(l => {
+    term.write(`\x1b[1;31m│\x1b[0m   \x1b[0;37m${l.padEnd(68).slice(0, 68)}\x1b[1;31m│\x1b[0m\r\n`);
+  });
+
+  if (raw && raw !== msg && raw !== desc) {
+    term.write("\x1b[1;31m├────────────────────────────────────────────────────────────────────────┤\x1b[0m\r\n");
+    const rawLines = wrapTerminalText("Raw details: " + raw, 68);
+    rawLines.forEach(l => {
+      term.write(`\x1b[1;31m│\x1b[0m   \x1b[0;90m${l.padEnd(68).slice(0, 68)}\x1b[1;31m│\x1b[0m\r\n`);
+    });
+  }
+
+  term.write("\x1b[1;31m├────────────────────────────────────────────────────────────────────────┤\x1b[0m\r\n");
+  term.write(`\x1b[1;31m│\x1b[0m \x1b[1;32m💡 Hint:\x1b[0m Click \x1b[1;33m↻ Reconnect\x1b[0m in top toolbar or press \x1b[1;33mCtrl+R\x1b[0m to retry      \x1b[1;31m│\x1b[0m\r\n`);
+  term.write("\x1b[1;31m└────────────────────────────────────────────────────────────────────────┘\x1b[0m\r\n\r\n");
+}
+
+function setTabConnectionState(tabId, state, errorInfo = null, customMessage = "") {
+  const t = tabs[tabId];
+  if (!t) return;
+
+  t.connectionState = state;
+  if (errorInfo) t.errorInfo = errorInfo;
+  if (customMessage) t.stateMessage = customMessage;
+
+  if (state === "Connected") {
+    t.isConnected = true;
+    t.errorInfo = null;
+  } else if (state === "Closed" || state === "Failed" || state === "Disconnected") {
+    t.isConnected = false;
+  }
+
+  const dotClass = getStateDotClass(t);
+  const tooltip = getStateTooltip(t);
+
+  // Update tab bar dot
+  if (t.tabEl) {
+    const dot = t.tabEl.querySelector(".tab-dot");
+    if (dot) {
+      dot.className = "tab-dot " + dotClass;
+      dot.title = tooltip;
+    }
+    t.tabEl.title = `${t.profile.name} (${tooltip})`;
+  }
+
+  // Update workspace pane tab dots
+  const paneDots = document.querySelectorAll(`.pane-tab-item[data-tab-id="${tabId}"] .pane-tab-dot`);
+  paneDots.forEach(pDot => {
+    pDot.className = "pane-tab-dot " + dotClass;
+    pDot.style.background = "";
+    pDot.title = tooltip;
+  });
+
+  // Update connected server list dot & badges
+  const srvItem = document.querySelector(`.connected-server-item[data-tab-id="${tabId}"]`);
+  if (srvItem) {
+    const sDot = srvItem.querySelector(".connected-item-dot");
+    if (sDot) {
+      sDot.className = "connected-item-dot " + dotClass;
+      sDot.title = tooltip;
+    }
+    const stateBadge = srvItem.querySelector(".connected-item-state");
+    if (stateBadge) {
+      stateBadge.className = "connected-item-state " + dotClass;
+      stateBadge.textContent = getStateLabel(t);
+    }
+  }
+
+  updateStatus();
+  renderTree();
+}
+
 function updateStatus() {
   const tabCount = Object.keys(tabs).length;
   if (activeSessionsCountEl) {
@@ -471,7 +805,38 @@ function updateStatus() {
         activeTargetTextEl.textContent = t.isLocal ? "Local Terminal" : `SSH • ${t.profile.username}@${t.profile.host}`;
       }
       if (statusMessageEl) {
-        statusMessageEl.textContent = t.isConnected ? `Connected: ${t.profile.name}` : `Disconnected: ${t.profile.name}`;
+        if (t.isLocal) {
+          statusMessageEl.textContent = t.isConnected ? "Local Terminal Active" : "Local Terminal Closed";
+        } else {
+          const st = t.connectionState || (t.isConnected ? "Connected" : "Closed");
+          if (st === "Connected") {
+            statusMessageEl.textContent = `● Connected: ${t.profile.name} (${t.profile.host})`;
+          } else if (st === "Connecting") {
+            statusMessageEl.textContent = `● Connecting to ${t.profile.host}...`;
+          } else if (st === "Authenticating") {
+            statusMessageEl.textContent = `● Authenticating ${t.profile.username}@${t.profile.host}...`;
+          } else if (st === "Reconnecting") {
+            statusMessageEl.textContent = `● Reconnecting to ${t.profile.host}...`;
+          } else if (st === "Closing") {
+            statusMessageEl.textContent = `● Closing connection to ${t.profile.host}...`;
+          } else if (st === "Failed") {
+            if (t.errorInfo?.category === "Authentication failure") {
+              statusMessageEl.textContent = `● Authentication failed for ${t.profile.username}@${t.profile.host}`;
+            } else if (t.errorInfo?.category === "Server closed connection") {
+              statusMessageEl.textContent = `● Connection lost: ${t.profile.host}`;
+            } else {
+              statusMessageEl.textContent = `● Connection failed: ${t.errorInfo?.category || 'Failed'} (${t.errorInfo?.message || t.profile.host})`;
+            }
+          } else if (st === "Closed") {
+            if (t.errorInfo?.category === "Server closed connection" || (t.stateMessage && t.stateMessage.toLowerCase().includes("lost"))) {
+              statusMessageEl.textContent = `● Connection lost: ${t.profile.host}`;
+            } else {
+              statusMessageEl.textContent = `● Disconnected: ${t.profile.name}`;
+            }
+          } else {
+            statusMessageEl.textContent = `● Disconnected: ${t.profile.name}`;
+          }
+        }
       }
     }
   }
@@ -499,49 +864,35 @@ function parseQuickConnect(raw) {
   if (str.includes(" ")) {
     const parts = str.split(/\s+/);
     str = parts[0];
-    initialDir = parts.slice(1).join(" ").trim();
+    initialDir = parts.slice(1).join(" ");
   }
 
-  let username = "root";
-  let host = str;
+  let username = "";
+  let host = "";
   let port = 22;
 
-  if (host.includes("@")) {
-    const atIdx = host.indexOf("@");
-    username = host.substring(0, atIdx) || "root";
-    host = host.substring(atIdx + 1);
+  if (str.includes("@")) {
+    const atParts = str.split("@");
+    username = atParts[0];
+    str = atParts[1];
   }
 
-  if (!initialDir && host.includes("/")) {
-    const slashIdx = host.indexOf("/");
-    initialDir = host.substring(slashIdx);
-    host = host.substring(0, slashIdx);
+  if (str.includes("/") && !str.includes("://")) {
+    const slashIdx = str.indexOf("/");
+    if (!initialDir) initialDir = str.substring(slashIdx);
+    str = str.substring(0, slashIdx);
   }
 
-  if (host.includes(":")) {
-    const colonIdx = host.indexOf(":");
-    const afterColon = host.substring(colonIdx + 1);
-    host = host.substring(0, colonIdx);
-    if (afterColon.startsWith("/")) {
-      if (!initialDir) initialDir = afterColon;
-    } else {
-      const portNum = parseInt(afterColon, 10);
-      if (!isNaN(portNum) && portNum > 0) {
-        port = portNum;
-      }
-    }
+  if (str.includes(":")) {
+    const colonParts = str.split(":");
+    host = colonParts[0];
+    const pNum = parseInt(colonParts[1], 10);
+    if (!isNaN(pNum) && pNum > 0) port = pNum;
+  } else {
+    host = str;
   }
 
-  if (initialDir && !initialDir.startsWith("/")) {
-    initialDir = "/" + initialDir;
-  }
-
-  return {
-    username: username.trim(),
-    host: host.trim(),
-    port: port,
-    initialDir: initialDir || "/"
-  };
+  return { host, port, username, initialDir };
 }
 
 // --------------------------------------------------------------------------
@@ -568,14 +919,21 @@ function renderConnectedServers() {
     item.className = `connected-server-item ${isActive ? 'active' : ''}`;
     item.dataset.tabId = tabId;
 
+    const dotClass = getStateDotClass(t);
+    const tooltip = getStateTooltip(t);
+    const stateLabel = getStateLabel(t);
+
     const titleText = t.profile.name || (t.isLocal ? "Local Terminal" : t.profile.host);
     const subText = t.isLocal ? "Local Terminal (PowerShell)" : `SSH • ${t.profile.username || 'user'}@${t.profile.host || 'host'}:${t.profile.port || 22}`;
     const activePath = t.sftpPath || (t.profile && t.profile.initialDir) || "/";
 
     item.innerHTML = `
-      <span class="connected-item-dot"></span>
+      <span class="connected-item-dot ${dotClass}" title="${escapeHtml(tooltip)}"></span>
       <div class="connected-item-info">
-        <span class="connected-item-title" title="${escapeHtml(titleText)}">${escapeHtml(titleText)}</span>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+          <span class="connected-item-title" title="${escapeHtml(titleText)}">${escapeHtml(titleText)}</span>
+          <span class="connected-item-state ${dotClass}">${escapeHtml(stateLabel)}</span>
+        </div>
         <span class="connected-item-sub" title="${escapeHtml(subText)}">${escapeHtml(subText)}</span>
         ${!t.isLocal ? `<span class="connected-item-path" title="Current SFTP Path: ${escapeHtml(activePath)}">📁 ${escapeHtml(activePath)}</span>` : ''}
       </div>
@@ -594,7 +952,6 @@ function renderConnectedServers() {
 
 // --------------------------------------------------------------------------
 // Tree Rendering & Session Management (Drag-and-Drop)
-// --------------------------------------------------------------------------
 
 async function refreshTree(filter = "") {
   try {
@@ -1327,21 +1684,34 @@ async function connectToSession(profile) {
     }
   }
 
-  showToast(`Connecting to ${profile.username}@${profile.host}...`, "info");
-  if (statusMessageEl) statusMessageEl.textContent = `Connecting to ${profile.host}...`;
+  // Pre-allocate tabId so the terminal tab and pane mount immediately with "Connecting..." state
+  const tabId = "ssh-" + Math.random().toString(36).substring(2, 9) + "-" + Date.now().toString(36);
+  createTab(tabId, profile, false, "Connecting");
 
-  let tabId;
+  showToast(`Connecting to ${profile.username}@${profile.host}...`, "info");
+  setTabConnectionState(tabId, "Connecting", null, `Connecting to ${profile.host}...`);
+
   try {
     if (window.go && window.go.main && window.go.main.App) {
-      tabId = await window.go.main.App.OpenSession(profile, password);
-    } else {
-      tabId = "mock-" + Math.random().toString(36).substring(7);
+      if (typeof window.go.main.App.OpenSessionWithTabID === "function") {
+        await window.go.main.App.OpenSessionWithTabID(tabId, profile, password);
+      } else {
+        const actualTabId = await window.go.main.App.OpenSession(profile, password);
+        if (actualTabId && actualTabId !== tabId && tabs[tabId]) {
+          tabs[actualTabId] = tabs[tabId];
+          delete tabs[tabId];
+        }
+      }
     }
-    createTab(tabId, profile, false);
+    setTabConnectionState(tabId, "Connected");
     showToast(`Connected to ${profile.name}`, "success");
   } catch (err) {
-    showToast(`Connection failed: ${err}`, "error");
-    if (statusMessageEl) statusMessageEl.textContent = "Connection failed";
+    const classified = parseClassifiedError(err);
+    setTabConnectionState(tabId, "Failed", classified);
+    if (tabs[tabId] && tabs[tabId].term) {
+      renderTerminalDiagnosticCard(tabs[tabId].term, profile, classified);
+    }
+    showToast(`Connection failed: [${classified.category}] ${classified.message}`, "error");
   }
 }
 
@@ -2012,16 +2382,20 @@ function setupDualPaneSFTP(tabId, profile, paneEl, fitAddon, term) {
   setTimeout(() => loadRemoteList(curRemotePath), 400);
 }
 
-function createTab(tabId, profile, isLocal = false) {
+function createTab(tabId, profile, isLocal = false, initialState = "Connected") {
   welcomeStateEl.classList.remove("active");
   homeTabBtnEl.classList.remove("active");
   floatingControlsEl.classList.remove("hidden");
 
+  const initialDotClass = isLocal ? "state-connected" : (initialState === "Connecting" ? "state-connecting" : "state-connected");
+  const initialTooltip = isLocal ? "● Connected" : (initialState === "Connecting" ? "● Connecting..." : "● Connected");
+
   const tabEl = document.createElement("div");
   tabEl.className = "tab-item active";
   tabEl.dataset.tabId = tabId;
+  tabEl.title = `${profile.name} (${initialTooltip})`;
   tabEl.innerHTML = `
-    <span class="tab-dot"></span>
+    <span class="tab-dot ${initialDotClass}" title="${initialTooltip}"></span>
     <span class="tab-title" title="${profile.name}">${profile.name}</span>
     <span class="tab-close" title="Close (Ctrl+W)">&times;</span>
   `;
@@ -2227,15 +2601,44 @@ function createTab(tabId, profile, isLocal = false) {
     });
     if (typeof unsubData === "function") unsubs.push(unsubData);
 
-    const unsubClosed = window.runtime.EventsOn("terminal:closed:" + tabId, (reason) => {
-      term.write(`\r\n\x1b[1;31m[Session closed: ${reason || 'Disconnected'}]\x1b[0m\r\n`);
-      if (tabs[tabId]) {
-        tabs[tabId].isConnected = false;
-        const dot = tabEl.querySelector(".tab-dot");
-        if (dot) dot.classList.add("disconnected");
-        updateStatus();
-        renderTree();
+    const unsubState = window.runtime.EventsOn("terminal:state:" + tabId, (payload) => {
+      if (!payload) return;
+      const st = payload.state;
+      const msg = payload.message || "";
+      const errInfo = payload.error ? parseClassifiedError(payload.error) : null;
+      setTabConnectionState(tabId, st, errInfo, msg);
+
+      if (st === "Connecting") {
+        term.write(`\r\n\x1b[1;36m● Connecting to ${profile.username || 'user'}@${profile.host}:${profile.port || 22}...\x1b[0m\r\n`);
+      } else if (st === "Authenticating") {
+        term.write(`\x1b[1;33m● Authenticating user '${profile.username}'...\x1b[0m\r\n`);
+      } else if (st === "Connected") {
+        term.write(`\x1b[1;32m● Connected to ${profile.host}\x1b[0m\r\n\r\n`);
+      } else if (st === "Failed") {
+        renderTerminalDiagnosticCard(term, profile, errInfo);
       }
+    });
+    if (typeof unsubState === "function") unsubs.push(unsubState);
+
+    const unsubClosed = window.runtime.EventsOn("terminal:closed:" + tabId, (payload) => {
+      let reason = "Disconnected";
+      let errInfo = null;
+      if (typeof payload === "object" && payload !== null) {
+        reason = payload.reason || "Disconnected";
+        errInfo = {
+          category: payload.category || "Server closed connection",
+          message: payload.reason || "Session closed",
+          description: payload.description || "The remote server or network closed the connection.",
+          rawError: payload.rawError || payload.reason || ""
+        };
+      } else if (typeof payload === "string") {
+        reason = payload;
+        errInfo = parseClassifiedError(payload);
+      }
+
+      setTabConnectionState(tabId, "Closed", errInfo, reason);
+      term.write(`\r\n\x1b[1;31m[● Connection lost: ${errInfo.category} - ${errInfo.message}]\x1b[0m\r\n`);
+      renderTerminalDiagnosticCard(term, profile, errInfo);
     });
     if (typeof unsubClosed === "function") unsubs.push(unsubClosed);
   }
@@ -2322,7 +2725,10 @@ function createTab(tabId, profile, isLocal = false) {
     paneEl,
     tabEl,
     paneId: targetPane.id,
-    isConnected: true,
+    isConnected: initialState === "Connected" || isLocal,
+    connectionState: isLocal ? "Connected" : initialState,
+    stateMessage: "",
+    errorInfo: null,
     isLocal,
     sftpPath: profile.initialDir || "~",
     terminalCwd: profile.initialDir || "~",
@@ -2543,9 +2949,13 @@ function renderWorkspace() {
 
       const itemEl = document.createElement("div");
       itemEl.className = `pane-tab-item ${tId === pane.activeTabId ? 'active' : ''}`;
+      itemEl.dataset.tabId = tId;
       itemEl.draggable = true;
+      const pDotClass = getStateDotClass(tabObj);
+      const pTooltip = getStateTooltip(tabObj);
+      itemEl.title = `${tabObj.profile.name || 'Terminal'} (${pTooltip})`;
       itemEl.innerHTML = `
-        <span class="pane-tab-dot" style="background: ${tabObj.isConnected ? '#22c55e' : '#ef4444'}"></span>
+        <span class="pane-tab-dot ${pDotClass}" title="${escapeHtml(pTooltip)}"></span>
         <span class="pane-tab-title" title="${escapeHtml(tabObj.profile.name || '')}">${escapeHtml(tabObj.profile.name || 'Terminal')}</span>
         <span class="pane-tab-close" title="Close Tab">&times;</span>
       `;
@@ -2880,6 +3290,7 @@ function closeTab(tabId) {
   // 2. Unregister event topics if EventsOff is available
   if (window.runtime && window.runtime.EventsOff) {
     try { window.runtime.EventsOff("terminal:data:" + tabId); } catch (_) {}
+    try { window.runtime.EventsOff("terminal:state:" + tabId); } catch (_) {}
     try { window.runtime.EventsOff("terminal:closed:" + tabId); } catch (_) {}
   }
 
@@ -7004,11 +7415,46 @@ function setupEventListeners() {
   safeClick("toolTunnel", showTunnelingDialog);
 
   // Floating controls
-  safeClick("reconnectBtn", () => {
-    if (activeTabId && tabs[activeTabId]) {
-      const p = tabs[activeTabId].profile;
-      closeTab(activeTabId);
-      connectToSession(p);
+  safeClick("reconnectBtn", async () => {
+    if (!activeTabId || !tabs[activeTabId]) return;
+    const t = tabs[activeTabId];
+    if (t.isLocal) {
+      showToast("Cannot reconnect a local terminal", "info");
+      return;
+    }
+    const tabId = activeTabId;
+    const profile = t.profile;
+
+    setTabConnectionState(tabId, "Reconnecting", null, `Reconnecting to ${profile.host}...`);
+    if (t.term) {
+      t.term.write(`\r\n\x1b[1;33m● Reconnecting to ${profile.username || 'user'}@${profile.host}:${profile.port || 22}...\x1b[0m\r\n`);
+    }
+    showToast(`Reconnecting to ${profile.host}...`, "info");
+
+    let password = "";
+    if (!profile.privateKeyPath && window.go && window.go.main && window.go.main.App && profile.vaultKey) {
+      try {
+        password = await window.go.main.App.GetSavedPassword(profile.vaultKey);
+      } catch (_) {}
+    }
+
+    try {
+      if (window.go && window.go.main && window.go.main.App) {
+        if (typeof window.go.main.App.OpenSessionWithTabID === "function") {
+          await window.go.main.App.OpenSessionWithTabID(tabId, profile, password);
+        } else {
+          await window.go.main.App.OpenSession(profile, password);
+        }
+      }
+      setTabConnectionState(tabId, "Connected");
+      showToast(`Reconnected to ${profile.name}`, "success");
+    } catch (err) {
+      const classified = parseClassifiedError(err);
+      setTabConnectionState(tabId, "Failed", classified);
+      if (t.term) {
+        renderTerminalDiagnosticCard(t.term, profile, classified);
+      }
+      showToast(`Reconnection failed: [${classified.category}] ${classified.message}`, "error");
     }
   });
   safeClick("clearTermBtn", () => {

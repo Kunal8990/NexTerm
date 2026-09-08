@@ -528,6 +528,29 @@ export namespace sftpmanager {
 
 }
 
+export namespace sshsession {
+	
+	export class ClassifiedError {
+	    category: string;
+	    message: string;
+	    description: string;
+	    rawError: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ClassifiedError(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.category = source["category"];
+	        this.message = source["message"];
+	        this.description = source["description"];
+	        this.rawError = source["rawError"];
+	    }
+	}
+
+}
+
 export namespace tunnel {
 	
 	export class TunnelConfig {
