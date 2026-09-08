@@ -10,6 +10,8 @@ import (
 	"sync"
 	"time"
 
+	"net"
+	"nexterm/internal/hostkey"
 	"nexterm/internal/macro"
 	"nexterm/internal/model"
 	"nexterm/internal/nettools"
@@ -23,6 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
+	"golang.org/x/crypto/ssh"
 )
 
 type externalFileWatch struct {
@@ -52,17 +55,23 @@ type App struct {
 
 	watcherMu    sync.Mutex
 	fileWatchers map[string]*externalFileWatch
+
+	hostKeyMgr        *hostkey.Manager
+	pendingHostKeysMu sync.Mutex
+	pendingHostKeys   map[string]chan string
 }
 
 func NewApp() *App {
 	return &App{
-		tabs:         make(map[string]*sshsession.Session),
-		localTabs:    make(map[string]*pty.Terminal),
-		sftpMgr:      sftpmanager.NewSFTPManager(),
-		tunnelMgr:    tunnel.NewTunnelManager(),
-		macroMgr:     macro.NewMacroManager(),
-		secMgr:       security.NewSecurityManager(),
-		fileWatchers: make(map[string]*externalFileWatch),
+		tabs:            make(map[string]*sshsession.Session),
+		localTabs:       make(map[string]*pty.Terminal),
+		sftpMgr:         sftpmanager.NewSFTPManager(),
+		tunnelMgr:       tunnel.NewTunnelManager(),
+		macroMgr:        macro.NewMacroManager(),
+		secMgr:          security.NewSecurityManager(),
+		fileWatchers:    make(map[string]*externalFileWatch),
+		hostKeyMgr:      hostkey.GetDefaultManager(),
+		pendingHostKeys: make(map[string]chan string),
 	}
 }
 
@@ -379,6 +388,8 @@ func (a *App) OpenSession(profile model.SessionProfile, password string) (string
 			}
 		}
 	}
+
+	opts.HostKeyCallback = a.buildHostKeyCallback()
 
 	sess, err := sshsession.Connect(opts)
 	if err != nil {
@@ -1056,4 +1067,116 @@ func deleteNodeRecursive(parent *model.TreeNode, id string) bool {
 	}
 	return false
 }
+
+func (a *App) buildHostKeyCallback() ssh.HostKeyCallback {
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		if a.hostKeyMgr == nil {
+			a.hostKeyMgr = hostkey.GetDefaultManager()
+		}
+
+		res, err := a.hostKeyMgr.Check(hostname, remote, key)
+		if err != nil {
+			return err
+		}
+
+		if res.Status == hostkey.StatusTrusted {
+			return nil
+		}
+
+		if res.Status == hostkey.StatusRevoked {
+			return fmt.Errorf("host key for %s is revoked in known_hosts", hostname)
+		}
+
+		// Prompt user interactively for Unknown or Mismatch
+		reqID := uuid.NewString()
+		respChan := make(chan string, 1)
+
+		a.pendingHostKeysMu.Lock()
+		a.pendingHostKeys[reqID] = respChan
+		a.pendingHostKeysMu.Unlock()
+
+		defer func() {
+			a.pendingHostKeysMu.Lock()
+			delete(a.pendingHostKeys, reqID)
+			a.pendingHostKeysMu.Unlock()
+		}()
+
+		// Emit event to frontend
+		wailsruntime.EventsEmit(a.ctx, "ssh:hostkey:verify_request", map[string]interface{}{
+			"requestId":         reqID,
+			"host":              res.Host,
+			"port":              res.Port,
+			"normalizedAddr":    res.NormalizedAddr,
+			"keyType":           res.KeyType,
+			"fingerprintSha256": res.FingerprintSHA256,
+			"fingerprintMd5":    res.FingerprintMD5,
+			"status":            string(res.Status),
+			"oldKeyType":        res.OldKeyType,
+			"oldFingerprintSha": res.OldFingerprintSHA,
+			"oldFingerprintMd5": res.OldFingerprintMD5,
+			"knownHostsPath":    res.KnownHostsPath,
+			"message":           res.Message,
+		})
+
+		select {
+		case action := <-respChan:
+			switch action {
+			case "accept_save":
+				if res.Status == hostkey.StatusMismatch {
+					if rErr := a.hostKeyMgr.Replace(hostname, remote, key); rErr != nil {
+						return fmt.Errorf("failed to update known_hosts: %w", rErr)
+					}
+				} else {
+					if aErr := a.hostKeyMgr.Add(hostname, remote, key); aErr != nil {
+						return fmt.Errorf("failed to save to known_hosts: %w", aErr)
+					}
+				}
+				return nil
+			case "accept_once":
+				return nil
+			case "reject":
+				return fmt.Errorf("connection rejected by user: host key untrusted")
+			default:
+				return fmt.Errorf("connection rejected: unexpected action %q", action)
+			}
+		case <-time.After(120 * time.Second):
+			return fmt.Errorf("connection timed out: host key verification took too long")
+		}
+	}
+}
+
+// RespondHostKey delivers the user decision ("accept_save", "accept_once", or "reject") for a pending host-key verification request.
+func (a *App) RespondHostKey(requestID string, action string) error {
+	a.pendingHostKeysMu.Lock()
+	ch, ok := a.pendingHostKeys[requestID]
+	a.pendingHostKeysMu.Unlock()
+
+	if !ok || ch == nil {
+		return fmt.Errorf("verification request not found or expired: %s", requestID)
+	}
+
+	select {
+	case ch <- action:
+		return nil
+	default:
+		return fmt.Errorf("host key request already answered")
+	}
+}
+
+// GetKnownHosts returns all known_hosts entries.
+func (a *App) GetKnownHosts() ([]hostkey.HostKeyEntry, error) {
+	if a.hostKeyMgr == nil {
+		a.hostKeyMgr = hostkey.GetDefaultManager()
+	}
+	return a.hostKeyMgr.List()
+}
+
+// DeleteKnownHost removes a host entry from known_hosts.
+func (a *App) DeleteKnownHost(hostname string, port int) error {
+	if a.hostKeyMgr == nil {
+		a.hostKeyMgr = hostkey.GetDefaultManager()
+	}
+	return a.hostKeyMgr.Remove(hostname, port)
+}
+
 

@@ -18,6 +18,10 @@ export function CloseTab(arg1) {
   return window['go']['main']['App']['CloseTab'](arg1);
 }
 
+export function DeleteKnownHost(arg1, arg2) {
+  return window['go']['main']['App']['DeleteKnownHost'](arg1, arg2);
+}
+
 export function DeleteMacro(arg1) {
   return window['go']['main']['App']['DeleteMacro'](arg1);
 }
@@ -52,6 +56,10 @@ export function GetAvailableSerialPorts() {
 
 export function GetCustomizerConfig() {
   return window['go']['main']['App']['GetCustomizerConfig']();
+}
+
+export function GetKnownHosts() {
+  return window['go']['main']['App']['GetKnownHosts']();
 }
 
 export function GetMacros() {
@@ -124,6 +132,10 @@ export function QuickConnect(arg1, arg2, arg3, arg4, arg5) {
 
 export function ResizeTerminal(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResizeTerminal'](arg1, arg2, arg3);
+}
+
+export function RespondHostKey(arg1, arg2) {
+  return window['go']['main']['App']['RespondHostKey'](arg1, arg2);
 }
 
 export function SFTPCommitExternalChange(arg1, arg2, arg3) {

@@ -2782,3 +2782,188 @@ html, body, #app {
 .nte-status-save.modified {
   color: #f59e0b;
 }
+
+/* --------------------------------------------------------------------------
+ * SSH Host Key Verification Modal
+ * -------------------------------------------------------------------------- */
+.modal-card.modal-hostkey {
+  width: 640px;
+  max-width: 95vw;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75);
+}
+
+.hostkey-header-unknown {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+.hostkey-header-mismatch {
+  background: linear-gradient(135deg, #581c1c 0%, #2b0e0e 100%) !important;
+  border-bottom: 1px solid #991b1b !important;
+}
+
+.hostkey-banner-unknown {
+  background: rgba(14, 165, 233, 0.08);
+  border: 1px solid rgba(14, 165, 233, 0.28);
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  color: #bae6fd;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.hostkey-banner-mismatch {
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.45);
+  border-radius: 6px;
+  padding: 14px;
+  margin-bottom: 14px;
+  color: #fecaca;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.hostkey-banner-mismatch strong {
+  color: #ef4444;
+  font-size: 13.5px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.hostkey-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #181b24;
+  border: 1px solid #2e3446;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.hostkey-row {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.hostkey-label {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.hostkey-val {
+  color: #f1f5f9;
+  word-break: break-all;
+}
+
+.hostkey-fp-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 5px 8px;
+}
+
+.hostkey-fp-box code {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  color: #38bdf8;
+  font-size: 11.5px;
+  word-break: break-all;
+}
+
+.hostkey-fp-box.mismatch code {
+  color: #f87171;
+}
+
+.hostkey-fp-box.old code {
+  color: #fbbf24;
+}
+
+.btn-copy-fp {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: #334155;
+  color: #f1f5f9;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.btn-copy-fp:hover {
+  background: #475569;
+}
+
+.hostkey-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+
+.hostkey-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #2e3446;
+}
+
+.btn-hostkey-trust {
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3) !important;
+}
+
+.btn-hostkey-trust:hover {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%) !important;
+}
+
+.btn-hostkey-danger {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4) !important;
+}
+
+.btn-hostkey-danger:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%) !important;
+}
+
+.knownhosts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.knownhosts-table th {
+  background: #181b24;
+  color: #94a3b8;
+  padding: 6px 10px;
+  text-align: left;
+  border-bottom: 1px solid #2e3446;
+}
+
+.knownhosts-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid #232733;
+  color: #e2e8f0;
+}
+

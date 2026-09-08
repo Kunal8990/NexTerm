@@ -445,6 +445,9 @@ async function init() {
     window.runtime.EventsOn("sftp:file:modified", (info) => {
       handleExternalFileModified(info);
     });
+    window.runtime.EventsOn("ssh:hostkey:verify_request", (data) => {
+      showHostKeyVerificationModal(data);
+    });
   }
 
   await refreshTree();
@@ -2064,6 +2067,188 @@ function hideModal() {
   if (modalBoxEl) modalBoxEl.innerHTML = "";
 }
 
+function showHostKeyVerificationModal(data) {
+  if (!data) return;
+
+  const isMismatch = data.status === "mismatch";
+  let responded = false;
+
+  function sendResponse(action) {
+    if (responded) return;
+    responded = true;
+    hideModal();
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.RespondHostKey) {
+      window.go.main.App.RespondHostKey(data.requestId, action);
+    }
+  }
+
+  const titleHtml = isMismatch
+    ? `<span>⚠️ CRITICAL: REMOTE HOST IDENTIFICATION HAS CHANGED!</span>`
+    : `<span>🛡️ SSH Server Host Key Verification</span>`;
+
+  const headerClass = isMismatch ? "hostkey-header-mismatch" : "hostkey-header-unknown";
+
+  const bannerHtml = isMismatch
+    ? `
+      <div class="hostkey-banner-mismatch">
+        <strong>⚠️ POTENTIAL SECURITY BREACH / MAN-IN-THE-MIDDLE ATTACK!</strong>
+        The host key provided by server <strong>${escapeHtml(data.host)}:${data.port}</strong> differs from the key cached in <code>${escapeHtml(data.knownHostsPath || 'known_hosts')}</code>.<br>
+        Someone could be intercepting your communication (Man-In-The-Middle attack), or the remote server administrator may have changed the host key.<br>
+        <strong>If you were not expecting this change, DO NOT connect!</strong>
+      </div>
+    `
+    : `
+      <div class="hostkey-banner-unknown">
+        The authenticity of host <strong>${escapeHtml(data.host)}:${data.port}</strong> cannot be established.<br>
+        This is the first time you are connecting to this server. Are you sure you want to continue connecting?
+      </div>
+    `;
+
+  let comparisonHtml = "";
+  if (isMismatch) {
+    comparisonHtml = `
+      <div class="hostkey-grid">
+        <div class="hostkey-row">
+          <span class="hostkey-label">Target Server:</span>
+          <span class="hostkey-val"><strong>${escapeHtml(data.host)}</strong> (Port ${data.port})</span>
+        </div>
+        <div class="hostkey-row">
+          <span class="hostkey-label">Stored Key Type:</span>
+          <span class="hostkey-val"><span class="hostkey-badge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border-color: rgba(245, 158, 11, 0.4);">${escapeHtml(data.oldKeyType || 'Unknown')}</span></span>
+        </div>
+        <div class="hostkey-row">
+          <span class="hostkey-label">Stored Fingerprint:</span>
+          <div class="hostkey-fp-box old">
+            <code>${escapeHtml(data.oldFingerprintSha || 'N/A')}</code>
+            <button class="btn-copy-fp" data-copy="${escapeHtml(data.oldFingerprintSha || '')}">📋 Copy</button>
+          </div>
+        </div>
+        <div class="hostkey-row">
+          <span class="hostkey-label">New Key Type:</span>
+          <span class="hostkey-val"><span class="hostkey-badge" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4);">${escapeHtml(data.keyType)}</span></span>
+        </div>
+        <div class="hostkey-row">
+          <span class="hostkey-label">New Fingerprint:</span>
+          <div class="hostkey-fp-box mismatch">
+            <code>${escapeHtml(data.fingerprintSha256)}</code>
+            <button class="btn-copy-fp" data-copy="${escapeHtml(data.fingerprintSha256)}">📋 Copy</button>
+          </div>
+        </div>
+        <div class="hostkey-row">
+          <span class="hostkey-label">known_hosts File:</span>
+          <span class="hostkey-val" style="font-size: 11px; color: #94a3b8;">${escapeHtml(data.knownHostsPath || '')}</span>
+        </div>
+      </div>
+    `;
+  } else {
+    comparisonHtml = `
+      <div class="hostkey-grid">
+        <div class="hostkey-row">
+          <span class="hostkey-label">Target Server:</span>
+          <span class="hostkey-val"><strong>${escapeHtml(data.host)}</strong> (Port ${data.port})</span>
+        </div>
+        <div class="hostkey-row">
+          <span class="hostkey-label">Key Algorithm:</span>
+          <span class="hostkey-val"><span class="hostkey-badge">${escapeHtml(data.keyType)}</span></span>
+        </div>
+        <div class="hostkey-row">
+          <span class="hostkey-label">SHA-256 Fingerprint:</span>
+          <div class="hostkey-fp-box">
+            <code>${escapeHtml(data.fingerprintSha256)}</code>
+            <button class="btn-copy-fp" data-copy="${escapeHtml(data.fingerprintSha256)}">📋 Copy</button>
+          </div>
+        </div>
+        <div class="hostkey-row">
+          <span class="hostkey-label">MD5 Fingerprint:</span>
+          <div class="hostkey-fp-box">
+            <code>${escapeHtml(data.fingerprintMd5)}</code>
+            <button class="btn-copy-fp" data-copy="${escapeHtml(data.fingerprintMd5)}">📋 Copy</button>
+          </div>
+        </div>
+        <div class="hostkey-row">
+          <span class="hostkey-label">known_hosts Cache:</span>
+          <span class="hostkey-val" style="font-size: 11px; color: #94a3b8;">${escapeHtml(data.knownHostsPath || '')}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  const actionsHtml = isMismatch
+    ? `
+      <div class="hostkey-actions">
+        <button class="btn btn-secondary btn-hostkey-danger" id="btnHkAbort">🛑 Abort Connection (Recommended)</button>
+        <button class="btn btn-outline" id="btnHkOverride" style="border-color: #f59e0b; color: #fbbf24;">⚠️ Replace Key in known_hosts & Connect</button>
+      </div>
+    `
+    : `
+      <div class="hostkey-actions">
+        <button class="btn btn-secondary" id="btnHkReject">✕ Reject & Disconnect</button>
+        <button class="btn btn-outline" id="btnHkOnce">Connect Once (Don't save)</button>
+        <button class="btn btn-hostkey-trust" id="btnHkTrust">🛡️ Accept & Save to known_hosts</button>
+      </div>
+    `;
+
+  const box = showModal(`
+    <div class="modal-header ${headerClass}">
+      <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">${titleHtml}</div>
+      <button class="modal-close-btn" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 18px 20px;">
+      ${bannerHtml}
+      ${comparisonHtml}
+      ${actionsHtml}
+    </div>
+  `, "modal-hostkey");
+
+  if (!box) return;
+
+  // Intercept backdrop and close button to reject
+  if (modalOverlayEl) {
+    modalOverlayEl.onclick = (e) => {
+      if (e.target === modalOverlayEl) sendResponse("reject");
+    };
+  }
+  const closeBtn = box.querySelector("#modalClose");
+  if (closeBtn) closeBtn.onclick = () => sendResponse("reject");
+
+  // Copy buttons
+  box.querySelectorAll(".btn-copy-fp").forEach(btn => {
+    btn.onclick = () => {
+      const copyVal = btn.dataset.copy;
+      if (copyVal && navigator.clipboard) {
+        navigator.clipboard.writeText(copyVal).then(() => {
+          showToast("Fingerprint copied to clipboard", "success");
+        }).catch(() => {
+          showToast("Failed to copy", "error");
+        });
+      }
+    };
+  });
+
+  if (isMismatch) {
+    const btnAbort = box.querySelector("#btnHkAbort");
+    if (btnAbort) btnAbort.onclick = () => sendResponse("reject");
+
+    const btnOverride = box.querySelector("#btnHkOverride");
+    if (btnOverride) {
+      btnOverride.onclick = () => {
+        if (confirm(`Are you absolutely sure you want to replace the host key for ${data.host}:${data.port} in known_hosts? This will trust the new key.`)) {
+          sendResponse("accept_save");
+        }
+      };
+    }
+  } else {
+    const btnReject = box.querySelector("#btnHkReject");
+    if (btnReject) btnReject.onclick = () => sendResponse("reject");
+
+    const btnOnce = box.querySelector("#btnHkOnce");
+    if (btnOnce) btnOnce.onclick = () => sendResponse("accept_once");
+
+    const btnTrust = box.querySelector("#btnHkTrust");
+    if (btnTrust) btnTrust.onclick = () => sendResponse("accept_save");
+  }
+}
+
 function detectSyntaxLanguage(fname = "") {
   const ext = fname.toLowerCase().substring(fname.lastIndexOf("."));
   switch (ext) {
@@ -3601,6 +3786,7 @@ async function showSettingsDialog() {
       <button class="modal-tab-btn" data-tab="tab-settings-pwd">🔑 Password Vault</button>
       <button class="modal-tab-btn" data-tab="tab-settings-sec">🛡️ Security Policies</button>
       <button class="modal-tab-btn" data-tab="tab-settings-custom">🏢 Customizer</button>
+      <button class="modal-tab-btn" data-tab="tab-settings-knownhosts">🛡️ Known Hosts</button>
     </div>
     <div class="modal-body" style="max-height: 480px; overflow-y: auto;">
       <!-- 1. Terminal & UI Settings Tab -->
@@ -3727,6 +3913,20 @@ async function showSettingsDialog() {
           </div>
         </div>
       </div>
+
+      <!-- 5. Known Hosts Tab -->
+      <div id="tab-settings-knownhosts" class="tab-content hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div>
+            <h4 style="margin: 0; color: #fff; font-size: 13px;">Cached SSH Known Hosts</h4>
+            <p style="margin: 3px 0 0; color: #94a3b8; font-size: 11.5px;">Trusted host keys cached in <code>%APPDATA%\Nexterm\known_hosts</code></p>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnRefreshKnownHosts" type="button">↻ Refresh</button>
+        </div>
+        <div id="knownHostsListContainer" style="max-height: 280px; overflow-y: auto; background: #13161f; border: 1px solid #232733; border-radius: 4px; padding: 6px;">
+          <div style="color: #94a3b8; padding: 12px; text-align: center;">Loading known hosts...</div>
+        </div>
+      </div>
     </div>
 
     <div class="modal-footer">
@@ -3734,6 +3934,62 @@ async function showSettingsDialog() {
       <button class="btn-primary" id="cfgSave">💾 Save All Settings</button>
     </div>
   `, "modal-lg");
+
+  async function loadKnownHostsList() {
+    const container = box.querySelector("#knownHostsListContainer");
+    if (!container) return;
+    try {
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.GetKnownHosts) {
+        const entries = await window.go.main.App.GetKnownHosts();
+        if (!entries || entries.length === 0) {
+          container.innerHTML = `<div style="color: #94a3b8; padding: 16px; text-align: center; font-size: 12px;">No trusted hosts cached yet. Host keys are saved when you connect to SSH servers.</div>`;
+          return;
+        }
+        let html = `
+          <table class="knownhosts-table">
+            <thead>
+              <tr>
+                <th>Host / Address</th>
+                <th>Key Type</th>
+                <th>Fingerprint (SHA256)</th>
+                <th style="width: 60px;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        entries.forEach((e) => {
+          html += `
+            <tr>
+              <td><strong>${escapeHtml(e.host)}</strong></td>
+              <td><span class="hostkey-badge">${escapeHtml(e.keyType || '')}</span></td>
+              <td><code style="color: #38bdf8; font-size: 11px;">${escapeHtml(e.fingerprint || '')}</code></td>
+              <td><button class="btn btn-danger btn-xs btn-del-knownhost" data-host="${escapeHtml(e.host)}" type="button">Delete</button></td>
+            </tr>
+          `;
+        });
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+
+        container.querySelectorAll(".btn-del-knownhost").forEach(b => {
+          b.onclick = async () => {
+            const h = b.dataset.host;
+            if (confirm(`Remove trusted host key for "${h}"? You will be prompted with the fingerprint next time you connect.`)) {
+              if (window.go && window.go.main && window.go.main.App && window.go.main.App.DeleteKnownHost) {
+                await window.go.main.App.DeleteKnownHost(h, 22);
+                showToast(`Removed ${h} from known_hosts`, "info");
+                loadKnownHostsList();
+              }
+            }
+          };
+        });
+      }
+    } catch (err) {
+      container.innerHTML = `<div style="color: #ef4444; padding: 12px;">Failed to load known hosts: ${escapeHtml(err)}</div>`;
+    }
+  }
+
+  const btnRefKh = box.querySelector("#btnRefreshKnownHosts");
+  if (btnRefKh) btnRefKh.onclick = loadKnownHostsList;
 
   // Tab switching inside modal
   box.querySelectorAll(".modal-tab-btn").forEach(btn => {
@@ -3743,6 +3999,9 @@ async function showSettingsDialog() {
       btn.classList.add("active");
       const target = box.querySelector(`#${btn.dataset.tab}`);
       if (target) target.classList.remove("hidden");
+      if (btn.dataset.tab === "tab-settings-knownhosts") {
+        loadKnownHostsList();
+      }
     };
   });
 

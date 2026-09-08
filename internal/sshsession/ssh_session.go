@@ -5,8 +5,11 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"sync"
 	"time"
+
+	"nexterm/internal/hostkey"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -38,6 +41,9 @@ type ConnectOptions struct {
 	KeepAliveInterval int // in seconds
 	Cols              int
 	Rows              int
+
+	// HostKeyCallback for verifying server identities against known_hosts.
+	HostKeyCallback   ssh.HostKeyCallback
 
 	// Jump Host / Bastion Proxy Configuration
 	UseJumpHost       bool
@@ -71,14 +77,29 @@ func Connect(opts ConnectOptions) (*Session, error) {
 		return nil, err
 	}
 
+	hkcb := opts.HostKeyCallback
+	if hkcb == nil {
+		mgr := hostkey.GetDefaultManager()
+		hkcb = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+			res, err := mgr.Check(hostname, remote, key)
+			if err != nil {
+				return err
+			}
+			if res.Status == hostkey.StatusTrusted {
+				return nil
+			}
+			return fmt.Errorf("host key verification failed for %s: %s (fingerprint: %s)", hostname, res.Status, res.FingerprintSHA256)
+		}
+	}
+
 	config := &ssh.ClientConfig{
 		User:            opts.Username,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // Accepts host keys for fast connection
+		HostKeyCallback: hkcb,
 		Timeout:         15 * time.Second,
 	}
 
-	addr := fmt.Sprintf("%s:%d", opts.Host, opts.Port)
+	addr := net.JoinHostPort(opts.Host, strconv.Itoa(opts.Port))
 	var conn net.Conn
 
 	if opts.UseJumpHost && opts.JumpHost != "" {
@@ -100,10 +121,10 @@ func Connect(opts ConnectOptions) (*Session, error) {
 		jumpConfig := &ssh.ClientConfig{
 			User:            opts.JumpUsername,
 			Auth:            jumpAuth,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			HostKeyCallback: hkcb,
 			Timeout:         15 * time.Second,
 		}
-		jumpAddr := fmt.Sprintf("%s:%d", opts.JumpHost, opts.JumpPort)
+		jumpAddr := net.JoinHostPort(opts.JumpHost, strconv.Itoa(opts.JumpPort))
 		bastionDirectConn, bErr := net.DialTimeout("tcp", jumpAddr, 15*time.Second)
 		if bErr != nil {
 			return nil, fmt.Errorf("bastion connection failed to %s: %w", jumpAddr, bErr)

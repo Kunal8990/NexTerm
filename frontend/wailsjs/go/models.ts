@@ -1,3 +1,28 @@
+export namespace hostkey {
+	
+	export class HostKeyEntry {
+	    host: string;
+	    keyType: string;
+	    fingerprint: string;
+	    sourceFile: string;
+	    lineNumber: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new HostKeyEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.host = source["host"];
+	        this.keyType = source["keyType"];
+	        this.fingerprint = source["fingerprint"];
+	        this.sourceFile = source["sourceFile"];
+	        this.lineNumber = source["lineNumber"];
+	    }
+	}
+
+}
+
 export namespace macro {
 	
 	export class Macro {
