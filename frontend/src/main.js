@@ -1763,14 +1763,14 @@ function renderSFTPItems(items, path = currentSFTPPath) {
       }
     });
 
-    // Double Click -> Open with external app or Nexterm Text Editor
+    // Double Click -> Open in NexTerm Text Editor
     row.addEventListener("dblclick", async (e) => {
       e.stopPropagation();
       if (item.isDir) {
         selectedSFTPItem = null;
         await refreshSFTP(item.path);
       } else {
-        openRemoteFileExternal(item.path, false);
+        openRemoteFileEditor(item.path);
       }
     });
 
@@ -2064,99 +2064,711 @@ function hideModal() {
   if (modalBoxEl) modalBoxEl.innerHTML = "";
 }
 
+function detectSyntaxLanguage(fname = "") {
+  const ext = fname.toLowerCase().substring(fname.lastIndexOf("."));
+  switch (ext) {
+    case ".c": case ".h": case ".cpp": case ".hpp": case ".cc": return "C/C++";
+    case ".py": case ".pyw": return "Python";
+    case ".sh": case ".bash": case ".zsh": case ".ksh": return "Shell/Bash";
+    case ".go": return "Go";
+    case ".java": return "Java";
+    case ".js": case ".mjs": case ".cjs": case ".ts": return "JavaScript";
+    case ".json": return "JSON";
+    case ".xml": case ".html": case ".htm": case ".svg": return "XML/HTML";
+    case ".sql": return "SQL";
+    case ".conf": case ".ini": case ".cfg": case ".yaml": case ".yml": return "Config/YAML";
+    default: return "Plain Text";
+  }
+}
+
 async function openRemoteFileEditor(remotePath) {
   if (!activeTabId || !window.go || !window.go.main || !window.go.main.App) return;
-  showToast(`Opening ${remotePath}...`, "info");
-  try {
-    const content = await window.go.main.App.SFTPReadFile(activeTabId, remotePath);
-    const fileName = remotePath.substring(remotePath.lastIndexOf("/") + 1);
-    const box = showModal(`
-      <div class="modal-header">
-        <div class="modal-title">✏️ Nexterm Editor — ${escapeHtml(fileName)}</div>
-        <button class="modal-close-btn" id="modalClose">&times;</button>
-      </div>
-      <div class="modal-body" style="display: flex; flex-direction: column; gap: 8px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-family: 'Fira Code', monospace;">
-          <span>Remote: <b>${escapeHtml(remotePath)}</b></span>
-          <span id="editorStatusBadge" style="color: var(--accent-green);">Ready (Ctrl+S to Commit & Save)</span>
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <textarea id="remoteEditTextarea" style="width: 100%; height: 380px; font-family: 'Fira Code', Consolas, monospace; font-size: 12px; background: #0f141c; color: #f1f5f9; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 10px; line-height: 1.5; resize: vertical;" spellcheck="false"></textarea>
-        </div>
-      </div>
-      <div class="modal-footer" style="display: flex; align-items: center; justify-content: space-between;">
-        <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); cursor: pointer;">
-          <input type="checkbox" id="autoCommitEditorCheck" checked /> Directly save to remote file on Ctrl+S
-        </label>
-        <div style="display: flex; gap: 6px;">
-          <button class="btn-secondary" id="modalCancel">Close</button>
-          <button class="btn-primary" id="saveRemoteBtn">💾 Save & Commit (Ctrl+S)</button>
-        </div>
-      </div>
-    `, "modal-large");
 
-    const textarea = box.querySelector("#remoteEditTextarea");
-    const statusBadge = box.querySelector("#editorStatusBadge");
-    const saveBtn = box.querySelector("#saveRemoteBtn");
-    textarea.value = content;
-    textarea.focus();
+  const fileName = remotePath ? remotePath.substring(remotePath.lastIndexOf("/") + 1) : "untitled.txt";
+  const activeTab = tabs[activeTabId];
+  const host = (activeTab && activeTab.profile && (activeTab.profile.host || activeTab.profile.name)) || "remote";
+  const displayPath = remotePath ? `${host}:${remotePath}` : `${host}:/tmp/untitled.txt`;
 
-    let isModified = false;
-    textarea.addEventListener("input", () => {
-      isModified = true;
-      if (statusBadge) {
-        statusBadge.textContent = "● Modified (Press Ctrl+S to save)";
-        statusBadge.style.color = "var(--accent-amber)";
-      }
-    });
-
-    const doSave = async () => {
-      const newText = textarea.value;
-      if (statusBadge) {
-        statusBadge.textContent = "Saving to remote...";
-        statusBadge.style.color = "var(--accent-cyan)";
-      }
-      try {
-        await window.go.main.App.SFTPWriteFile(activeTabId, remotePath, newText);
-        isModified = false;
-        if (statusBadge) {
-          statusBadge.textContent = "✅ Saved & Committed to Server!";
-          statusBadge.style.color = "var(--accent-green)";
-        }
-        showToast(`Saved & committed changes directly to ${fileName}`, "success");
-        await refreshSFTP(currentSFTPPath);
-      } catch (err) {
-        if (statusBadge) {
-          statusBadge.textContent = "❌ Save failed";
-          statusBadge.style.color = "var(--accent-rose)";
-        }
-        showToast("Save failed: " + err, "error");
-      }
-    };
-
-    textarea.addEventListener("keydown", (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault();
-        doSave();
-      }
-    });
-
-    saveBtn.onclick = doSave;
-    box.querySelector("#modalCancel").onclick = () => {
-      if (isModified && !confirm(`You have unsaved modifications in "${fileName}". Close anyway?`)) {
-        return;
-      }
-      hideModal();
-    };
-    box.querySelector("#modalClose").onclick = () => {
-      if (isModified && !confirm(`You have unsaved modifications in "${fileName}". Close anyway?`)) {
-        return;
-      }
-      hideModal();
-    };
-  } catch (err) {
-    showToast("Failed to open remote file: " + err, "error");
+  showToast(`Opening ${fileName}...`, "info");
+  let content = "";
+  if (remotePath) {
+    try {
+      content = await window.go.main.App.SFTPReadFile(activeTabId, remotePath);
+    } catch (err) {
+      showToast("Failed to open remote file: " + err, "error");
+      return;
+    }
   }
+
+  const detectedLang = detectSyntaxLanguage(fileName);
+  let eolLabel = "🐧 Linux";
+  if (content.includes("\r\n")) {
+    eolLabel = "🪟 Windows";
+  } else if (content.includes("\r") && !content.includes("\n")) {
+    eolLabel = "🍎 Mac";
+  }
+
+  const box = showModal(`
+    <div class="nte-titlebar">
+      <div class="nte-title-left">
+        <span class="nte-title-icon">📝</span>
+        <span id="nteTitleText">NexTerm Text Editor — ${escapeHtml(fileName)}</span>
+      </div>
+      <div class="nte-window-controls">
+        <button class="nte-win-btn" id="nteMaximizeBtn" title="Maximize / Restore">🗖</button>
+        <button class="nte-win-btn close-btn" id="nteCloseBtn" title="Close">✕</button>
+      </div>
+    </div>
+
+    <div class="nte-menubar">
+      <div class="nte-menu-item" id="nteMenuFile">File
+        <div class="nte-dropdown hidden" id="nteDropFile">
+          <div class="nte-dropdown-item" id="nteActionSave"><span>💾 Save to Server</span><span class="shortcut">Ctrl+S</span></div>
+          <div class="nte-dropdown-item" id="nteActionReload"><span>↻ Reload / Revert</span><span class="shortcut">F5</span></div>
+          <div class="nte-dropdown-separator"></div>
+          <div class="nte-dropdown-item" id="nteActionClose"><span>✕ Close Editor</span><span class="shortcut">Esc</span></div>
+        </div>
+      </div>
+      <div class="nte-menu-item" id="nteMenuEdit">Edit
+        <div class="nte-dropdown hidden" id="nteDropEdit">
+          <div class="nte-dropdown-item" id="nteActionUndo"><span>↩ Undo</span><span class="shortcut">Ctrl+Z</span></div>
+          <div class="nte-dropdown-item" id="nteActionRedo"><span>↪ Redo</span><span class="shortcut">Ctrl+Y</span></div>
+          <div class="nte-dropdown-separator"></div>
+          <div class="nte-dropdown-item" id="nteActionCut"><span>✂ Cut</span><span class="shortcut">Ctrl+X</span></div>
+          <div class="nte-dropdown-item" id="nteActionCopy"><span>📋 Copy</span><span class="shortcut">Ctrl+C</span></div>
+          <div class="nte-dropdown-item" id="nteActionPaste"><span>📄 Paste</span><span class="shortcut">Ctrl+V</span></div>
+          <div class="nte-dropdown-separator"></div>
+          <div class="nte-dropdown-item" id="nteActionSelectAll"><span>🔍 Select All</span><span class="shortcut">Ctrl+A</span></div>
+        </div>
+      </div>
+      <div class="nte-menu-item" id="nteMenuSearch">Search
+        <div class="nte-dropdown hidden" id="nteDropSearch">
+          <div class="nte-dropdown-item" id="nteActionFind"><span>🔍 Find / Search</span><span class="shortcut">Ctrl+F</span></div>
+          <div class="nte-dropdown-item" id="nteActionReplace"><span>🔁 Replace</span><span class="shortcut">Ctrl+H</span></div>
+          <div class="nte-dropdown-item" id="nteActionGoto"><span>📍 Go to Line...</span><span class="shortcut">Ctrl+G</span></div>
+        </div>
+      </div>
+      <div class="nte-menu-item" id="nteMenuView">View
+        <div class="nte-dropdown hidden" id="nteDropView">
+          <div class="nte-dropdown-item" id="nteActionToggleGutter"><span>🔢 Toggle Line Numbers</span></div>
+          <div class="nte-dropdown-item" id="nteActionToggleWrap"><span>↩ Toggle Word Wrap</span></div>
+          <div class="nte-dropdown-separator"></div>
+          <div class="nte-dropdown-item" id="nteActionZoomIn"><span>🔍 Zoom In Font</span><span class="shortcut">Ctrl++</span></div>
+          <div class="nte-dropdown-item" id="nteActionZoomOut"><span>🔍 Zoom Out Font</span><span class="shortcut">Ctrl+-</span></div>
+        </div>
+      </div>
+      <div class="nte-menu-item" id="nteMenuFormat">Format
+        <div class="nte-dropdown hidden" id="nteDropFormat">
+          <div class="nte-dropdown-item" id="nteActionUpper"><span>🔤 UPPERCASE</span></div>
+          <div class="nte-dropdown-item" id="nteActionLower"><span>🔡 lowercase</span></div>
+          <div class="nte-dropdown-separator"></div>
+          <div class="nte-dropdown-item" id="nteActionTrim"><span>✂ Trim Trailing Spaces</span></div>
+          <div class="nte-dropdown-item" id="nteActionTabsToSpaces"><span>⇥ Tabs to 4 Spaces</span></div>
+        </div>
+      </div>
+      <div class="nte-menu-item" id="nteMenuEncoding">Encoding
+        <div class="nte-dropdown hidden" id="nteDropEncoding">
+          <div class="nte-dropdown-item" id="nteEncUtf8"><span>✓ UTF-8</span></div>
+          <div class="nte-dropdown-item" id="nteEncAnsi"><span>ANSI / ASCII</span></div>
+          <div class="nte-dropdown-item" id="nteEncUtf16"><span>UTF-16</span></div>
+        </div>
+      </div>
+      <div class="nte-menu-item" id="nteMenuSyntax">Syntax
+        <div class="nte-dropdown hidden" id="nteDropSyntax">
+          <div class="nte-dropdown-item nte-syntax-opt" data-lang="C/C++"><span>C / C++</span></div>
+          <div class="nte-dropdown-item nte-syntax-opt" data-lang="Shell/Bash"><span>Shell / Bash</span></div>
+          <div class="nte-dropdown-item nte-syntax-opt" data-lang="Python"><span>Python</span></div>
+          <div class="nte-dropdown-item nte-syntax-opt" data-lang="Go"><span>Go</span></div>
+          <div class="nte-dropdown-item nte-syntax-opt" data-lang="Java"><span>Java</span></div>
+          <div class="nte-dropdown-item nte-syntax-opt" data-lang="SQL"><span>SQL</span></div>
+          <div class="nte-dropdown-item nte-syntax-opt" data-lang="JSON"><span>JSON</span></div>
+          <div class="nte-dropdown-item nte-syntax-opt" data-lang="XML/HTML"><span>XML / HTML</span></div>
+          <div class="nte-dropdown-item nte-syntax-opt" data-lang="Plain Text"><span>Plain Text</span></div>
+        </div>
+      </div>
+      <div class="nte-menu-item" id="nteMenuSpecial">Special tools
+        <div class="nte-dropdown hidden" id="nteDropSpecial">
+          <div class="nte-dropdown-item" id="nteActionEolLinux"><span>🐧 Convert EOL to Linux (LF)</span></div>
+          <div class="nte-dropdown-item" id="nteActionEolWindows"><span>🪟 Convert EOL to Windows (CRLF)</span></div>
+          <div class="nte-dropdown-separator"></div>
+          <div class="nte-dropdown-item" id="nteActionStats"><span>📊 Document Statistics</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nte-toolbar">
+      <button class="nte-tb-btn" id="nteTbSave" title="Save & Commit directly to Server (Ctrl+S)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" fill="#3b82f6"/><polyline points="17 21 17 13 7 13 7 21" fill="#1e293b"/><polyline points="7 3 7 8 15 8" fill="#93c5fd"/></svg>
+      </button>
+      <button class="nte-tb-btn" id="nteTbReload" title="Reload / Revert from Server (F5)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 3v5h-5M3 21v-5h5M21 8A9 9 0 0 0 4.5 6.5M3 16a9 9 0 0 0 16.5 1.5" stroke="#22c55e" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="nte-tb-separator"></div>
+      <button class="nte-tb-btn" id="nteTbCut" title="Cut (Ctrl+X)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="6" r="3" stroke="#f43f5e" stroke-width="2"/><circle cx="6" cy="18" r="3" stroke="#f43f5e" stroke-width="2"/><line x1="20" y1="4" x2="8.12" y2="15.88" stroke="#f43f5e" stroke-width="2"/><line x1="14.47" y1="14.48" x2="20" y2="20" stroke="#f43f5e" stroke-width="2"/><line x1="8.12" y1="8.12" x2="12" y2="12" stroke="#f43f5e" stroke-width="2"/></svg>
+      </button>
+      <button class="nte-tb-btn" id="nteTbCopy" title="Copy (Ctrl+C)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="#60a5fa" stroke-width="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="#93c5fd" stroke-width="2"/></svg>
+      </button>
+      <button class="nte-tb-btn" id="nteTbPaste" title="Paste (Ctrl+V)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" stroke="#f59e0b" stroke-width="2"/><rect x="8" y="2" width="8" height="4" rx="1" fill="#f59e0b"/></svg>
+      </button>
+      <div class="nte-tb-separator"></div>
+      <button class="nte-tb-btn" id="nteTbUndo" title="Undo (Ctrl+Z)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 7v6h6" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <button class="nte-tb-btn" id="nteTbRedo" title="Redo (Ctrl+Y)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M21 7v6h-6" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" stroke="#a78bfa" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="nte-tb-separator"></div>
+      <button class="nte-tb-btn" id="nteTbFind" title="Find & Replace (Ctrl+F)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="#38bdf8" stroke-width="2"/><line x1="21" y1="21" x2="16.65" y2="16.65" stroke="#38bdf8" stroke-width="2.5"/></svg>
+      </button>
+      <button class="nte-tb-btn active" id="nteTbGutter" title="Toggle Line Numbers">
+        <span style="font-size: 11px; font-weight: 700; color: #a7f3d0; font-family: monospace;">123</span>
+      </button>
+      <button class="nte-tb-btn" id="nteTbWrap" title="Toggle Word Wrap">
+        <span style="font-size: 13px; color: #fde047;">↩</span>
+      </button>
+      <div class="nte-tb-separator"></div>
+      <button class="nte-tb-btn" id="nteTbWinEol" title="Convert to Windows EOL (CRLF)">
+        <span style="font-size: 13px;">🪟</span>
+      </button>
+      <button class="nte-tb-btn" id="nteTbMacEol" title="Convert to Mac EOL (CR)">
+        <span style="font-size: 13px;">🍎</span>
+      </button>
+      <button class="nte-tb-btn" id="nteTbLinEol" title="Convert to Linux EOL (LF)">
+        <span style="font-size: 13px;">🐧</span>
+      </button>
+      <button class="nte-tb-btn" id="nteTbPilcrow" title="Show Whitespace Characters">
+        <span style="font-size: 13px; font-weight: bold; color: #c084fc;">¶</span>
+      </button>
+      <div class="nte-tb-separator"></div>
+      <button class="nte-tb-btn" id="nteTbZoomIn" title="Zoom In (Ctrl++)">
+        <span style="font-size: 12px; font-weight: 700; color: #38bdf8;">A+</span>
+      </button>
+      <button class="nte-tb-btn" id="nteTbZoomOut" title="Zoom Out (Ctrl+-)">
+        <span style="font-size: 12px; font-weight: 700; color: #94a3b8;">A-</span>
+      </button>
+      <div class="nte-tb-separator"></div>
+      <div style="display: flex; align-items: center; gap: 4px; font-size: 11.5px; color: #9ca3af; margin-left: auto;">
+        <span>Syntax:</span>
+        <select id="nteSyntaxSelect" style="background: #2a2a2e; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 11px; padding: 2px 6px;">
+          ${["C/C++", "Shell/Bash", "Python", "Go", "Java", "SQL", "JSON", "XML/HTML", "Config/YAML", "Plain Text"].map(s => `
+            <option value="${s}" ${s === detectedLang ? 'selected' : ''}>${s}</option>
+          `).join("")}
+        </select>
+      </div>
+    </div>
+
+    <div class="nte-tabstrip">
+      <div class="nte-tab">
+        <span>📄</span>
+        <span id="nteTabFileName">${escapeHtml(fileName)}</span>
+        <span class="nte-tab-dot" id="nteTabDot"></span>
+        <span class="nte-tab-close" id="nteTabClose" title="Close">✕</span>
+      </div>
+    </div>
+
+    <div class="nte-editor-wrap">
+      <div class="nte-gutter" id="nteGutter">1</div>
+      <textarea class="nte-textarea" id="remoteEditTextarea" spellcheck="false"></textarea>
+
+      <div class="nte-find-panel hidden" id="nteFindPanel">
+        <div class="nte-find-row">
+          <input type="text" id="nteFindInput" class="nte-find-input" placeholder="Find..." />
+          <button class="nte-btn-sm" id="nteFindNextBtn">Find Next</button>
+          <button class="nte-btn-sm" id="nteFindPrevBtn">Find Prev</button>
+          <button class="nte-btn-sm" id="nteFindCloseBtn" style="color: #f87171;">✕</button>
+        </div>
+        <div class="nte-find-row">
+          <input type="text" id="nteReplaceInput" class="nte-find-input" placeholder="Replace with..." />
+          <button class="nte-btn-sm" id="nteReplaceBtn">Replace</button>
+          <button class="nte-btn-sm" id="nteReplaceAllBtn">Replace All</button>
+        </div>
+        <div id="nteFindStatus" style="font-size: 10.5px; color: #9ca3af;"></div>
+      </div>
+    </div>
+
+    <div class="nte-statusbar">
+      <div class="nte-status-left">
+        <span class="nte-status-path" id="nteStatusPath">${escapeHtml(displayPath)}</span>
+      </div>
+      <div class="nte-status-right">
+        <span class="nte-status-pill" id="nteStatusEol">${eolLabel}</span>
+        <span class="nte-status-pill" id="nteStatusSyntax" style="font-weight: 600; color: #a5b4fc;">${detectedLang}</span>
+        <span class="nte-status-pill" id="nteStatusEncoding">UTF-8</span>
+        <span class="nte-status-pill" id="nteStatusCaret">Row: 1 | Col: 1 | Pos: 0</span>
+        <span class="nte-status-pill" id="nteStatusCounts">0 lines | 0 chars</span>
+        <span class="nte-status-save" id="nteStatusSave">✅ Saved</span>
+      </div>
+    </div>
+  `, "nexterm-editor-window");
+
+  const textarea = box.querySelector("#remoteEditTextarea");
+  const gutter = box.querySelector("#nteGutter");
+  const tabDot = box.querySelector("#nteTabDot");
+  const statusSave = box.querySelector("#nteStatusSave");
+  const statusCaret = box.querySelector("#nteStatusCaret");
+  const statusCounts = box.querySelector("#nteStatusCounts");
+  const statusEol = box.querySelector("#nteStatusEol");
+  const statusSyntax = box.querySelector("#nteStatusSyntax");
+  const syntaxSelect = box.querySelector("#nteSyntaxSelect");
+  const findPanel = box.querySelector("#nteFindPanel");
+  const findInput = box.querySelector("#nteFindInput");
+  const replaceInput = box.querySelector("#nteReplaceInput");
+  const findStatus = box.querySelector("#nteFindStatus");
+
+  textarea.value = content;
+
+  let isModified = false;
+  let currentFontSize = 13;
+
+  function updateGutterAndStats() {
+    const val = textarea.value;
+    const lines = val.split("\n");
+    const totalLines = lines.length;
+    const totalChars = val.length;
+
+    // Update gutter line numbers
+    let gutterStr = "";
+    for (let i = 1; i <= totalLines; i++) {
+      gutterStr += i + "\n";
+    }
+    gutter.textContent = gutterStr;
+    gutter.scrollTop = textarea.scrollTop;
+
+    // Update caret info
+    const pos = textarea.selectionStart || 0;
+    const beforeText = val.substring(0, pos);
+    const beforeLines = beforeText.split("\n");
+    const row = beforeLines.length;
+    const col = beforeLines[beforeLines.length - 1].length + 1;
+
+    statusCaret.textContent = `Row: ${row} | Col: ${col} | Pos: ${pos}`;
+    statusCounts.textContent = `${totalLines} lines | ${totalChars} chars`;
+  }
+
+  updateGutterAndStats();
+  textarea.focus();
+
+  // Scroll synchronization
+  textarea.addEventListener("scroll", () => {
+    gutter.scrollTop = textarea.scrollTop;
+  });
+
+  // Tracking edits
+  textarea.addEventListener("input", () => {
+    if (!isModified) {
+      isModified = true;
+      tabDot.classList.add("modified");
+      statusSave.textContent = "● Modified (Ctrl+S to save)";
+      statusSave.className = "nte-status-save modified";
+    }
+    updateGutterAndStats();
+  });
+
+  ["click", "keyup", "select"].forEach(ev => {
+    textarea.addEventListener(ev, updateGutterAndStats);
+  });
+
+  // Tab indentation (4 spaces) & Shortcuts
+  textarea.addEventListener("keydown", (e) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const val = textarea.value;
+      textarea.value = val.substring(0, start) + "    " + val.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + 4;
+      if (!isModified) {
+        isModified = true;
+        tabDot.classList.add("modified");
+        statusSave.textContent = "● Modified (Ctrl+S to save)";
+        statusSave.className = "nte-status-save modified";
+      }
+      updateGutterAndStats();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      e.preventDefault();
+      doSave();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === "f") {
+      e.preventDefault();
+      toggleFind(false);
+    } else if ((e.ctrlKey || e.metaKey) && e.key === "h") {
+      e.preventDefault();
+      toggleFind(true);
+    }
+  });
+
+  // Save implementation
+  const doSave = async () => {
+    if (!remotePath) {
+      showToast("Untitled scratchpad content (not bound to remote path)", "info");
+      return;
+    }
+    statusSave.textContent = "Saving to server...";
+    statusSave.className = "nte-status-save";
+    try {
+      await window.go.main.App.SFTPWriteFile(activeTabId, remotePath, textarea.value);
+      isModified = false;
+      tabDot.classList.remove("modified");
+      statusSave.textContent = "✅ Saved & Committed";
+      statusSave.className = "nte-status-save";
+      showToast(`Saved & committed changes directly to ${fileName}`, "success");
+      await refreshSFTP(currentSFTPPath);
+    } catch (err) {
+      statusSave.textContent = "❌ Save failed";
+      statusSave.className = "nte-status-save modified";
+      showToast("Save failed: " + err, "error");
+    }
+  };
+
+  // Reload implementation
+  const doReload = async () => {
+    if (!remotePath) return;
+    if (isModified && !confirm("Discard unsaved changes and reload from server?")) return;
+    try {
+      const refreshed = await window.go.main.App.SFTPReadFile(activeTabId, remotePath);
+      textarea.value = refreshed;
+      isModified = false;
+      tabDot.classList.remove("modified");
+      statusSave.textContent = "✅ Saved";
+      statusSave.className = "nte-status-save";
+      updateGutterAndStats();
+      showToast(`Reloaded ${fileName} from server`, "info");
+    } catch (err) {
+      showToast("Reload failed: " + err, "error");
+    }
+  };
+
+  // Menubar Dropdowns
+  const menuItems = box.querySelectorAll(".nte-menu-item");
+  menuItems.forEach(mi => {
+    mi.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const drop = mi.querySelector(".nte-dropdown");
+      const wasHidden = drop.classList.contains("hidden");
+      box.querySelectorAll(".nte-dropdown").forEach(d => d.classList.add("hidden"));
+      if (wasHidden) drop.classList.remove("hidden");
+    });
+  });
+  box.addEventListener("click", () => {
+    box.querySelectorAll(".nte-dropdown").forEach(d => d.classList.add("hidden"));
+  });
+
+  // Maximize / Restore window
+  const maxBtn = box.querySelector("#nteMaximizeBtn");
+  maxBtn.onclick = () => {
+    box.classList.toggle("is-maximized");
+    maxBtn.textContent = box.classList.contains("is-maximized") ? "🗗" : "🗖";
+  };
+
+  // Close confirmation
+  const handleClose = () => {
+    if (isModified && !confirm(`You have unsaved modifications in "${fileName}". Discard and close?`)) {
+      return;
+    }
+    hideModal();
+  };
+  box.querySelector("#nteCloseBtn").onclick = handleClose;
+  box.querySelector("#nteTabClose").onclick = handleClose;
+  box.querySelector("#nteActionClose").onclick = handleClose;
+
+  // Toolbar & Menu action bindings
+  box.querySelector("#nteTbSave").onclick = doSave;
+  box.querySelector("#nteActionSave").onclick = doSave;
+  box.querySelector("#nteTbReload").onclick = doReload;
+  box.querySelector("#nteActionReload").onclick = doReload;
+
+  box.querySelector("#nteTbCut").onclick = () => {
+    const sel = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+    if (sel) {
+      navigator.clipboard.writeText(sel);
+      const start = textarea.selectionStart;
+      textarea.value = textarea.value.substring(0, start) + textarea.value.substring(textarea.selectionEnd);
+      textarea.selectionStart = textarea.selectionEnd = start;
+      isModified = true;
+      tabDot.classList.add("modified");
+      updateGutterAndStats();
+    }
+  };
+  box.querySelector("#nteActionCut").onclick = () => box.querySelector("#nteTbCut").click();
+
+  box.querySelector("#nteTbCopy").onclick = () => {
+    const sel = textarea.value.substring(textarea.selectionStart, textarea.selectionEnd);
+    if (sel) {
+      navigator.clipboard.writeText(sel);
+      showToast("Copied to clipboard", "info");
+    }
+  };
+  box.querySelector("#nteActionCopy").onclick = () => box.querySelector("#nteTbCopy").click();
+
+  box.querySelector("#nteTbPaste").onclick = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        const start = textarea.selectionStart;
+        textarea.value = textarea.value.substring(0, start) + text + textarea.value.substring(textarea.selectionEnd);
+        textarea.selectionStart = textarea.selectionEnd = start + text.length;
+        isModified = true;
+        tabDot.classList.add("modified");
+        updateGutterAndStats();
+      }
+    } catch (_) {}
+  };
+  box.querySelector("#nteActionPaste").onclick = () => box.querySelector("#nteTbPaste").click();
+
+  box.querySelector("#nteActionSelectAll").onclick = () => {
+    textarea.select();
+    updateGutterAndStats();
+  };
+
+  box.querySelector("#nteTbUndo").onclick = () => document.execCommand("undo");
+  box.querySelector("#nteActionUndo").onclick = () => document.execCommand("undo");
+  box.querySelector("#nteTbRedo").onclick = () => document.execCommand("redo");
+  box.querySelector("#nteActionRedo").onclick = () => document.execCommand("redo");
+
+  // Toggle gutter / line numbers
+  let showGutter = true;
+  box.querySelector("#nteTbGutter").onclick = () => {
+    showGutter = !showGutter;
+    gutter.style.display = showGutter ? "block" : "none";
+    box.querySelector("#nteTbGutter").classList.toggle("active", showGutter);
+  };
+  box.querySelector("#nteActionToggleGutter").onclick = () => box.querySelector("#nteTbGutter").click();
+
+  // Toggle word wrap
+  let isWrapped = false;
+  box.querySelector("#nteTbWrap").onclick = () => {
+    isWrapped = !isWrapped;
+    textarea.classList.toggle("wrap-enabled", isWrapped);
+    box.querySelector("#nteTbWrap").classList.toggle("active", isWrapped);
+  };
+  box.querySelector("#nteActionToggleWrap").onclick = () => box.querySelector("#nteTbWrap").click();
+
+  // Zoom In / Out Font
+  box.querySelector("#nteTbZoomIn").onclick = () => {
+    if (currentFontSize < 26) {
+      currentFontSize += 1;
+      textarea.style.fontSize = currentFontSize + "px";
+      gutter.style.fontSize = currentFontSize + "px";
+    }
+  };
+  box.querySelector("#nteActionZoomIn").onclick = () => box.querySelector("#nteTbZoomIn").click();
+
+  box.querySelector("#nteTbZoomOut").onclick = () => {
+    if (currentFontSize > 10) {
+      currentFontSize -= 1;
+      textarea.style.fontSize = currentFontSize + "px";
+      gutter.style.fontSize = currentFontSize + "px";
+    }
+  };
+  box.querySelector("#nteActionZoomOut").onclick = () => box.querySelector("#nteTbZoomOut").click();
+
+  // Convert EOL
+  box.querySelector("#nteTbLinEol").onclick = () => {
+    textarea.value = textarea.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    statusEol.textContent = "🐧 Linux";
+    isModified = true;
+    tabDot.classList.add("modified");
+    updateGutterAndStats();
+    showToast("Converted EOL to Linux (LF)", "info");
+  };
+  box.querySelector("#nteActionEolLinux").onclick = () => box.querySelector("#nteTbLinEol").click();
+
+  box.querySelector("#nteTbWinEol").onclick = () => {
+    textarea.value = textarea.value.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n/g, "\r\n");
+    statusEol.textContent = "🪟 Windows";
+    isModified = true;
+    tabDot.classList.add("modified");
+    updateGutterAndStats();
+    showToast("Converted EOL to Windows (CRLF)", "info");
+  };
+  box.querySelector("#nteActionEolWindows").onclick = () => box.querySelector("#nteTbWinEol").click();
+
+  box.querySelector("#nteTbMacEol").onclick = () => {
+    textarea.value = textarea.value.replace(/\r\n/g, "\r").replace(/\n/g, "\r");
+    statusEol.textContent = "🍎 Mac";
+    isModified = true;
+    tabDot.classList.add("modified");
+    updateGutterAndStats();
+    showToast("Converted EOL to Mac (CR)", "info");
+  };
+
+  // UPPERCASE / lowercase / Trim
+  box.querySelector("#nteActionUpper").onclick = () => {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    if (start !== end) {
+      const sel = textarea.value.substring(start, end).toUpperCase();
+      textarea.value = textarea.value.substring(0, start) + sel + textarea.value.substring(end);
+      textarea.selectionStart = start;
+      textarea.selectionEnd = end;
+    } else {
+      textarea.value = textarea.value.toUpperCase();
+    }
+    isModified = true;
+    tabDot.classList.add("modified");
+    updateGutterAndStats();
+  };
+
+  box.querySelector("#nteActionLower").onclick = () => {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    if (start !== end) {
+      const sel = textarea.value.substring(start, end).toLowerCase();
+      textarea.value = textarea.value.substring(0, start) + sel + textarea.value.substring(end);
+      textarea.selectionStart = start;
+      textarea.selectionEnd = end;
+    } else {
+      textarea.value = textarea.value.toLowerCase();
+    }
+    isModified = true;
+    tabDot.classList.add("modified");
+    updateGutterAndStats();
+  };
+
+  box.querySelector("#nteActionTrim").onclick = () => {
+    textarea.value = textarea.value.split("\n").map(l => l.trimEnd()).join("\n");
+    isModified = true;
+    tabDot.classList.add("modified");
+    updateGutterAndStats();
+    showToast("Trimmed trailing whitespaces", "info");
+  };
+
+  box.querySelector("#nteActionTabsToSpaces").onclick = () => {
+    textarea.value = textarea.value.replace(/\t/g, "    ");
+    isModified = true;
+    tabDot.classList.add("modified");
+    updateGutterAndStats();
+    showToast("Converted tabs to 4 spaces", "info");
+  };
+
+  // Syntax switcher
+  const setSyntax = (lang) => {
+    statusSyntax.textContent = lang;
+    if (syntaxSelect) syntaxSelect.value = lang;
+    showToast(`Syntax highlighting set to ${lang}`, "info");
+  };
+  if (syntaxSelect) {
+    syntaxSelect.onchange = (e) => setSyntax(e.target.value);
+  }
+  box.querySelectorAll(".nte-syntax-opt").forEach(opt => {
+    opt.onclick = () => setSyntax(opt.dataset.lang);
+  });
+
+  // Document Statistics
+  box.querySelector("#nteActionStats").onclick = () => {
+    const txt = textarea.value;
+    const lines = txt.split("\n").length;
+    const words = (txt.match(/\S+/g) || []).length;
+    const chars = txt.length;
+    alert(`Document Statistics:\n• File: ${fileName}\n• Lines: ${lines}\n• Words: ${words}\n• Characters: ${chars}\n• Syntax: ${statusSyntax.textContent}`);
+  };
+
+  // Find & Replace Floating Panel
+  const toggleFind = (withReplace = false) => {
+    const isHidden = findPanel.classList.contains("hidden");
+    if (isHidden) {
+      findPanel.classList.remove("hidden");
+      findInput.focus();
+      findInput.select();
+      if (withReplace) replaceInput.focus();
+    } else {
+      findPanel.classList.add("hidden");
+      textarea.focus();
+    }
+  };
+
+  box.querySelector("#nteTbFind").onclick = () => toggleFind(false);
+  box.querySelector("#nteActionFind").onclick = () => toggleFind(false);
+  box.querySelector("#nteActionReplace").onclick = () => toggleFind(true);
+  box.querySelector("#nteFindCloseBtn").onclick = () => findPanel.classList.add("hidden");
+
+  const doFindNext = (direction = 1) => {
+    const query = findInput.value;
+    if (!query) return;
+    const text = textarea.value;
+    let idx = direction === 1 
+      ? text.indexOf(query, textarea.selectionEnd)
+      : text.lastIndexOf(query, Math.max(0, textarea.selectionStart - 1));
+
+    if (idx === -1) {
+      idx = direction === 1 ? text.indexOf(query, 0) : text.lastIndexOf(query);
+    }
+
+    if (idx !== -1) {
+      textarea.focus();
+      textarea.setSelectionRange(idx, idx + query.length);
+      findStatus.textContent = `Found at position ${idx}`;
+      findStatus.style.color = "#a7f3d0";
+      updateGutterAndStats();
+    } else {
+      findStatus.textContent = "Phrase not found";
+      findStatus.style.color = "#f87171";
+    }
+  };
+
+  box.querySelector("#nteFindNextBtn").onclick = () => doFindNext(1);
+  box.querySelector("#nteFindPrevBtn").onclick = () => doFindNext(-1);
+  findInput.onkeydown = (e) => {
+    if (e.key === "Enter") doFindNext(e.shiftKey ? -1 : 1);
+    else if (e.key === "Escape") findPanel.classList.add("hidden");
+  };
+
+  box.querySelector("#nteReplaceBtn").onclick = () => {
+    const q = findInput.value;
+    const rep = replaceInput.value;
+    if (!q) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    if (textarea.value.substring(start, end) === q) {
+      textarea.value = textarea.value.substring(0, start) + rep + textarea.value.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + rep.length;
+      isModified = true;
+      tabDot.classList.add("modified");
+      updateGutterAndStats();
+    }
+    doFindNext(1);
+  };
+
+  box.querySelector("#nteReplaceAllBtn").onclick = () => {
+    const q = findInput.value;
+    const rep = replaceInput.value;
+    if (!q) return;
+    const count = (textarea.value.split(q).length - 1);
+    if (count > 0) {
+      textarea.value = textarea.value.split(q).join(rep);
+      isModified = true;
+      tabDot.classList.add("modified");
+      updateGutterAndStats();
+      findStatus.textContent = `Replaced ${count} occurrences`;
+      findStatus.style.color = "#a7f3d0";
+    } else {
+      findStatus.textContent = "No matches to replace";
+      findStatus.style.color = "#f87171";
+    }
+  };
+
+  // Go to line
+  box.querySelector("#nteActionGoto").onclick = () => {
+    const lineNum = prompt("Enter line number to navigate to:");
+    if (lineNum) {
+      const target = parseInt(lineNum, 10);
+      if (!isNaN(target) && target > 0) {
+        const lines = textarea.value.split("\n");
+        if (target <= lines.length) {
+          let charIndex = 0;
+          for (let i = 0; i < target - 1; i++) {
+            charIndex += lines[i].length + 1;
+          }
+          textarea.focus();
+          textarea.setSelectionRange(charIndex, charIndex);
+          updateGutterAndStats();
+        }
+      }
+    }
+  };
 }
 
 // --------------------------------------------------------------------------

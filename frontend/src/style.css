@@ -2380,3 +2380,405 @@ html, body, #app {
 .hidden {
   display: none !important;
 }
+
+/* ==========================================================================
+   NexTerm Text Editor — Full Desktop Code & Script Editor Window
+   ========================================================================== */
+.modal-card.nexterm-editor-window {
+  width: 95vw;
+  max-width: 1440px;
+  height: 92vh;
+  max-height: 94vh;
+  background: #181818;
+  border: 1px solid #333842;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.modal-card.nexterm-editor-window.is-maximized {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  border-radius: 0 !important;
+}
+
+/* 1. Titlebar */
+.nte-titlebar {
+  height: 34px;
+  background: #1e1e1e;
+  border-bottom: 1px solid #282828;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  user-select: none;
+}
+
+.nte-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.nte-title-icon {
+  font-size: 15px;
+}
+
+.nte-window-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nte-win-btn {
+  background: transparent;
+  border: none;
+  color: #9ca3af;
+  width: 28px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.nte-win-btn:hover {
+  background: #323747;
+  color: #ffffff;
+}
+
+.nte-win-btn.close-btn:hover {
+  background: #e11d48;
+  color: #ffffff;
+}
+
+/* 2. Menubar */
+.nte-menubar {
+  height: 27px;
+  background: #252526;
+  border-bottom: 1px solid #333333;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  gap: 2px;
+  font-size: 12px;
+  user-select: none;
+  position: relative;
+}
+
+.nte-menu-item {
+  padding: 3px 8px;
+  color: #cccccc;
+  cursor: pointer;
+  border-radius: 3px;
+  position: relative;
+}
+
+.nte-menu-item:hover, .nte-menu-item.active {
+  background: #333333;
+  color: #ffffff;
+}
+
+.nte-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #252526;
+  border: 1px solid #454545;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  min-width: 220px;
+  z-index: 1000;
+  padding: 4px 0;
+}
+
+.nte-dropdown-item {
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #cccccc;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.nte-dropdown-item:hover {
+  background: #094771;
+  color: #ffffff;
+}
+
+.nte-dropdown-item .shortcut {
+  font-size: 10.5px;
+  color: #888888;
+}
+
+.nte-dropdown-item:hover .shortcut {
+  color: #dddddd;
+}
+
+.nte-dropdown-separator {
+  height: 1px;
+  background: #383838;
+  margin: 4px 0;
+}
+
+/* 3. Toolbar */
+.nte-toolbar {
+  height: 38px;
+  background: #202020;
+  border-bottom: 1px solid #2d2d2d;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 3px;
+  user-select: none;
+  overflow-x: auto;
+}
+
+.nte-tb-btn {
+  height: 28px;
+  min-width: 28px;
+  padding: 0 5px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: #d1d5db;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.nte-tb-btn:hover {
+  background: #333333;
+  border-color: #444444;
+  color: #ffffff;
+}
+
+.nte-tb-btn.active {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+
+.nte-tb-separator {
+  width: 1px;
+  height: 20px;
+  background: #3a3a3a;
+  margin: 0 4px;
+}
+
+/* 4. Tab Strip */
+.nte-tabstrip {
+  height: 30px;
+  background: #181818;
+  border-bottom: 1px solid #282828;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 6px;
+  user-select: none;
+}
+
+.nte-tab {
+  height: 28px;
+  padding: 0 12px;
+  background: #1e1e1e;
+  border: 1px solid #282828;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #e5e7eb;
+  cursor: pointer;
+  border-top: 2px solid #3b82f6;
+}
+
+.nte-tab-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.nte-tab-dot.modified {
+  background: #f59e0b;
+}
+
+.nte-tab-close {
+  font-size: 14px;
+  color: #9ca3af;
+  border-radius: 3px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.nte-tab-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+}
+
+/* 5. Editor Body & Gutter */
+.nte-editor-wrap {
+  flex: 1;
+  display: flex;
+  position: relative;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+.nte-gutter {
+  width: 48px;
+  min-width: 48px;
+  background: #1e1e1e;
+  border-right: 1px solid #2a2a2a;
+  color: #6e7681;
+  font-family: 'Cascadia Mono', Consolas, 'Fira Code', monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: right;
+  padding: 8px 6px 8px 0;
+  user-select: none;
+  overflow-y: hidden;
+  white-space: pre;
+}
+
+.nte-textarea {
+  flex: 1;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: 'Cascadia Mono', Consolas, 'Fira Code', monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 8px 12px;
+  border: none;
+  outline: none;
+  resize: none;
+  white-space: pre;
+  tab-size: 4;
+  overflow: auto;
+  caret-color: #60a5fa;
+}
+
+.nte-textarea.wrap-enabled {
+  white-space: pre-wrap;
+}
+
+/* Find & Replace Floating Panel */
+.nte-find-panel {
+  position: absolute;
+  top: 8px;
+  right: 20px;
+  background: #252526;
+  border: 1px solid #454545;
+  border-radius: 6px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.7);
+  z-index: 50;
+  font-size: 12px;
+}
+
+.nte-find-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nte-find-input {
+  background: #1e1e1e;
+  border: 1px solid #3c3c3c;
+  border-radius: 3px;
+  color: #fff;
+  padding: 4px 8px;
+  font-size: 12px;
+  width: 200px;
+}
+
+.nte-find-input:focus {
+  border-color: #007acc;
+  outline: none;
+}
+
+.nte-btn-sm {
+  background: #333333;
+  border: 1px solid #444444;
+  color: #d1d5db;
+  border-radius: 3px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.nte-btn-sm:hover {
+  background: #007acc;
+  color: #fff;
+  border-color: #007acc;
+}
+
+/* 6. Status Bar */
+.nte-statusbar {
+  height: 25px;
+  background: #181a20;
+  border-top: 1px solid #282828;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  font-size: 11px;
+  color: #9ca3af;
+  user-select: none;
+}
+
+.nte-status-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nte-status-path {
+  color: #60a5fa;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+}
+
+.nte-status-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.nte-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nte-status-save {
+  font-weight: 600;
+  color: #10b981;
+}
+
+.nte-status-save.modified {
+  color: #f59e0b;
+}
