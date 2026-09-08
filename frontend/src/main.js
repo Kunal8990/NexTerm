@@ -804,6 +804,202 @@ function updateRecentSessionsGrid() {
 }
 
 // --------------------------------------------------------------------------
+// Follow Terminal Folder Tracking (MobaXterm Automatic Directory Sync)
+// --------------------------------------------------------------------------
+
+function isFollowTerminalFolderEnabled() {
+  const chk = document.getElementById("sftpFollowTermCheckbox");
+  return !chk || chk.checked;
+}
+
+function extractCdTarget(cmd) {
+  if (!cmd) return null;
+  const trimmed = cmd.trim();
+  const match = trimmed.match(/^(?:cd|pushd)(?:[\s]+(.*))?$/i);
+  if (!match) return null;
+
+  let target = match[1] !== undefined ? match[1].trim() : "";
+  if (!target) return "~";
+
+  // Split on compound commands: cd /tmp && ls -> /tmp
+  if (target.includes(";") || target.includes("&&") || target.includes("||") || target.includes("|")) {
+    target = target.split(/[;&|]/)[0].trim();
+  }
+
+  // Remove surrounding quotes: "dir name" -> dir name
+  if ((target.startsWith('"') && target.endsWith('"')) || (target.startsWith("'") && target.endsWith("'"))) {
+    target = target.slice(1, -1);
+  }
+  // Replace backslash escaped spaces: dir\ name -> dir name
+  target = target.replace(/\\ /g, " ");
+
+  // Remove trailing slashes
+  if (target.length > 1 && target.endsWith("/")) {
+    target = target.slice(0, -1);
+  }
+
+  return target.trim();
+}
+
+function cleanPathSegments(p) {
+  const isAbs = p.startsWith("/");
+  const segments = p.split("/").filter(s => s && s !== ".");
+  const stack = [];
+  for (const seg of segments) {
+    if (seg === "..") {
+      if (stack.length > 0) stack.pop();
+    } else {
+      stack.push(seg);
+    }
+  }
+  return (isAbs ? "/" : "") + stack.join("/");
+}
+
+function resolveTerminalPath(currentDir, target, lastDir = "~") {
+  if (!target || target === "~" || target === "$HOME" || target === "") return "~";
+  if (target === "-") return lastDir || "~";
+
+  if (target.startsWith("/")) {
+    return cleanPathSegments(target);
+  }
+
+  if (target.startsWith("~/")) {
+    return "~/" + cleanPathSegments(target.slice(2));
+  }
+
+  let base = currentDir && currentDir !== "/" ? currentDir : "";
+  if (!base || base === "~") {
+    return "~/" + cleanPathSegments(target);
+  }
+
+  return cleanPathSegments(base + "/" + target);
+}
+
+let cdNavDebounceTimer = null;
+function handleTerminalCdCommand(tabId, cmd) {
+  if (!isFollowTerminalFolderEnabled()) return;
+
+  const target = extractCdTarget(cmd);
+  if (target === null) return;
+
+  const tab = tabs[tabId];
+  if (!tab || tab.isLocal) return;
+
+  const currentPath = tab.sftpPath || currentSFTPPath || "~";
+  const newPath = resolveTerminalPath(currentPath, target, tab.lastSftpPath);
+
+  if (cdNavDebounceTimer) clearTimeout(cdNavDebounceTimer);
+  cdNavDebounceTimer = setTimeout(async () => {
+    if (tabs[tabId] && activeTabId === tabId) {
+      tab.lastSftpPath = tab.sftpPath;
+      tab.sftpPath = newPath;
+      await refreshSFTP(newPath);
+    }
+  }, 400);
+}
+
+function handleTerminalTitleChange(tabId, title) {
+  if (!isFollowTerminalFolderEnabled()) return;
+
+  let candidate = "";
+  if (title.includes(":")) {
+    const parts = title.split(":");
+    candidate = parts[parts.length - 1].trim();
+  } else if (title.startsWith("/") || title.startsWith("~")) {
+    candidate = title.trim();
+  }
+
+  if (candidate && (candidate.startsWith("/") || candidate.startsWith("~"))) {
+    candidate = candidate.split(/[\s\$#]/)[0].trim();
+    const tab = tabs[tabId];
+    if (candidate && tab && tab.sftpPath !== candidate) {
+      tab.lastSftpPath = tab.sftpPath;
+      tab.sftpPath = candidate;
+      if (activeTabId === tabId) {
+        refreshSFTP(candidate);
+      }
+    }
+  }
+}
+
+function handleTerminalOsc7(tabId, data) {
+  if (!isFollowTerminalFolderEnabled()) return;
+
+  let dir = data;
+  if (dir.startsWith("file://")) {
+    try {
+      const u = new URL(dir);
+      dir = decodeURIComponent(u.pathname);
+    } catch (_) {
+      dir = dir.replace(/^file:\/\/[^\/]*/, "");
+    }
+  }
+  if (dir && dir.startsWith("/")) {
+    const tab = tabs[tabId];
+    if (tab && tab.sftpPath !== dir) {
+      tab.lastSftpPath = tab.sftpPath;
+      tab.sftpPath = dir;
+      if (activeTabId === tabId) {
+        refreshSFTP(dir);
+      }
+    }
+  }
+}
+
+let lastPromptSyncDir = "";
+function handleTerminalOutputPrompt(tabId, buffer) {
+  if (!isFollowTerminalFolderEnabled()) return;
+
+  // Strip ANSI color and control codes
+  const clean = buffer
+    .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
+    .replace(/\x1b\][^\x07\x1b]*(\x07|\x1b\\)/g, "");
+
+  // Match bracketed prompt: [pin@AVI-IT-SRV-BRM-01 ~]$ or [user@host dir]#
+  const bracketMatch = clean.match(/\[[^@\s]+@[^\]\s]+\s+([^\]]+)\][\$#]\s*$/);
+  if (bracketMatch && bracketMatch[1]) {
+    syncPromptDir(tabId, bracketMatch[1].trim());
+    return;
+  }
+
+  // Match colon prompt: pin@host:~$ or user@host:/var/log#
+  const colonMatch = clean.match(/[^@\s]+@[^:\s]+:([^\$#\r\n]+)[\$#]\s*$/);
+  if (colonMatch && colonMatch[1]) {
+    syncPromptDir(tabId, colonMatch[1].trim());
+    return;
+  }
+}
+
+function syncPromptDir(tabId, dirToken) {
+  if (!dirToken) return;
+  const tab = tabs[tabId];
+  if (!tab || tab.isLocal) return;
+
+  let targetPath = "";
+  if (dirToken === "~") {
+    targetPath = "~";
+  } else if (dirToken.startsWith("/") || dirToken.startsWith("~/")) {
+    targetPath = dirToken;
+  } else {
+    // Basename directory from shell prompt \W (e.g. "Videos" or "Desktop")
+    const current = tab.sftpPath || currentSFTPPath || "~";
+    const currentClean = current.replace(/\/+$/, "");
+    const baseName = currentClean.split("/").pop();
+    if (baseName === dirToken) return;
+    targetPath = resolveTerminalPath(current, dirToken, tab.lastSftpPath);
+  }
+
+  if (targetPath && targetPath !== tab.sftpPath && targetPath !== lastPromptSyncDir) {
+    lastPromptSyncDir = targetPath;
+    tab.lastSftpPath = tab.sftpPath;
+    tab.sftpPath = targetPath;
+    if (activeTabId === tabId) {
+      refreshSFTP(targetPath);
+    }
+  }
+}
+
+// --------------------------------------------------------------------------
 // Tab & Terminal Connections
 // --------------------------------------------------------------------------
 
@@ -942,15 +1138,54 @@ function createTab(tabId, profile, isLocal = false) {
     } catch (e) {}
   }, 50);
 
+  // Follow Terminal Folder: track keystrokes, window title, OSC 7, and prompt output
+  let inputBuffer = "";
+  let outputBuffer = "";
+
   term.onData((data) => {
     if (window.go && window.go.main && window.go.main.App) {
       window.go.main.App.WriteToTerminal(tabId, data);
     }
+
+    if (isLocal) return;
+
+    for (let i = 0; i < data.length; i++) {
+      const ch = data[i];
+      if (ch === "\r" || ch === "\n") {
+        const cmd = inputBuffer.trim();
+        inputBuffer = "";
+        handleTerminalCdCommand(tabId, cmd);
+      } else if (ch === "\x7f" || ch === "\b") {
+        inputBuffer = inputBuffer.slice(0, -1);
+      } else if (ch === "\x03" || ch === "\x15") {
+        inputBuffer = "";
+      } else if (ch >= " " && ch <= "~") {
+        inputBuffer += ch;
+      }
+    }
   });
+
+  term.onTitleChange((title) => {
+    if (!title || isLocal) return;
+    handleTerminalTitleChange(tabId, title);
+  });
+
+  try {
+    if (term.parser && typeof term.parser.registerOscHandler === "function") {
+      term.parser.registerOscHandler(7, (data) => {
+        if (!isLocal) handleTerminalOsc7(tabId, data);
+        return true;
+      });
+    }
+  } catch (_) {}
 
   if (window.runtime && window.runtime.EventsOn) {
     window.runtime.EventsOn("terminal:data:" + tabId, (data) => {
       term.write(data);
+      if (!isLocal) {
+        outputBuffer = (outputBuffer + data).slice(-500);
+        handleTerminalOutputPrompt(tabId, outputBuffer);
+      }
     });
 
     window.runtime.EventsOn("terminal:closed:" + tabId, (reason) => {
@@ -1473,6 +1708,7 @@ function renderSFTPItems(items, path = currentSFTPPath) {
 function showSFTPContextMenu(x, y, item) {
   contextMenuEl.innerHTML = `
     ${!item.isDir ? '<div class="context-menu-item" id="sftpEdit">✏️ Edit in MobaTextEditor</div>' : '<div class="context-menu-item" id="sftpOpenDir">📁 Open Folder</div>'}
+    ${item.isDir ? '<div class="context-menu-item" id="sftpCdTerminal">💻 cd terminal to this folder</div>' : ''}
     <div class="context-menu-item" id="sftpDownload">⬇ Download to Local PC</div>
     <div class="context-menu-item" id="sftpCopyPath">📋 Copy Remote Path</div>
     <div class="context-menu-separator"></div>
@@ -1485,6 +1721,16 @@ function showSFTPContextMenu(x, y, item) {
     contextMenuEl.querySelector("#sftpEdit").onclick = () => { hideContextMenu(); openRemoteFileEditor(item.path); };
   } else {
     contextMenuEl.querySelector("#sftpOpenDir").onclick = () => { hideContextMenu(); refreshSFTP(item.path); };
+    const cdTermBtn = contextMenuEl.querySelector("#sftpCdTerminal");
+    if (cdTermBtn) {
+      cdTermBtn.onclick = () => {
+        hideContextMenu();
+        if (activeTabId && tabs[activeTabId] && !tabs[activeTabId].isLocal && window.go && window.go.main && window.go.main.App) {
+          window.go.main.App.WriteToTerminal(activeTabId, `cd "${item.path}"\r`);
+          showToast(`Sent: cd "${item.path}" to terminal`, "info");
+        }
+      };
+    }
   }
 
   contextMenuEl.querySelector("#sftpCopyPath").onclick = () => {
@@ -3203,8 +3449,9 @@ function setupEventListeners() {
       showToast("Open an SSH connection first", "warning");
       return;
     }
-    refreshSFTP("~");
-    showToast("SFTP synced to Home / Terminal directory", "info");
+    const cur = tabs[activeTabId].sftpPath || currentSFTPPath || "~";
+    refreshSFTP(cur);
+    showToast(`SFTP synchronized with terminal directory (${cur})`, "success");
   });
 
   safeClick("sftpDownloadBtn", async () => {
@@ -3332,8 +3579,25 @@ function setupEventListeners() {
   });
 
   safeClick("sftpSyncBtn", () => {
-    showToast("Terminal auto-sync mode active", "success");
+    const chk = document.getElementById("sftpFollowTermCheckbox");
+    if (chk) {
+      chk.checked = !chk.checked;
+      showToast(chk.checked ? "Automatic Terminal-SFTP Directory Sync: ON" : "Automatic Terminal-SFTP Directory Sync: OFF", chk.checked ? "success" : "info");
+      if (chk.checked && activeTabId && tabs[activeTabId] && !tabs[activeTabId].isLocal) {
+        refreshSFTP(tabs[activeTabId].sftpPath || "~");
+      }
+    }
   });
+
+  const followCheckbox = document.getElementById("sftpFollowTermCheckbox");
+  if (followCheckbox) {
+    followCheckbox.addEventListener("change", () => {
+      showToast(followCheckbox.checked ? "Follow terminal folder: ON" : "Follow terminal folder: OFF", followCheckbox.checked ? "success" : "info");
+      if (followCheckbox.checked && activeTabId && tabs[activeTabId] && !tabs[activeTabId].isLocal) {
+        refreshSFTP(tabs[activeTabId].sftpPath || "~");
+      }
+    });
+  }
 
   // Path Combobox Dropdown Button & Menu Items
   safeClick("sftpPathDropdownBtn", (e) => {
