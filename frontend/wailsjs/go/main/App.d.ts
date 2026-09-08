@@ -69,6 +69,8 @@ export function QuickConnect(arg1:string,arg2:number,arg3:string,arg4:string,arg
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
 
+export function SFTPCreateFile(arg1:string,arg2:string):Promise<void>;
+
 export function SFTPDelete(arg1:string,arg2:string):Promise<void>;
 
 export function SFTPDownload(arg1:string,arg2:string,arg3:string):Promise<void>;

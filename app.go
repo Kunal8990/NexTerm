@@ -635,6 +635,17 @@ func (a *App) SFTPMkdir(tabID, remotePath string) error {
 	return a.sftpMgr.Mkdir(tabID, sess.Client(), remotePath)
 }
 
+func (a *App) SFTPCreateFile(tabID, remotePath string) error {
+	a.mu.Lock()
+	sess, ok := a.tabs[tabID]
+	a.mu.Unlock()
+
+	if !ok || sess == nil {
+		return fmt.Errorf("active SSH session not found")
+	}
+	return a.sftpMgr.CreateFile(tabID, sess.Client(), remotePath)
+}
+
 func (a *App) SFTPReadFile(tabID, remotePath string) (string, error) {
 	a.mu.Lock()
 	sess, ok := a.tabs[tabID]

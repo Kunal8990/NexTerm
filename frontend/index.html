@@ -254,13 +254,26 @@
                 <span id="sftpActiveTabBadge" class="sftp-target-badge">No SSH Tab</span>
               </div>
               <div class="sftp-toolbar">
-                <button id="sftpUpBtn" class="sftp-tool-btn" title="Go Up (Parent Directory)">⬆</button>
-                <button id="sftpRefreshBtn" class="sftp-tool-btn" title="Refresh">↻</button>
+                <button id="sftpUpBtn" class="sftp-tool-btn" title="Go Up (Parent Directory)">⬆ Up</button>
+                <button id="sftpRefreshBtn" class="sftp-tool-btn" title="Refresh Directory">↻</button>
                 <button id="sftpUploadBtn" class="sftp-tool-btn" title="Upload Local File">⬆ Upload</button>
-                <button id="sftpMkdirBtn" class="sftp-tool-btn" title="New Folder">＋ Dir</button>
+                <button id="sftpMkdirBtn" class="sftp-tool-btn" title="New Folder">📁＋ Dir</button>
+                <button id="sftpNewFileBtn" class="sftp-tool-btn" title="New Empty File">📄＋ File</button>
               </div>
               <div class="sftp-path-bar">
-                <input type="text" id="sftpPathInput" value="/" placeholder="/remote/path..." spellcheck="false" />
+                <input type="text" id="sftpPathInput" value="/" placeholder="/remote/path..." spellcheck="false" title="Press Enter to navigate" />
+              </div>
+              <div class="sftp-quick-chips">
+                <button class="sftp-chip-btn" data-path="/">/</button>
+                <button class="sftp-chip-btn" data-path="~">~</button>
+                <button class="sftp-chip-btn" data-path="/var/log">/var/log</button>
+                <button class="sftp-chip-btn" data-path="/etc">/etc</button>
+                <button class="sftp-chip-btn" data-path="/opt">/opt</button>
+                <button class="sftp-chip-btn" data-path="/tmp">/tmp</button>
+              </div>
+              <div class="sftp-status-bar">
+                <span id="sftpCountBadge">0 items</span>
+                <span id="sftpCurrentPathDisplay" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 140px;" title="/">/</span>
               </div>
               <div id="sftpFileList" class="sftp-file-list">
                 <div class="sftp-empty-hint">Connect to an SSH server to browse remote files via SFTP</div>

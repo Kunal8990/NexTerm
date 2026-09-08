@@ -209,6 +209,19 @@ func (m *SFTPManager) Mkdir(tabID string, sshClient *ssh.Client, remotePath stri
 	return client.Mkdir(remotePath)
 }
 
+// CreateFile creates a new empty file on the remote host.
+func (m *SFTPManager) CreateFile(tabID string, sshClient *ssh.Client, remotePath string) error {
+	client, err := m.getOrCreate(tabID, sshClient)
+	if err != nil {
+		return err
+	}
+	f, err := client.Create(remotePath)
+	if err != nil {
+		return err
+	}
+	return f.Close()
+}
+
 // ReadFile reads the full text of a remote file for inline viewing/editing.
 func (m *SFTPManager) ReadFile(tabID string, sshClient *ssh.Client, remotePath string) (string, error) {
 	client, err := m.getOrCreate(tabID, sshClient)

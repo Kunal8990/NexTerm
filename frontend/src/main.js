@@ -476,6 +476,64 @@ function escapeHtml(str) {
 }
 
 // --------------------------------------------------------------------------
+// Quick Connect String Parser (Supports user@host:port/path, host/path, etc.)
+// --------------------------------------------------------------------------
+
+function parseQuickConnect(raw) {
+  let str = (raw || "").trim();
+  if (str.toLowerCase().startsWith("ssh ")) {
+    str = str.substring(4).trim();
+  }
+  let initialDir = "";
+  if (str.includes(" ")) {
+    const parts = str.split(/\s+/);
+    str = parts[0];
+    initialDir = parts.slice(1).join(" ").trim();
+  }
+
+  let username = "root";
+  let host = str;
+  let port = 22;
+
+  if (host.includes("@")) {
+    const atIdx = host.indexOf("@");
+    username = host.substring(0, atIdx) || "root";
+    host = host.substring(atIdx + 1);
+  }
+
+  if (!initialDir && host.includes("/")) {
+    const slashIdx = host.indexOf("/");
+    initialDir = host.substring(slashIdx);
+    host = host.substring(0, slashIdx);
+  }
+
+  if (host.includes(":")) {
+    const colonIdx = host.indexOf(":");
+    const afterColon = host.substring(colonIdx + 1);
+    host = host.substring(0, colonIdx);
+    if (afterColon.startsWith("/")) {
+      if (!initialDir) initialDir = afterColon;
+    } else {
+      const portNum = parseInt(afterColon, 10);
+      if (!isNaN(portNum) && portNum > 0) {
+        port = portNum;
+      }
+    }
+  }
+
+  if (initialDir && !initialDir.startsWith("/")) {
+    initialDir = "/" + initialDir;
+  }
+
+  return {
+    username: username.trim(),
+    host: host.trim(),
+    port: port,
+    initialDir: initialDir || "/"
+  };
+}
+
+// --------------------------------------------------------------------------
 // Connected Servers Panel (Live Active Sessions)
 // --------------------------------------------------------------------------
 
@@ -501,12 +559,14 @@ function renderConnectedServers() {
 
     const titleText = t.profile.name || (t.isLocal ? "Local Terminal" : t.profile.host);
     const subText = t.isLocal ? "Local Terminal (PowerShell)" : `SSH • ${t.profile.username || 'user'}@${t.profile.host || 'host'}:${t.profile.port || 22}`;
+    const activePath = t.sftpPath || (t.profile && t.profile.initialDir) || "/";
 
     item.innerHTML = `
       <span class="connected-item-dot"></span>
       <div class="connected-item-info">
         <span class="connected-item-title" title="${escapeHtml(titleText)}">${escapeHtml(titleText)}</span>
         <span class="connected-item-sub" title="${escapeHtml(subText)}">${escapeHtml(subText)}</span>
+        ${!t.isLocal ? `<span class="connected-item-path" title="Current SFTP Path: ${escapeHtml(activePath)}">📁 ${escapeHtml(activePath)}</span>` : ''}
       </div>
       <span class="connected-item-close" title="Close connection">&times;</span>
     `;
@@ -976,7 +1036,8 @@ function createTab(tabId, profile, isLocal = false) {
     paneEl,
     tabEl,
     isConnected: true,
-    isLocal
+    isLocal,
+    sftpPath: profile.initialDir || "/"
   };
 
   activateTab(tabId);
@@ -1074,7 +1135,8 @@ function activateTab(tabId) {
     if (sftpBadge) {
       if (!currentTab.isLocal) {
         sftpBadge.textContent = currentTab.profile.name || currentTab.profile.host;
-        refreshSFTP();
+        currentSFTPPath = currentTab.sftpPath || (currentTab.profile && currentTab.profile.initialDir) || "/";
+        refreshSFTP(currentSFTPPath);
       } else {
         sftpBadge.textContent = "Local Terminal";
       }
@@ -1140,56 +1202,128 @@ async function sendMultiExec() {
 let currentSFTPPath = "/";
 let sftpCurrentItems = [];
 
+function goSFTPParentDirectory() {
+  if (!currentSFTPPath || currentSFTPPath === "/") return;
+  const lastSlash = currentSFTPPath.lastIndexOf("/");
+  let parent = currentSFTPPath.substring(0, lastSlash);
+  if (!parent || parent === "") parent = "/";
+  refreshSFTP(parent);
+}
+
 async function refreshSFTP(targetPath = "") {
   const fileListEl = document.getElementById("sftpFileList");
   const pathInput = document.getElementById("sftpPathInput");
+  const pathDisplay = document.getElementById("sftpCurrentPathDisplay");
+  const badge = document.getElementById("sftpCountBadge");
   if (!fileListEl) return;
 
   if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
     fileListEl.innerHTML = `<div class="sftp-empty-hint">Connect to an SSH server to browse remote files via SFTP</div>`;
+    if (badge) badge.textContent = "0 items";
+    if (pathDisplay) { pathDisplay.textContent = "/"; pathDisplay.title = "/"; }
     return;
   }
 
-  const path = targetPath || currentSFTPPath || "/";
+  const activeTab = tabs[activeTabId];
+  const path = targetPath || (activeTab && activeTab.sftpPath) || currentSFTPPath || "/";
   fileListEl.innerHTML = `<div class="sftp-empty-hint">Loading files from ${escapeHtml(path)}...</div>`;
 
   try {
     if (window.go && window.go.main && window.go.main.App) {
       const res = await window.go.main.App.SFTPList(activeTabId, path);
       currentSFTPPath = (res && res.path) || path;
+      if (activeTab) activeTab.sftpPath = currentSFTPPath;
       if (pathInput) pathInput.value = currentSFTPPath;
+      if (pathDisplay) {
+        pathDisplay.textContent = currentSFTPPath;
+        pathDisplay.title = currentSFTPPath;
+      }
       sftpCurrentItems = (res && res.items) || [];
-      renderSFTPItems(sftpCurrentItems);
+      renderSFTPItems(sftpCurrentItems, currentSFTPPath);
+      renderConnectedServers();
     }
   } catch (err) {
     fileListEl.innerHTML = `<div class="sftp-empty-hint" style="color: var(--accent-red);">SFTP Error: ${escapeHtml(err.toString())}</div>`;
   }
 }
 
-function renderSFTPItems(items) {
+function renderSFTPItems(items, path = currentSFTPPath) {
   const fileListEl = document.getElementById("sftpFileList");
+  const badge = document.getElementById("sftpCountBadge");
+  const pathDisplay = document.getElementById("sftpCurrentPathDisplay");
   if (!fileListEl) return;
 
-  if (items.length === 0) {
-    fileListEl.innerHTML = `<div class="sftp-empty-hint">Directory is empty</div>`;
-    return;
+  if (pathDisplay) {
+    pathDisplay.textContent = path || "/";
+    pathDisplay.title = path || "/";
+  }
+
+  const dCount = items.filter(i => i.isDir).length;
+  const fCount = items.filter(i => !i.isDir).length;
+  if (badge) {
+    badge.textContent = `${items.length} items (${dCount} dirs, ${fCount} files)`;
   }
 
   fileListEl.innerHTML = "";
+
+  // Parent Directory entry if not at root
+  if (path && path !== "/" && path !== "") {
+    const parentRow = document.createElement("div");
+    parentRow.className = "sftp-file-row sftp-parent-row";
+    parentRow.title = "Go to parent directory (Double-click)";
+    parentRow.innerHTML = `
+      <div class="sftp-item-left">
+        <span style="font-size: 14px;">📂</span>
+        <span class="sftp-item-name" style="font-weight: 600; color: #38bdf8;">.. [Parent Directory]</span>
+      </div>
+      <span class="sftp-item-size" style="color: var(--text-dim); font-size: 10px;">&lt;UP&gt;</span>
+    `;
+    parentRow.addEventListener("dblclick", () => {
+      goSFTPParentDirectory();
+    });
+    fileListEl.appendChild(parentRow);
+  }
+
+  if (items.length === 0) {
+    const emptyEl = document.createElement("div");
+    emptyEl.className = "sftp-empty-hint";
+    emptyEl.textContent = "Directory is empty";
+    fileListEl.appendChild(emptyEl);
+    return;
+  }
+
   items.forEach(item => {
     const row = document.createElement("div");
     row.className = "sftp-file-row";
     row.dataset.path = item.path;
     row.dataset.isDir = item.isDir;
 
-    const icon = item.isDir ? "📁" : (item.extension === ".sh" || item.extension === ".py" || item.extension === ".go" ? "📜" : (item.extension === ".tar" || item.extension === ".gz" || item.extension === ".zip" ? "📦" : "📄"));
+    let icon = "📄";
+    if (item.isDir) {
+      icon = "📁";
+    } else {
+      const ext = (item.extension || "").toLowerCase();
+      if ([".sh", ".bash", ".zsh", ".py", ".js", ".ts", ".go", ".c", ".cpp", ".java", ".rs", ".sql", ".php", ".rb"].includes(ext)) {
+        icon = "📜";
+      } else if ([".tar", ".gz", ".tgz", ".zip", ".rar", ".7z", ".deb", ".rpm", ".pkg"].includes(ext)) {
+        icon = "📦";
+      } else if ([".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico"].includes(ext)) {
+        icon = "🖼️";
+      } else if ([".json", ".yaml", ".yml", ".xml", ".conf", ".ini", ".env", ".toml", ".config"].includes(ext)) {
+        icon = "⚙️";
+      } else if ([".log", ".txt", ".md", ".csv"].includes(ext)) {
+        icon = "📝";
+      }
+    }
+
+    const tooltip = `${item.path}\nSize: ${item.formattedSize}\nPermissions: ${item.permissions || 'N/A'}\nModified: ${item.modTime || 'N/A'}`;
 
     row.innerHTML = `
-      <div class="sftp-item-left" title="${escapeHtml(item.path)} (${item.permissions})">
-        <span>${icon}</span>
+      <div class="sftp-item-left" title="${escapeHtml(tooltip)}">
+        <span style="font-size: 13px;">${icon}</span>
         <span class="sftp-item-name">${escapeHtml(item.name)}</span>
       </div>
-      <span class="sftp-item-size">${item.formattedSize}</span>
+      <span class="sftp-item-size">${escapeHtml(item.formattedSize)}</span>
     `;
 
     row.addEventListener("dblclick", async () => {
@@ -2938,12 +3072,7 @@ function setupEventListeners() {
   safeClick("navTabTools", () => switchSidebarView("tools"));
 
   // Sidebar SFTP controls
-  safeClick("sftpUpBtn", () => {
-    if (currentSFTPPath && currentSFTPPath !== "/") {
-      const parent = currentSFTPPath.substring(0, currentSFTPPath.lastIndexOf("/")) || "/";
-      refreshSFTP(parent);
-    }
-  });
+  safeClick("sftpUpBtn", goSFTPParentDirectory);
   safeClick("sftpRefreshBtn", () => refreshSFTP(currentSFTPPath));
   safeClick("sftpUploadBtn", async () => {
     if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
@@ -2966,18 +3095,49 @@ function setupEventListeners() {
       }
     }
   });
+
   safeClick("sftpMkdirBtn", async () => {
-    const dirName = prompt("Enter new directory name:");
+    if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
+      showToast("Open an SSH connection first to create folders", "warning");
+      return;
+    }
+    const dirName = prompt("Enter new folder name:");
     if (dirName && window.go && window.go.main && window.go.main.App) {
-      const remoteDest = (currentSFTPPath === "/" ? "" : currentSFTPPath) + "/" + dirName;
+      const remoteDest = (currentSFTPPath === "/" ? "" : currentSFTPPath) + "/" + dirName.trim();
       try {
         await window.go.main.App.SFTPMkdir(activeTabId, remoteDest);
-        showToast("Directory created", "success");
+        showToast(`Folder "${dirName}" created`, "success");
         await refreshSFTP(currentSFTPPath);
       } catch (err) {
         showToast("Mkdir failed: " + err, "error");
       }
     }
+  });
+
+  safeClick("sftpNewFileBtn", async () => {
+    if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
+      showToast("Open an SSH connection first to create files", "warning");
+      return;
+    }
+    const fileName = prompt("Enter new file name (e.g. test.txt, script.sh):");
+    if (fileName && window.go && window.go.main && window.go.main.App) {
+      const remoteDest = (currentSFTPPath === "/" ? "" : currentSFTPPath) + "/" + fileName.trim();
+      try {
+        await window.go.main.App.SFTPCreateFile(activeTabId, remoteDest);
+        showToast(`File "${fileName}" created`, "success");
+        await refreshSFTP(currentSFTPPath);
+      } catch (err) {
+        showToast("Create file failed: " + err, "error");
+      }
+    }
+  });
+
+  // SFTP Quick Chips
+  document.querySelectorAll(".sftp-chip-btn").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const p = chip.dataset.path;
+      if (p) refreshSFTP(p);
+    });
   });
 
   const sftpPathInput = document.getElementById("sftpPathInput");
@@ -3002,11 +3162,17 @@ function setupEventListeners() {
       if (e.key === "Enter") {
         const raw = sidebarQuickConnectInput.value.trim();
         if (!raw) return;
-        let u = "root", h = raw, p = 22;
-        if (h.includes("@")) { const pts = h.split("@"); u = pts[0]; h = pts[1]; }
-        if (h.includes(":")) { const pts = h.split(":"); h = pts[0]; p = parseInt(pts[1], 10) || 22; }
+        const parsed = parseQuickConnect(raw);
         sidebarQuickConnectInput.value = "";
-        connectToSession({ id: "q-" + Date.now(), name: `${u}@${h}`, host: h, port: p, username: u });
+        const title = `${parsed.username}@${parsed.host}${parsed.initialDir !== '/' ? ' ' + parsed.initialDir : ''}`;
+        connectToSession({
+          id: "q-" + Date.now(),
+          name: title,
+          host: parsed.host,
+          port: parsed.port,
+          username: parsed.username,
+          initialDir: parsed.initialDir
+        });
       }
     };
   }

@@ -126,6 +126,10 @@ export function ResizeTerminal(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResizeTerminal'](arg1, arg2, arg3);
 }
 
+export function SFTPCreateFile(arg1, arg2) {
+  return window['go']['main']['App']['SFTPCreateFile'](arg1, arg2);
+}
+
 export function SFTPDelete(arg1, arg2) {
   return window['go']['main']['App']['SFTPDelete'](arg1, arg2);
 }
