@@ -451,6 +451,9 @@ async function init() {
     window.runtime.EventsOn("ssh:hostkey:verify_request", (data) => {
       showHostKeyVerificationModal(data);
     });
+    window.runtime.EventsOn("ssh:auth:challenge_request", (data) => {
+      showAuthChallengeModal(data);
+    });
   }
 
   await refreshTree();
@@ -1998,10 +2001,260 @@ async function startLocalTerminal(shellType = "powershell") {
   showToast("Local terminal started", "success");
 }
 
+function promptPasswordDialog(profile) {
+  return new Promise((resolve) => {
+    const box = showModal(`
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>🔐</span> SSH Password Authentication
+        </div>
+        <button class="modal-close-btn" id="promptPwClose">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px;">
+        <div style="margin-bottom: 12px; font-size: 13px; color: var(--text-color);">
+          Please enter password for <b>${escapeHtml(profile.username || 'user')}@${escapeHtml(profile.host)}</b>:
+        </div>
+        <div class="sess-password-wrap">
+          <input type="password" id="promptPwInput" class="auth-modal-input" placeholder="Enter password" autofocus autocomplete="current-password" style="width: 100%; height: 34px; padding: 0 36px 0 10px; background: #0c0f17; border: 1px solid #283046; border-radius: 4px; color: #fff; font-size: 13px; box-sizing: border-box;" />
+          <button type="button" class="sess-password-toggle" id="promptPwToggle" title="Toggle visibility">👁️</button>
+        </div>
+        <div style="margin-top: 14px;">
+          <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="promptPwSaveVault" checked />
+            <span>Save encrypted password in platform credential vault</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn-secondary" id="promptPwCancel" type="button">Cancel</button>
+        <button class="btn-primary" id="promptPwSubmit" type="button">Connect</button>
+      </div>
+    `, "modal-auth-prompt");
+
+    if (!box) {
+      resolve(null);
+      return;
+    }
+
+    const input = box.querySelector("#promptPwInput");
+    const toggleBtn = box.querySelector("#promptPwToggle");
+    const saveCheck = box.querySelector("#promptPwSaveVault");
+    const submitBtn = box.querySelector("#promptPwSubmit");
+    const cancelBtn = box.querySelector("#promptPwCancel");
+    const closeBtn = box.querySelector("#promptPwClose");
+
+    setTimeout(() => { if (input) input.focus(); }, 50);
+
+    if (toggleBtn && input) {
+      toggleBtn.onclick = () => {
+        const isPw = input.type === "password";
+        input.type = isPw ? "text" : "password";
+        toggleBtn.textContent = isPw ? "🔒" : "👁️";
+      };
+    }
+
+    const doSubmit = async () => {
+      const val = input ? input.value : "";
+      if (saveCheck && saveCheck.checked && val && profile.vaultKey && window.go?.main?.App?.SavePassword) {
+        try {
+          await window.go.main.App.SavePassword(profile.vaultKey, val);
+        } catch (_) {}
+      }
+      hideModal();
+      resolve(val);
+    };
+
+    const doCancel = () => {
+      hideModal();
+      resolve(null);
+    };
+
+    if (submitBtn) submitBtn.onclick = doSubmit;
+    if (cancelBtn) cancelBtn.onclick = doCancel;
+    if (closeBtn) closeBtn.onclick = doCancel;
+    if (input) {
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") doSubmit();
+        else if (e.key === "Escape") doCancel();
+      };
+    }
+  });
+}
+
+function promptPassphraseDialog(profile) {
+  return new Promise((resolve) => {
+    const box = showModal(`
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>🔑</span> Private Key Passphrase Required
+        </div>
+        <button class="modal-close-btn" id="promptPassClose">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px;">
+        <div style="margin-bottom: 10px; font-size: 13px; color: var(--text-color);">
+          The private key for <b>${escapeHtml(profile.name || profile.host)}</b> is encrypted:
+        </div>
+        <div style="margin-bottom: 12px; font-size: 11px; color: var(--text-dim); word-break: break-all; background: #0c0f17; padding: 6px 10px; border-radius: 4px; border: 1px solid #1f2536;">
+          <code>${escapeHtml(profile.privateKeyPath || '')}</code>
+        </div>
+        <div class="sess-password-wrap">
+          <input type="password" id="promptPassInput" class="auth-modal-input" placeholder="Enter key passphrase" autofocus style="width: 100%; height: 34px; padding: 0 36px 0 10px; background: #0c0f17; border: 1px solid #283046; border-radius: 4px; color: #fff; font-size: 13px; box-sizing: border-box;" />
+          <button type="button" class="sess-password-toggle" id="promptPassToggle" title="Toggle visibility">👁️</button>
+        </div>
+        <div style="margin-top: 14px;">
+          <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="promptPassSaveVault" checked />
+            <span>Save passphrase in encrypted credential vault</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn-secondary" id="promptPassCancel" type="button">Cancel</button>
+        <button class="btn-primary" id="promptPassSubmit" type="button">Unlock &amp; Connect</button>
+      </div>
+    `, "modal-auth-prompt");
+
+    if (!box) {
+      resolve(null);
+      return;
+    }
+
+    const input = box.querySelector("#promptPassInput");
+    const toggleBtn = box.querySelector("#promptPassToggle");
+    const saveCheck = box.querySelector("#promptPassSaveVault");
+    const submitBtn = box.querySelector("#promptPassSubmit");
+    const cancelBtn = box.querySelector("#promptPassCancel");
+    const closeBtn = box.querySelector("#promptPassClose");
+
+    setTimeout(() => { if (input) input.focus(); }, 50);
+
+    if (toggleBtn && input) {
+      toggleBtn.onclick = () => {
+        const isPw = input.type === "password";
+        input.type = isPw ? "text" : "password";
+        toggleBtn.textContent = isPw ? "🔒" : "👁️";
+      };
+    }
+
+    const doSubmit = async () => {
+      const val = input ? input.value : "";
+      const pvKey = profile.passphraseVaultKey || (profile.vaultKey ? profile.vaultKey + "_passphrase" : "");
+      if (saveCheck && saveCheck.checked && val && pvKey && window.go?.main?.App?.SavePassword) {
+        try {
+          await window.go.main.App.SavePassword(pvKey, val);
+        } catch (_) {}
+      }
+      hideModal();
+      resolve(val);
+    };
+
+    const doCancel = () => {
+      hideModal();
+      resolve(null);
+    };
+
+    if (submitBtn) submitBtn.onclick = doSubmit;
+    if (cancelBtn) cancelBtn.onclick = doCancel;
+    if (closeBtn) closeBtn.onclick = doCancel;
+    if (input) {
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") doSubmit();
+        else if (e.key === "Escape") doCancel();
+      };
+    }
+  });
+}
+
+function showAuthChallengeModal(data) {
+  if (!data || !data.requestId) return;
+  const { requestId, user, instruction, questions, echoes } = data;
+
+  let questionsHtml = "";
+  (questions || []).forEach((q, i) => {
+    const isEcho = echoes && echoes[i] === true;
+    questionsHtml += `
+      <div class="auth-challenge-group" style="margin-top: 12px;">
+        <label style="display: block; font-size: 12px; font-weight: 600; color: #cbd5e1; margin-bottom: 4px;">${escapeHtml(q)}</label>
+        <input type="${isEcho ? 'text' : 'password'}" class="auth-challenge-field" data-index="${i}" placeholder="Enter response..." style="width: 100%; height: 34px; padding: 0 10px; background: #0c0f17; border: 1px solid #283046; border-radius: 4px; color: #fff; font-size: 13px; font-family: inherit; box-sizing: border-box;" autocomplete="off" />
+      </div>
+    `;
+  });
+
+  const box = showModal(`
+    <div class="modal-header">
+      <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+        <span>🛡️</span> Interactive Authentication Challenge
+      </div>
+      <button class="modal-close-btn" id="challengeClose">&times;</button>
+    </div>
+    <div class="modal-body" style="padding: 16px 20px;">
+      <div style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">
+        Authentication challenge for user <b>${escapeHtml(user || 'remote')}</b>:
+      </div>
+      ${instruction ? `<div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px; padding: 10px 12px; font-size: 12.5px; color: #93c5fd; margin-bottom: 12px; line-height: 1.4;">${escapeHtml(instruction)}</div>` : ''}
+      <div id="challengeQuestionsWrap">
+        ${questionsHtml || '<div style="color: var(--text-dim); font-size: 12px;">Server requested response. Click continue to proceed.</div>'}
+      </div>
+    </div>
+    <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+      <button class="btn-secondary" id="challengeCancel" type="button">Cancel</button>
+      <button class="btn-primary" id="challengeSubmit" type="button">Verify &amp; Continue</button>
+    </div>
+  `, "modal-auth-challenge");
+
+  if (!box) return;
+
+  const firstInput = box.querySelector(".auth-challenge-field");
+  setTimeout(() => { if (firstInput) firstInput.focus(); }, 50);
+
+  const doSubmit = async () => {
+    const inputs = box.querySelectorAll(".auth-challenge-field");
+    const answers = [];
+    inputs.forEach(inp => answers.push(inp.value));
+    hideModal();
+    if (window.go?.main?.App?.RespondAuthChallenge) {
+      try {
+        await window.go.main.App.RespondAuthChallenge(requestId, answers);
+      } catch (err) {
+        showToast("Challenge response error: " + err, "error");
+      }
+    }
+  };
+
+  const doCancel = async () => {
+    hideModal();
+    if (window.go?.main?.App?.CancelAuthChallenge) {
+      try {
+        await window.go.main.App.CancelAuthChallenge(requestId);
+      } catch (_) {}
+    }
+  };
+
+  const submitBtn = box.querySelector("#challengeSubmit");
+  const cancelBtn = box.querySelector("#challengeCancel");
+  const closeBtn = box.querySelector("#challengeClose");
+
+  if (submitBtn) submitBtn.onclick = doSubmit;
+  if (cancelBtn) cancelBtn.onclick = doCancel;
+  if (closeBtn) closeBtn.onclick = doCancel;
+
+  box.querySelectorAll(".auth-challenge-field").forEach((inp, idx, arr) => {
+    inp.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        if (idx === arr.length - 1) doSubmit();
+        else arr[idx + 1].focus();
+      } else if (e.key === "Escape") {
+        doCancel();
+      }
+    };
+  });
+}
+
 async function connectToSession(profile) {
   let password = "";
+  const authType = profile.authType || (profile.privateKeyPath ? "key" : "password");
 
-  if (!profile.privateKeyPath) {
+  if (authType === "password") {
     let hasSaved = false;
     if (window.go && window.go.main && window.go.main.App && profile.vaultKey) {
       try {
@@ -2012,6 +2265,38 @@ async function connectToSession(profile) {
     if (!hasSaved) {
       password = await promptPasswordDialog(profile);
       if (password === null) return;
+    }
+  } else if (authType === "key") {
+    // Check if key is encrypted and needs passphrase
+    if (profile.privateKeyPath && window.go && window.go.main && window.go.main.App && window.go.main.App.ValidatePrivateKeyFile) {
+      let hasSavedPass = false;
+      const passKey = profile.passphraseVaultKey || (profile.vaultKey ? profile.vaultKey + "_passphrase" : "");
+      if (passKey && window.go.main.App.GetSessionPassphrase) {
+        try {
+          const saved = await window.go.main.App.GetSessionPassphrase(passKey);
+          if (saved) hasSavedPass = true;
+        } catch (_) {}
+      }
+      if (!hasSavedPass && !profile.keyPassphrase) {
+        try {
+          const info = await window.go.main.App.ValidatePrivateKeyFile(profile.privateKeyPath, "");
+          if (info && info.encrypted) {
+            const enteredPass = await promptPassphraseDialog(profile);
+            if (enteredPass === null) return;
+            profile.keyPassphrase = enteredPass;
+          }
+        } catch (_) {}
+      }
+    }
+  } else if (authType === "agent") {
+    // Proactively check SSH agent
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.CheckSSHAgent) {
+      try {
+        const agentStatus = await window.go.main.App.CheckSSHAgent();
+        if (agentStatus && !agentStatus.available) {
+          showToast(`Warning: SSH Agent not active (${agentStatus.error || 'service not running'})`, "warning");
+        }
+      } catch (_) {}
     }
   }
 
@@ -5925,10 +6210,11 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
           <div class="sess-form-group">
             <label>Authentication Method</label>
             <select id="sAuthType">
-              <option value="password" ${p.authType === 'password' || (!p.privateKeyPath && p.authType !== 'agent' && p.authType !== 'keyboard-interactive') ? 'selected' : ''}>Password (Encrypted in Vault)</option>
-              <option value="key" ${p.authType === 'key' || p.privateKeyPath ? 'selected' : ''}>Private Key (RSA / Ed25519 / OpenSSH)</option>
-              <option value="agent" ${p.authType === 'agent' ? 'selected' : ''}>SSH Agent / Pageant</option>
-              <option value="keyboard-interactive" ${p.authType === 'keyboard-interactive' ? 'selected' : ''}>Keyboard-Interactive</option>
+              <option value="password" ${p.authType === 'password' || (!p.privateKeyPath && p.authType !== 'agent' && p.authType !== 'keyboard-interactive' && p.authType !== 'auto') ? 'selected' : ''}>Password (Encrypted in Vault)</option>
+              <option value="key" ${p.authType === 'key' || (!p.authType && p.privateKeyPath) ? 'selected' : ''}>Public Key / Private Key (RSA / Ed25519 / OpenSSH Cert)</option>
+              <option value="agent" ${p.authType === 'agent' ? 'selected' : ''}>SSH Agent / Pageant (Local Key Agent)</option>
+              <option value="keyboard-interactive" ${p.authType === 'keyboard-interactive' ? 'selected' : ''}>Keyboard-Interactive (MFA / 2FA / PAM Challenge)</option>
+              <option value="auto" ${p.authType === 'auto' ? 'selected' : ''}>Auto (Smart Priority Chain: Key → Agent → 2FA → Password)</option>
             </select>
           </div>
 
@@ -5945,7 +6231,7 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
             </div>
           </div>
 
-          <div id="sessKeyFields" class="${p.authType === 'key' ? '' : 'hidden'}">
+          <div id="sessKeyFields" class="${p.authType === 'password' || p.authType === 'agent' || p.authType === 'keyboard-interactive' ? 'hidden' : ''}">
             <div class="sess-form-group">
               <label>Private Key File</label>
               <div class="file-input-group" style="display: flex; gap: 8px;">
@@ -5966,6 +6252,13 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
                 🔐 Encrypted in platform credential vault. Never stored in plaintext.
               </div>
             </div>
+            <div class="sess-form-group" style="margin-top: 8px;">
+              <label>OpenSSH Certificate (Optional, auto-detected if &lt;key&gt;-cert.pub)</label>
+              <div class="file-input-group" style="display: flex; gap: 8px;">
+                <input type="text" id="sCertPath" value="${escapeHtml(p.certificatePath || '')}" placeholder="Optional: C:\\Users\\...\\.ssh\\id_rsa-cert.pub" />
+                <button class="btn-secondary" id="browseCertBtn" type="button">Browse...</button>
+              </div>
+            </div>
           </div>
 
           <div class="sess-form-group" style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #232838;">
@@ -5973,7 +6266,10 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
               <input type="checkbox" id="sUseAgent" ${p.useAgent ? 'checked' : ''} />
               <span><b>Enable SSH Agent / Pageant authentication forwarding</b></span>
             </label>
-            <div id="sessAgentStatus" style="font-size: 11px; margin-top: 6px; margin-left: 26px; min-height: 16px;"></div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px; margin-left: 26px;">
+              <div id="sessAgentStatus" style="font-size: 11px; min-height: 16px; flex: 1;"></div>
+              <button class="btn-secondary" id="refreshAgentBtn" type="button" style="padding: 2px 8px; font-size: 11px; height: 24px;">🔄 Refresh Agent</button>
+            </div>
           </div>
         </div>
 
@@ -6369,7 +6665,11 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
       try {
         const info = await window.go.main.App.ValidatePrivateKeyFile(path, passphrase);
         if (info && info.valid) {
-          badge.innerHTML = `<span style="color: #4ade80;">🟢 Valid <b>${escapeHtml(info.keyType || 'Key')}</b> • Fingerprint: <code>${escapeHtml(info.fingerprint || '')}</code></span>`;
+          let certHtml = "";
+          if (info.hasCertificate) {
+            certHtml = ` • 📜 <span style="color: #67e8f9;">OpenSSH Certificate (${escapeHtml(info.certificateKeyId || 'Active')})</span>`;
+          }
+          badge.innerHTML = `<span style="color: #4ade80;">🟢 Valid <b>${escapeHtml(info.keyType || 'Key')}</b>${certHtml} • Fingerprint: <code>${escapeHtml(info.fingerprint || '')}</code></span>`;
         } else if (info && info.encrypted && !passphrase) {
           badge.innerHTML = `<span style="color: #fbbf24;">🔒 Encrypted private key (${escapeHtml(info.keyType || 'Key')}) • Passphrase required</span>`;
         } else if (info && info.error) {
@@ -6400,6 +6700,11 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
     }
   };
 
+  const refreshAgentBtn = box.querySelector("#refreshAgentBtn");
+  if (refreshAgentBtn) {
+    refreshAgentBtn.onclick = () => updateAgentStatus();
+  }
+
   // Auth type dropdown
   const authSelect = box.querySelector("#sAuthType");
   const passFields = box.querySelector("#sessPassFields");
@@ -6408,10 +6713,14 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
     authSelect.onchange = () => {
       const isKey = authSelect.value === "key";
       const isAgent = authSelect.value === "agent";
+      const isAuto = authSelect.value === "auto";
+      const isKI = authSelect.value === "keyboard-interactive";
+      const isPass = authSelect.value === "password";
+
       if (passFields) passFields.classList.toggle("hidden", isKey || isAgent);
-      if (keyFields) keyFields.classList.toggle("hidden", !isKey);
-      if (isAgent) updateAgentStatus();
-      if (isKey) updateKeyInfo();
+      if (keyFields) keyFields.classList.toggle("hidden", isPass || isAgent || isKI);
+      if (isAgent || isAuto) updateAgentStatus();
+      if (isKey || isAuto) updateKeyInfo();
     };
   }
 
@@ -6431,7 +6740,7 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
       if (useAgentCheck.checked) updateAgentStatus();
       else {
         const statusDiv = box.querySelector("#sessAgentStatus");
-        if (statusDiv) statusDiv.innerHTML = "";
+        if (statusDiv && authSelect?.value !== "agent") statusDiv.innerHTML = "";
       }
     };
   }
@@ -6446,6 +6755,21 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
           if (path) {
             box.querySelector("#sKeyPath").value = path;
             await updateKeyInfo();
+          }
+        } catch (_) {}
+      }
+    };
+  }
+
+  // Browse cert button
+  const browseCertBtn = box.querySelector("#browseCertBtn");
+  if (browseCertBtn) {
+    browseCertBtn.onclick = async () => {
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.SelectPrivateKeyFile) {
+        try {
+          const path = await window.go.main.App.SelectPrivateKeyFile();
+          if (path && box.querySelector("#sCertPath")) {
+            box.querySelector("#sCertPath").value = path;
           }
         } catch (_) {}
       }
@@ -6545,9 +6869,10 @@ async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
       port: parseInt(box.querySelector("#sPort").value, 10) || (currentProto === "rdp" ? 3389 : 22),
       username,
       authType: authSelect ? authSelect.value : "password",
-      privateKeyPath: authSelect && authSelect.value === "key" ? box.querySelector("#sKeyPath").value.trim() : "",
+      privateKeyPath: (authSelect && (authSelect.value === "key" || authSelect.value === "auto")) ? box.querySelector("#sKeyPath").value.trim() : "",
+      certificatePath: box.querySelector("#sCertPath") ? box.querySelector("#sCertPath").value.trim() : "",
       keyPassphrase: box.querySelector("#sKeyPassphrase") ? box.querySelector("#sKeyPassphrase").value : "",
-      useAgent: box.querySelector("#sUseAgent") ? box.querySelector("#sUseAgent").checked : false,
+      useAgent: box.querySelector("#sUseAgent") ? box.querySelector("#sUseAgent").checked : (authSelect?.value === "agent"),
 
       // Terminal
       terminalType: box.querySelector("#sTermType") ? box.querySelector("#sTermType").value : "xterm-256color",

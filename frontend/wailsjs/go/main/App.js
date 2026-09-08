@@ -18,6 +18,10 @@ export function BroadcastCommand(arg1) {
   return window['go']['main']['App']['BroadcastCommand'](arg1);
 }
 
+export function CancelAuthChallenge(arg1) {
+  return window['go']['main']['App']['CancelAuthChallenge'](arg1);
+}
+
 export function CheckSSHAgent() {
   return window['go']['main']['App']['CheckSSHAgent']();
 }
@@ -188,6 +192,10 @@ export function RenameNode(arg1, arg2) {
 
 export function ResizeTerminal(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResizeTerminal'](arg1, arg2, arg3);
+}
+
+export function RespondAuthChallenge(arg1, arg2) {
+  return window['go']['main']['App']['RespondAuthChallenge'](arg1, arg2);
 }
 
 export function RespondHostKey(arg1, arg2) {

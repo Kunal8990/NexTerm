@@ -13,13 +13,16 @@ import (
 
 // KeyInfo holds inspection details for an SSH private key.
 type KeyInfo struct {
-	Valid       bool   `json:"valid"`
-	Path        string `json:"path,omitempty"`
-	KeyType     string `json:"keyType"`     // e.g. "RSA 2048-bit", "ED25519", "ECDSA P-256"
-	Fingerprint string `json:"fingerprint"` // e.g. "SHA256:..."
-	Encrypted   bool   `json:"encrypted"`   // requires passphrase
-	Comment     string `json:"comment,omitempty"`
-	Error       string `json:"error,omitempty"`
+	Valid            bool   `json:"valid"`
+	Path             string `json:"path,omitempty"`
+	KeyType          string `json:"keyType"`     // e.g. "RSA 2048-bit", "ED25519", "ECDSA P-256"
+	Fingerprint      string `json:"fingerprint"` // e.g. "SHA256:..."
+	Encrypted        bool   `json:"encrypted"`   // requires passphrase
+	Comment          string `json:"comment,omitempty"`
+	HasCertificate   bool   `json:"hasCertificate,omitempty"`
+	CertificateType  string `json:"certificateType,omitempty"`
+	CertificateKeyID string `json:"certificateKeyId,omitempty"`
+	Error            string `json:"error,omitempty"`
 }
 
 // ValidatePrivateKey reads a key file from disk and inspects its validity, type, and encryption.
@@ -40,6 +43,19 @@ func ValidatePrivateKey(keyPath string, passphrase string) (*KeyInfo, error) {
 
 	info, err := InspectPrivateKeyData(data, passphrase)
 	info.Path = keyPath
+
+	// Check if an associated OpenSSH Certificate (<keyPath>-cert.pub) exists
+	certPath := keyPath + "-cert.pub"
+	if cData, cErr := os.ReadFile(certPath); cErr == nil {
+		if pubKey, _, _, _, pErr := ssh.ParseAuthorizedKey(cData); pErr == nil {
+			if cert, ok := pubKey.(*ssh.Certificate); ok {
+				info.HasCertificate = true
+				info.CertificateType = cert.Type()
+				info.CertificateKeyID = cert.KeyId
+			}
+		}
+	}
+
 	return info, err
 }
 

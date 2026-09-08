@@ -17,7 +17,11 @@ const (
 	AuthTypePrivateKey          AuthType = "key"
 	AuthTypeAgent               AuthType = "agent"
 	AuthTypeKeyboardInteractive AuthType = "keyboard-interactive"
+	AuthTypeAuto                AuthType = "auto"
 )
+
+// KeyboardInteractiveChallengeHandler abstracts dynamic RFC 4256 challenge-response prompts.
+type KeyboardInteractiveChallengeHandler func(user, instruction string, questions []string, echos []bool) ([]string, error)
 
 // AuthenticationProvider abstracts different SSH authentication strategies.
 type AuthenticationProvider interface {
@@ -56,9 +60,11 @@ func (p *PasswordAuthProvider) BuildAuthMethods() ([]ssh.AuthMethod, error) {
 // -------------------------------------------------------------------------
 
 type PrivateKeyAuthProvider struct {
-	KeyPath       string
-	KeyPEM        []byte
-	KeyPassphrase string
+	KeyPath         string
+	KeyPEM          []byte
+	KeyPassphrase   string
+	CertificatePath string
+	CertificatePEM  []byte
 }
 
 func (p *PrivateKeyAuthProvider) Type() AuthType {
@@ -95,6 +101,32 @@ func (p *PrivateKeyAuthProvider) BuildAuthMethods() ([]ssh.AuthMethod, error) {
 			return nil, fmt.Errorf("private key is encrypted: passphrase required (%w)", parseErr)
 		}
 		return nil, fmt.Errorf("parse private key: %w", parseErr)
+	}
+
+	// Check for OpenSSH Certificate
+	certData := p.CertificatePEM
+	if len(certData) == 0 && p.CertificatePath != "" {
+		if cData, err := os.ReadFile(p.CertificatePath); err == nil {
+			certData = cData
+		}
+	} else if len(certData) == 0 && p.KeyPath != "" {
+		// Standard OpenSSH certificate file convention: <key>-cert.pub
+		certFile := p.KeyPath + "-cert.pub"
+		if cData, err := os.ReadFile(certFile); err == nil {
+			certData = cData
+		}
+	}
+
+	if len(certData) > 0 {
+		pubKey, _, _, _, err := ssh.ParseAuthorizedKey(certData)
+		if err == nil {
+			if cert, ok := pubKey.(*ssh.Certificate); ok {
+				certSigner, err := ssh.NewCertSigner(cert, signer)
+				if err == nil {
+					return []ssh.AuthMethod{ssh.PublicKeys(certSigner)}, nil
+				}
+			}
+		}
 	}
 
 	return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
@@ -152,7 +184,8 @@ func CheckAgentStatus() (bool, int, error) {
 // -------------------------------------------------------------------------
 
 type KeyboardInteractiveAuthProvider struct {
-	Handler ssh.KeyboardInteractiveChallenge
+	Password string
+	Prompt   KeyboardInteractiveChallengeHandler
 }
 
 func (p *KeyboardInteractiveAuthProvider) Type() AuthType {
@@ -160,8 +193,36 @@ func (p *KeyboardInteractiveAuthProvider) Type() AuthType {
 }
 
 func (p *KeyboardInteractiveAuthProvider) BuildAuthMethods() ([]ssh.AuthMethod, error) {
-	if p.Handler == nil {
-		return nil, errors.New("keyboard-interactive handler cannot be nil")
+	handler := func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+		if len(questions) == 0 {
+			return []string{}, nil
+		}
+
+		// 1. If an interactive prompt handler is available, invoke it
+		if p.Prompt != nil {
+			answers, err := p.Prompt(user, instruction, questions, echos)
+			if err == nil && len(answers) == len(questions) {
+				return answers, nil
+			}
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// 2. Fallback: answer password if question is a password query and password is provided
+		if p.Password != "" {
+			answers := make([]string, len(questions))
+			for i, q := range questions {
+				lower := strings.ToLower(q)
+				if strings.Contains(lower, "password") || strings.Contains(lower, "passphrase") {
+					answers[i] = p.Password
+				}
+			}
+			return answers, nil
+		}
+
+		return nil, errors.New("keyboard-interactive authentication requires challenge response answers")
 	}
-	return []ssh.AuthMethod{ssh.KeyboardInteractive(p.Handler)}, nil
+
+	return []ssh.AuthMethod{ssh.KeyboardInteractive(handler)}, nil
 }

@@ -123,6 +123,7 @@ export namespace model {
 	    vaultKey?: string;
 	    passphraseVaultKey?: string;
 	    privateKeyPath?: string;
+	    certificatePath?: string;
 	    keyPassphrase?: string;
 	    keyType?: string;
 	    keyFingerprint?: string;
@@ -188,6 +189,7 @@ export namespace model {
 	        this.vaultKey = source["vaultKey"];
 	        this.passphraseVaultKey = source["passphraseVaultKey"];
 	        this.privateKeyPath = source["privateKeyPath"];
+	        this.certificatePath = source["certificatePath"];
 	        this.keyPassphrase = source["keyPassphrase"];
 	        this.keyType = source["keyType"];
 	        this.keyFingerprint = source["keyFingerprint"];
@@ -567,6 +569,9 @@ export namespace sshsession {
 	    fingerprint: string;
 	    encrypted: boolean;
 	    comment?: string;
+	    hasCertificate?: boolean;
+	    certificateType?: string;
+	    certificateKeyId?: string;
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -581,6 +586,9 @@ export namespace sshsession {
 	        this.fingerprint = source["fingerprint"];
 	        this.encrypted = source["encrypted"];
 	        this.comment = source["comment"];
+	        this.hasCertificate = source["hasCertificate"];
+	        this.certificateType = source["certificateType"];
+	        this.certificateKeyId = source["certificateKeyId"];
 	        this.error = source["error"];
 	    }
 	}

@@ -8,10 +8,11 @@ type SessionProfile struct {
 	Host              string `json:"host"`
 	Port              int    `json:"port"`
 	Username           string `json:"username"`
-	AuthType           string `json:"authType,omitempty"` // "password", "key", "agent", or "keyboard-interactive"
+	AuthType           string `json:"authType,omitempty"` // "password", "key", "agent", "keyboard-interactive", "auto"
 	VaultKey           string `json:"vaultKey,omitempty"`
 	PassphraseVaultKey string `json:"passphraseVaultKey,omitempty"`
 	PrivateKeyPath     string `json:"privateKeyPath,omitempty"`
+	CertificatePath    string `json:"certificatePath,omitempty"`
 	KeyPassphrase      string `json:"keyPassphrase,omitempty"`
 	KeyType            string `json:"keyType,omitempty"`
 	KeyFingerprint     string `json:"keyFingerprint,omitempty"`

@@ -1,6 +1,7 @@
 package sshsession
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -35,16 +36,19 @@ type ConnectOptions struct {
 	OnStateChange     func(state ConnectionState, message string)
 	Host              string
 	Port              int
-	Username          string
-	AuthType          AuthType // "password", "key", "agent", "keyboard-interactive"
-	Password          string   // empty if using a key
-	PrivateKeyPath    string   // path to private key on disk
-	PrivateKeyPEM     []byte   // raw private key data
-	KeyPassphrase     string
-	UseAgent          bool   // enable SSH Agent forwarding/auth
-	AgentSocket       string // optional custom SSH_AUTH_SOCK path
-	StartupCommand    string
-	TerminalType      string
+	Username                  string
+	AuthType                  AuthType // "password", "key", "agent", "keyboard-interactive", "auto"
+	Password                  string   // empty if using a key
+	PrivateKeyPath            string   // path to private key on disk
+	PrivateKeyPEM             []byte   // raw private key data
+	KeyPassphrase             string
+	CertificatePath           string                               // path to OpenSSH certificate file
+	CertificatePEM            []byte                               // raw certificate data
+	UseAgent                  bool                                 // enable SSH Agent forwarding/auth
+	AgentSocket               string                               // optional custom SSH_AUTH_SOCK path
+	KeyboardInteractivePrompt KeyboardInteractiveChallengeHandler // callback for challenge-response (2FA/OTP/PAM)
+	StartupCommand            string
+	TerminalType              string
 	KeepAliveInterval int // in seconds
 	Cols              int
 	Rows              int
@@ -276,61 +280,106 @@ func Connect(opts ConnectOptions) (*Session, error) {
 }
 
 func buildAuthMethods(opts ConnectOptions) ([]ssh.AuthMethod, error) {
-	// 1. Explicit auth provider type
+	var methods []ssh.AuthMethod
+
 	switch opts.AuthType {
-	case AuthTypePrivateKey:
-		p := &PrivateKeyAuthProvider{
-			KeyPath:       opts.PrivateKeyPath,
-			KeyPEM:        opts.PrivateKeyPEM,
-			KeyPassphrase: opts.KeyPassphrase,
-		}
-		return p.BuildAuthMethods()
-
-	case AuthTypeAgent:
-		p := &SSHAgentAuthProvider{
-			CustomSocket: opts.AgentSocket,
-		}
-		return p.BuildAuthMethods()
-
-	case AuthTypeKeyboardInteractive:
-		p := &PasswordAuthProvider{Password: opts.Password}
-		return p.BuildAuthMethods()
-
 	case AuthTypePassword:
 		p := &PasswordAuthProvider{Password: opts.Password}
 		return p.BuildAuthMethods()
-	}
 
-	// 2. Fallback / combined chain
-	var methods []ssh.AuthMethod
-
-	// Private Key
-	if len(opts.PrivateKeyPEM) > 0 || opts.PrivateKeyPath != "" {
+	case AuthTypePrivateKey:
 		p := &PrivateKeyAuthProvider{
-			KeyPath:       opts.PrivateKeyPath,
-			KeyPEM:        opts.PrivateKeyPEM,
-			KeyPassphrase: opts.KeyPassphrase,
+			KeyPath:         opts.PrivateKeyPath,
+			KeyPEM:          opts.PrivateKeyPEM,
+			KeyPassphrase:   opts.KeyPassphrase,
+			CertificatePath: opts.CertificatePath,
+			CertificatePEM:  opts.CertificatePEM,
 		}
 		m, err := p.BuildAuthMethods()
 		if err != nil {
 			return nil, err
 		}
 		methods = append(methods, m...)
-	}
+		// Secondary dynamic challenge support for MFA servers
+		if opts.KeyboardInteractivePrompt != nil {
+			ki := &KeyboardInteractiveAuthProvider{Password: opts.Password, Prompt: opts.KeyboardInteractivePrompt}
+			if km, err := ki.BuildAuthMethods(); err == nil {
+				methods = append(methods, km...)
+			}
+		}
+		return methods, nil
 
-	// SSH Agent
-	if opts.UseAgent {
-		agentProv := &SSHAgentAuthProvider{CustomSocket: opts.AgentSocket}
-		if m, err := agentProv.BuildAuthMethods(); err == nil {
-			methods = append(methods, m...)
+	case AuthTypeAgent:
+		p := &SSHAgentAuthProvider{
+			CustomSocket: opts.AgentSocket,
+		}
+		m, err := p.BuildAuthMethods()
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, m...)
+		// Secondary dynamic challenge support for MFA
+		if opts.KeyboardInteractivePrompt != nil {
+			ki := &KeyboardInteractiveAuthProvider{Password: opts.Password, Prompt: opts.KeyboardInteractivePrompt}
+			if km, err := ki.BuildAuthMethods(); err == nil {
+				methods = append(methods, km...)
+			}
+		}
+		return methods, nil
+
+	case AuthTypeKeyboardInteractive:
+		p := &KeyboardInteractiveAuthProvider{
+			Password: opts.Password,
+			Prompt:   opts.KeyboardInteractivePrompt,
+		}
+		return p.BuildAuthMethods()
+
+	case AuthTypeAuto, "":
+		// Fallback priority chain:
+		// 1. Private Key & Certificates
+		if len(opts.PrivateKeyPEM) > 0 || opts.PrivateKeyPath != "" {
+			p := &PrivateKeyAuthProvider{
+				KeyPath:         opts.PrivateKeyPath,
+				KeyPEM:          opts.PrivateKeyPEM,
+				KeyPassphrase:   opts.KeyPassphrase,
+				CertificatePath: opts.CertificatePath,
+				CertificatePEM:  opts.CertificatePEM,
+			}
+			if m, err := p.BuildAuthMethods(); err == nil && len(m) > 0 {
+				methods = append(methods, m...)
+			}
+		}
+
+		// 2. SSH Agent
+		if opts.UseAgent {
+			agentProv := &SSHAgentAuthProvider{CustomSocket: opts.AgentSocket}
+			if m, err := agentProv.BuildAuthMethods(); err == nil && len(m) > 0 {
+				methods = append(methods, m...)
+			}
+		}
+
+		// 3. Keyboard-Interactive Challenge
+		if opts.KeyboardInteractivePrompt != nil {
+			kiProv := &KeyboardInteractiveAuthProvider{
+				Password: opts.Password,
+				Prompt:   opts.KeyboardInteractivePrompt,
+			}
+			if m, err := kiProv.BuildAuthMethods(); err == nil && len(m) > 0 {
+				methods = append(methods, m...)
+			}
+		}
+
+		// 4. Password
+		if opts.Password != "" {
+			pwProv := &PasswordAuthProvider{Password: opts.Password}
+			if m, err := pwProv.BuildAuthMethods(); err == nil && len(m) > 0 {
+				methods = append(methods, m...)
+			}
 		}
 	}
 
-	// Password & Interactive
-	if opts.Password != "" || len(methods) == 0 {
-		pwProv := &PasswordAuthProvider{Password: opts.Password}
-		m, _ := pwProv.BuildAuthMethods()
-		methods = append(methods, m...)
+	if len(methods) == 0 {
+		return nil, errors.New("no SSH authentication method available: please provide password, private key, or activate ssh-agent")
 	}
 
 	return methods, nil

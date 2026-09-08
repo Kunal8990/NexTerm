@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -61,20 +62,29 @@ type App struct {
 	hostKeyMgr        *hostkey.Manager
 	pendingHostKeysMu sync.Mutex
 	pendingHostKeys   map[string]chan string
+
+	pendingChallengesMu sync.Mutex
+	pendingChallenges   map[string]chan authChallengeResponse
+}
+
+type authChallengeResponse struct {
+	answers []string
+	err     error
 }
 
 func NewApp() *App {
 	return &App{
-		tabs:            make(map[string]*sshsession.Session),
-		localTabs:       make(map[string]*pty.Terminal),
-		workspace:       model.NewWorkspace("default", "Default Workspace"),
-		sftpMgr:         sftpmanager.NewSFTPManager(),
-		tunnelMgr:       tunnel.NewTunnelManager(),
-		macroMgr:        macro.NewMacroManager(),
-		secMgr:          security.NewSecurityManager(),
-		fileWatchers:    make(map[string]*externalFileWatch),
-		hostKeyMgr:      hostkey.GetDefaultManager(),
-		pendingHostKeys: make(map[string]chan string),
+		tabs:              make(map[string]*sshsession.Session),
+		localTabs:         make(map[string]*pty.Terminal),
+		workspace:         model.NewWorkspace("default", "Default Workspace"),
+		sftpMgr:           sftpmanager.NewSFTPManager(),
+		tunnelMgr:         tunnel.NewTunnelManager(),
+		macroMgr:          macro.NewMacroManager(),
+		secMgr:            security.NewSecurityManager(),
+		fileWatchers:      make(map[string]*externalFileWatch),
+		hostKeyMgr:        hostkey.GetDefaultManager(),
+		pendingHostKeys:   make(map[string]chan string),
+		pendingChallenges: make(map[string]chan authChallengeResponse),
 	}
 }
 
@@ -606,7 +616,8 @@ func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, p
 		Port:              profile.Port,
 		Username:          profile.Username,
 		AuthType:          sshsession.AuthType(profile.AuthType),
-		UseAgent:          profile.UseAgent,
+		UseAgent:          profile.UseAgent || profile.AuthType == "agent",
+		CertificatePath:   profile.CertificatePath,
 		StartupCommand:    profile.StartupCommand,
 		TerminalType:      profile.TerminalType,
 		KeepAliveInterval: profile.KeepAliveInterval,
@@ -622,35 +633,43 @@ func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, p
 		Rows:              profile.Rows,
 	}
 
-	// Load passphrase securely from vault if present
-	if profile.PassphraseVaultKey != "" && a.vault != nil {
-		if savedPass, ok, err := a.vault.Load(profile.PassphraseVaultKey); err == nil && ok && savedPass != "" {
-			opts.KeyPassphrase = savedPass
-		}
-	} else if profile.VaultKey != "" && a.vault != nil {
-		if savedPass, ok, err := a.vault.Load(profile.VaultKey + "_passphrase"); err == nil && ok && savedPass != "" {
-			opts.KeyPassphrase = savedPass
-		}
-	}
-	if profile.KeyPassphrase != "" {
-		opts.KeyPassphrase = profile.KeyPassphrase
-	}
-
-	if profile.PrivateKeyPath != "" {
-		opts.PrivateKeyPath = profile.PrivateKeyPath
-		keyBytes, err := sshsession.ReadPrivateKeyFile(profile.PrivateKeyPath)
-		if err != nil {
-			return fmt.Errorf("read private key: %w", err)
-		}
-		opts.PrivateKeyPEM = keyBytes
-	} else if password != "" {
+	// 1. Password from direct argument or platform credential vault
+	if password != "" {
 		opts.Password = password
 	} else if profile.VaultKey != "" && a.vault != nil {
 		saved, ok, err := a.vault.Load(profile.VaultKey)
-		if err == nil && ok {
+		if err == nil && ok && saved != "" {
 			opts.Password = saved
 		}
 	}
+
+	// 2. Private Key & Key Passphrase (when key or auto auth is enabled)
+	if profile.PrivateKeyPath != "" && (profile.AuthType == "" || profile.AuthType == "key" || profile.AuthType == "auto") {
+		opts.PrivateKeyPath = profile.PrivateKeyPath
+		opts.CertificatePath = profile.CertificatePath
+		keyBytes, err := sshsession.ReadPrivateKeyFile(profile.PrivateKeyPath)
+		if err != nil && profile.AuthType == "key" {
+			return fmt.Errorf("read private key: %w", err)
+		}
+		opts.PrivateKeyPEM = keyBytes
+
+		// Load passphrase securely from vault if present
+		if profile.PassphraseVaultKey != "" && a.vault != nil {
+			if savedPass, ok, err := a.vault.Load(profile.PassphraseVaultKey); err == nil && ok && savedPass != "" {
+				opts.KeyPassphrase = savedPass
+			}
+		} else if profile.VaultKey != "" && a.vault != nil {
+			if savedPass, ok, err := a.vault.Load(profile.VaultKey + "_passphrase"); err == nil && ok && savedPass != "" {
+				opts.KeyPassphrase = savedPass
+			}
+		}
+		if profile.KeyPassphrase != "" {
+			opts.KeyPassphrase = profile.KeyPassphrase
+		}
+	}
+
+	// 3. Dynamic Keyboard-Interactive challenge callback (2FA, PAM, OTP)
+	opts.KeyboardInteractivePrompt = a.buildAuthChallengeCallback(tabID, opts.Password)
 
 	// Handle Jump Host / Bastion Proxy configuration
 	if profile.UseJumpHost && profile.JumpHost != "" {
@@ -665,7 +684,8 @@ func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, p
 			if err == nil {
 				opts.JumpPrivateKeyPEM = jKeyBytes
 			}
-		} else if profile.JumpVaultKey != "" && a.vault != nil {
+		}
+		if profile.JumpVaultKey != "" && a.vault != nil {
 			jPw, ok, err := a.vault.Load(profile.JumpVaultKey)
 			if err == nil && ok {
 				opts.JumpPassword = jPw
@@ -1638,5 +1658,102 @@ func (a *App) DeleteKnownHost(hostname string, port int) error {
 	}
 	return a.hostKeyMgr.Remove(hostname, port)
 }
+
+func (a *App) buildAuthChallengeCallback(tabID string, defaultPassword string) sshsession.KeyboardInteractiveChallengeHandler {
+	return func(user, instruction string, questions []string, echos []bool) ([]string, error) {
+		if len(questions) == 0 {
+			return []string{}, nil
+		}
+
+		// If questions are only asking for password and defaultPassword is available, auto-fulfill
+		allPassword := true
+		for _, q := range questions {
+			lower := strings.ToLower(q)
+			if !strings.Contains(lower, "password") && !strings.Contains(lower, "passphrase") {
+				allPassword = false
+				break
+			}
+		}
+		if allPassword && defaultPassword != "" {
+			ans := make([]string, len(questions))
+			for i := range questions {
+				ans[i] = defaultPassword
+			}
+			return ans, nil
+		}
+
+		// Prompt user interactively via Wails event
+		reqID := uuid.NewString()
+		respChan := make(chan authChallengeResponse, 1)
+
+		a.pendingChallengesMu.Lock()
+		a.pendingChallenges[reqID] = respChan
+		a.pendingChallengesMu.Unlock()
+
+		defer func() {
+			a.pendingChallengesMu.Lock()
+			delete(a.pendingChallenges, reqID)
+			a.pendingChallengesMu.Unlock()
+		}()
+
+		wailsruntime.EventsEmit(a.ctx, "ssh:auth:challenge_request", map[string]interface{}{
+			"requestId":   reqID,
+			"tabId":       tabID,
+			"user":        user,
+			"instruction": instruction,
+			"questions":   questions,
+			"echoes":      echos,
+		})
+
+		select {
+		case res := <-respChan:
+			if res.err != nil {
+				return nil, res.err
+			}
+			return res.answers, nil
+		case <-time.After(120 * time.Second):
+			return nil, errors.New("keyboard-interactive challenge timed out after 120 seconds")
+		case <-a.ctx.Done():
+			return nil, errors.New("application closed")
+		}
+	}
+}
+
+// RespondAuthChallenge delivers user answers for a pending keyboard-interactive challenge.
+func (a *App) RespondAuthChallenge(requestID string, answers []string) error {
+	a.pendingChallengesMu.Lock()
+	ch, ok := a.pendingChallenges[requestID]
+	a.pendingChallengesMu.Unlock()
+
+	if !ok || ch == nil {
+		return fmt.Errorf("challenge request not found or expired: %s", requestID)
+	}
+
+	select {
+	case ch <- authChallengeResponse{answers: answers}:
+		return nil
+	default:
+		return fmt.Errorf("challenge request already answered")
+	}
+}
+
+// CancelAuthChallenge cancels a pending keyboard-interactive challenge.
+func (a *App) CancelAuthChallenge(requestID string) error {
+	a.pendingChallengesMu.Lock()
+	ch, ok := a.pendingChallenges[requestID]
+	a.pendingChallengesMu.Unlock()
+
+	if !ok || ch == nil {
+		return nil
+	}
+
+	select {
+	case ch <- authChallengeResponse{err: errors.New("authentication cancelled by user")}:
+		return nil
+	default:
+		return nil
+	}
+}
+
 
 

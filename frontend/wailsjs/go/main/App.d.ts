@@ -18,6 +18,8 @@ export function AddWorkspacePane(arg1:string):Promise<model.Pane>;
 
 export function BroadcastCommand(arg1:string):Promise<void>;
 
+export function CancelAuthChallenge(arg1:string):Promise<void>;
+
 export function CheckSSHAgent():Promise<{[key: string]: any}>;
 
 export function ClassifyConnectionError(arg1:string):Promise<sshsession.ClassifiedError>;
@@ -103,6 +105,8 @@ export function QuickConnect(arg1:string,arg2:number,arg3:string,arg4:string,arg
 export function RenameNode(arg1:string,arg2:string):Promise<model.TreeNode>;
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
+
+export function RespondAuthChallenge(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function RespondHostKey(arg1:string,arg2:string):Promise<void>;
 
