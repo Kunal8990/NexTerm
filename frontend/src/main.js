@@ -2215,16 +2215,19 @@ function createTab(tabId, profile, isLocal = false) {
     }
   } catch (_) {}
 
+  const unsubs = [];
+
   if (window.runtime && window.runtime.EventsOn) {
-    window.runtime.EventsOn("terminal:data:" + tabId, (data) => {
+    const unsubData = window.runtime.EventsOn("terminal:data:" + tabId, (data) => {
       term.write(data);
       if (!isLocal) {
         outputBuffer = (outputBuffer + data).slice(-500);
         handleTerminalOutputPrompt(tabId, outputBuffer);
       }
     });
+    if (typeof unsubData === "function") unsubs.push(unsubData);
 
-    window.runtime.EventsOn("terminal:closed:" + tabId, (reason) => {
+    const unsubClosed = window.runtime.EventsOn("terminal:closed:" + tabId, (reason) => {
       term.write(`\r\n\x1b[1;31m[Session closed: ${reason || 'Disconnected'}]\x1b[0m\r\n`);
       if (tabs[tabId]) {
         tabs[tabId].isConnected = false;
@@ -2234,6 +2237,7 @@ function createTab(tabId, profile, isLocal = false) {
         renderTree();
       }
     });
+    if (typeof unsubClosed === "function") unsubs.push(unsubClosed);
   }
 
   // 1. Right-Click Quick Paste
@@ -2322,7 +2326,8 @@ function createTab(tabId, profile, isLocal = false) {
     isLocal,
     sftpPath: profile.initialDir || "~",
     terminalCwd: profile.initialDir || "~",
-    lastSftpPath: "~"
+    lastSftpPath: "~",
+    unsubscribers: unsubs
   };
 
   renderWorkspace();
@@ -2861,6 +2866,22 @@ function activateTab(tabId) {
 function closeTab(tabId) {
   const t = tabs[tabId];
   if (!t) return;
+
+  // 1. Explicitly clean up and destroy Wails runtime event listeners
+  if (t.unsubscribers && Array.isArray(t.unsubscribers)) {
+    t.unsubscribers.forEach(unsub => {
+      try {
+        if (typeof unsub === "function") unsub();
+      } catch (_) {}
+    });
+    t.unsubscribers = [];
+  }
+
+  // 2. Unregister event topics if EventsOff is available
+  if (window.runtime && window.runtime.EventsOff) {
+    try { window.runtime.EventsOff("terminal:data:" + tabId); } catch (_) {}
+    try { window.runtime.EventsOff("terminal:closed:" + tabId); } catch (_) {}
+  }
 
   if (window.go && window.go.main && window.go.main.App) {
     window.go.main.App.CloseTab(tabId);
