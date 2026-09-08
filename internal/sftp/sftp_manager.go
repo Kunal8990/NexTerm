@@ -275,6 +275,31 @@ func (m *SFTPManager) WriteFile(tabID string, sshClient *ssh.Client, remotePath 
 	return err
 }
 
+// Stat returns metadata for a specific remote file or directory.
+func (m *SFTPManager) Stat(tabID string, sshClient *ssh.Client, remotePath string) (*SFTPItem, error) {
+	client, err := m.getOrCreate(tabID, sshClient)
+	if err != nil {
+		return nil, err
+	}
+
+	fi, err := client.Stat(remotePath)
+	if err != nil {
+		return nil, err
+	}
+
+	ext := strings.ToLower(filepath.Ext(fi.Name()))
+	return &SFTPItem{
+		Name:          fi.Name(),
+		Path:          remotePath,
+		Size:          fi.Size(),
+		FormattedSize: formatBytes(fi.Size(), fi.IsDir()),
+		IsDir:         fi.IsDir(),
+		ModTime:       fi.ModTime().Format("2006-01-02 15:04:05"),
+		Permissions:   fi.Mode().String(),
+		Extension:     ext,
+	}, nil
+}
+
 func formatBytes(bytes int64, isDir bool) string {
 	if isDir {
 		return "<DIR>"

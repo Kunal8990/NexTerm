@@ -126,6 +126,10 @@ export function ResizeTerminal(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResizeTerminal'](arg1, arg2, arg3);
 }
 
+export function SFTPCommitExternalChange(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SFTPCommitExternalChange'](arg1, arg2, arg3);
+}
+
 export function SFTPCreateFile(arg1, arg2) {
   return window['go']['main']['App']['SFTPCreateFile'](arg1, arg2);
 }
@@ -138,12 +142,20 @@ export function SFTPDownload(arg1, arg2, arg3) {
   return window['go']['main']['App']['SFTPDownload'](arg1, arg2, arg3);
 }
 
+export function SFTPGetFileProperties(arg1, arg2) {
+  return window['go']['main']['App']['SFTPGetFileProperties'](arg1, arg2);
+}
+
 export function SFTPList(arg1, arg2) {
   return window['go']['main']['App']['SFTPList'](arg1, arg2);
 }
 
 export function SFTPMkdir(arg1, arg2) {
   return window['go']['main']['App']['SFTPMkdir'](arg1, arg2);
+}
+
+export function SFTPOpenExternal(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SFTPOpenExternal'](arg1, arg2, arg3);
 }
 
 export function SFTPReadFile(arg1, arg2) {

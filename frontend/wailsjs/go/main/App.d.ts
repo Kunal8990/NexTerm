@@ -6,6 +6,7 @@ import {macro} from '../models';
 import {main} from '../models';
 import {tunnel} from '../models';
 import {nettools} from '../models';
+import {sftpmanager} from '../models';
 
 export function AddFolder(arg1:string,arg2:string):Promise<model.TreeNode>;
 
@@ -69,15 +70,21 @@ export function QuickConnect(arg1:string,arg2:number,arg3:string,arg4:string,arg
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
 
+export function SFTPCommitExternalChange(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function SFTPCreateFile(arg1:string,arg2:string):Promise<void>;
 
 export function SFTPDelete(arg1:string,arg2:string):Promise<void>;
 
 export function SFTPDownload(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function SFTPGetFileProperties(arg1:string,arg2:string):Promise<sftpmanager.SFTPItem>;
+
 export function SFTPList(arg1:string,arg2:string):Promise<main.SFTPListResult>;
 
 export function SFTPMkdir(arg1:string,arg2:string):Promise<void>;
+
+export function SFTPOpenExternal(arg1:string,arg2:string,arg3:boolean):Promise<void>;
 
 export function SFTPReadFile(arg1:string,arg2:string):Promise<string>;
 

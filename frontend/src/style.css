@@ -2046,6 +2046,121 @@ html, body, #app {
   line-height: 1.5;
 }
 
+/* File Modification Notification Banner (MobaXterm External Editor Sync) */
+.file-change-banner {
+  position: fixed;
+  top: 72px;
+  right: 20px;
+  z-index: 9999;
+  background: #1e293b;
+  border: 1.5px solid #3b82f6;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: slideInDown 0.2s ease;
+  max-width: 580px;
+}
+
+@keyframes slideInDown {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.file-change-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.file-change-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #60a5fa;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.file-change-desc {
+  font-size: 11px;
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-change-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.btn-commit {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.btn-commit:hover {
+  background: #22c55e;
+}
+
+.btn-auto-commit {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  cursor: pointer;
+}
+.btn-auto-commit:hover {
+  background: #3b82f6;
+}
+
+.btn-discard {
+  background: transparent;
+  color: #94a3b8;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+}
+.btn-discard:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* File Properties Modal */
+.prop-grid {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px 12px;
+  font-size: 11.5px;
+  padding: 8px 4px;
+}
+.prop-label {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+.prop-val {
+  color: var(--text-primary);
+  font-family: 'Cascadia Mono', 'Fira Code', monospace;
+  word-break: break-all;
+}
+
 /* =========================================================================
    Split Terminal Layouts
    ========================================================================= */

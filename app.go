@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"nexterm/internal/macro"
 	"nexterm/internal/model"
@@ -23,6 +24,14 @@ import (
 	"github.com/google/uuid"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
+
+type externalFileWatch struct {
+	tabID       string
+	remotePath  string
+	localPath   string
+	lastModTime time.Time
+	stopChan    chan struct{}
+}
 
 // App is bound to the frontend by Wails: every exported method here becomes
 // callable from JS as window.go.main.App.<MethodName>(...).
@@ -40,16 +49,20 @@ type App struct {
 	tunnelMgr *tunnel.TunnelManager
 	macroMgr  *macro.MacroManager
 	secMgr    *security.SecurityManager
+
+	watcherMu    sync.Mutex
+	fileWatchers map[string]*externalFileWatch
 }
 
 func NewApp() *App {
 	return &App{
-		tabs:      make(map[string]*sshsession.Session),
-		localTabs: make(map[string]*pty.Terminal),
-		sftpMgr:   sftpmanager.NewSFTPManager(),
-		tunnelMgr: tunnel.NewTunnelManager(),
-		macroMgr:  macro.NewMacroManager(),
-		secMgr:    security.NewSecurityManager(),
+		tabs:         make(map[string]*sshsession.Session),
+		localTabs:    make(map[string]*pty.Terminal),
+		sftpMgr:      sftpmanager.NewSFTPManager(),
+		tunnelMgr:    tunnel.NewTunnelManager(),
+		macroMgr:     macro.NewMacroManager(),
+		secMgr:       security.NewSecurityManager(),
+		fileWatchers: make(map[string]*externalFileWatch),
 	}
 }
 
@@ -679,6 +692,150 @@ func (a *App) SelectUploadFile() (string, error) {
 	return wailsruntime.OpenFileDialog(a.ctx, wailsruntime.OpenDialogOptions{
 		Title: "Select File to Upload via SFTP",
 	})
+}
+
+// SFTPOpenExternal downloads a remote file to a local temp cache directory,
+// launches it with the system default program (or Windows "Open With" dialog),
+// and watches the local cached file for modifications to notify or auto-commit to the server.
+func (a *App) SFTPOpenExternal(tabID, remotePath string, chooseApp bool) error {
+	a.mu.Lock()
+	sess, ok := a.tabs[tabID]
+	a.mu.Unlock()
+
+	if !ok || sess == nil {
+		return fmt.Errorf("active SSH session not found for tab %s", tabID)
+	}
+
+	cacheDir := filepath.Join(os.TempDir(), "nexterm_cache", tabID)
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return fmt.Errorf("create local cache dir: %w", err)
+	}
+
+	baseName := filepath.Base(remotePath)
+	localPath := filepath.Join(cacheDir, baseName)
+
+	// Download remote file to local temp cache
+	if err := a.sftpMgr.Download(tabID, sess.Client(), remotePath, localPath); err != nil {
+		return fmt.Errorf("download remote file: %w", err)
+	}
+
+	stat, err := os.Stat(localPath)
+	if err != nil {
+		return fmt.Errorf("stat local cache file: %w", err)
+	}
+	initialModTime := stat.ModTime()
+
+	// Launch program
+	if chooseApp {
+		// Open Windows native "Select an app to open this file" dialog
+		cmd := exec.Command("rundll32.exe", "shell32.dll,OpenAs_RunDLL", localPath)
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("launch Open With dialog: %w", err)
+		}
+	} else {
+		// Launch with Windows default associated program
+		cmd := exec.Command("cmd", "/c", "start", "", localPath)
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("launch default program: %w", err)
+		}
+	}
+
+	// Register file watcher
+	key := tabID + ":" + remotePath
+	a.watcherMu.Lock()
+	if existing, found := a.fileWatchers[key]; found && existing != nil {
+		close(existing.stopChan)
+	}
+
+	stopChan := make(chan struct{})
+	watch := &externalFileWatch{
+		tabID:       tabID,
+		remotePath:  remotePath,
+		localPath:   localPath,
+		lastModTime: initialModTime,
+		stopChan:    stopChan,
+	}
+	a.fileWatchers[key] = watch
+	a.watcherMu.Unlock()
+
+	// Background polling watcher
+	go func() {
+		ticker := time.NewTicker(800 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-stopChan:
+				return
+			case <-ticker.C:
+				st, err := os.Stat(localPath)
+				if err != nil {
+					continue
+				}
+
+				a.watcherMu.Lock()
+				currentWatch := a.fileWatchers[key]
+				if currentWatch == nil {
+					a.watcherMu.Unlock()
+					return
+				}
+
+				if st.ModTime().After(currentWatch.lastModTime) {
+					currentWatch.lastModTime = st.ModTime()
+					a.watcherMu.Unlock()
+
+					// Notify frontend that local file has changed
+					wailsruntime.EventsEmit(a.ctx, "sftp:file:modified", map[string]interface{}{
+						"tabId":      tabID,
+						"remotePath": remotePath,
+						"localPath":  localPath,
+						"fileName":   baseName,
+						"modTime":    st.ModTime().Format("15:04:05"),
+						"size":       st.Size(),
+					})
+				} else {
+					a.watcherMu.Unlock()
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
+// SFTPCommitExternalChange uploads the locally edited cached file directly back to the remote server.
+func (a *App) SFTPCommitExternalChange(tabID, remotePath, localPath string) error {
+	a.mu.Lock()
+	sess, ok := a.tabs[tabID]
+	a.mu.Unlock()
+
+	if !ok || sess == nil {
+		return fmt.Errorf("active SSH session not found")
+	}
+
+	key := tabID + ":" + remotePath
+	if stat, err := os.Stat(localPath); err == nil {
+		a.watcherMu.Lock()
+		if w, ok := a.fileWatchers[key]; ok && w != nil {
+			w.lastModTime = stat.ModTime()
+		}
+		a.watcherMu.Unlock()
+	}
+
+	return a.sftpMgr.Upload(tabID, sess.Client(), localPath, remotePath)
+}
+
+// SFTPGetFileProperties returns detailed file metadata for properties/permissions dialog.
+func (a *App) SFTPGetFileProperties(tabID, remotePath string) (*sftpmanager.SFTPItem, error) {
+	a.mu.Lock()
+	sess, ok := a.tabs[tabID]
+	a.mu.Unlock()
+
+	if !ok || sess == nil {
+		return nil, fmt.Errorf("active SSH session not found")
+	}
+
+	return a.sftpMgr.Stat(tabID, sess.Client(), remotePath)
 }
 
 // =========================================================================

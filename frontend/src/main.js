@@ -440,6 +440,13 @@ async function init() {
   }
 
   setupEventListeners();
+
+  if (window.runtime && window.runtime.EventsOn) {
+    window.runtime.EventsOn("sftp:file:modified", (info) => {
+      handleExternalFileModified(info);
+    });
+  }
+
   await refreshTree();
   activateHomeTab();
   updateStatus();
@@ -1680,14 +1687,14 @@ function renderSFTPItems(items, path = currentSFTPPath) {
       }
     });
 
-    // Double Click -> Navigate directory or Open Editor
+    // Double Click -> Open with external app or MobaTextEditor
     row.addEventListener("dblclick", async (e) => {
       e.stopPropagation();
       if (item.isDir) {
         selectedSFTPItem = null;
         await refreshSFTP(item.path);
       } else {
-        openRemoteFileEditor(item.path);
+        openRemoteFileExternal(item.path, false);
       }
     });
 
@@ -1707,20 +1714,43 @@ function renderSFTPItems(items, path = currentSFTPPath) {
 
 function showSFTPContextMenu(x, y, item) {
   contextMenuEl.innerHTML = `
-    ${!item.isDir ? '<div class="context-menu-item" id="sftpEdit">✏️ Edit in MobaTextEditor</div>' : '<div class="context-menu-item" id="sftpOpenDir">📁 Open Folder</div>'}
-    ${item.isDir ? '<div class="context-menu-item" id="sftpCdTerminal">💻 cd terminal to this folder</div>' : ''}
+    ${!item.isDir ? `
+      <div class="context-menu-item" id="sftpOpenExternal">📂 Open (Default Program)</div>
+      <div class="context-menu-item" id="sftpEdit">✏️ Open with default text editor</div>
+      <div class="context-menu-item" id="sftpOpenWith">📋 Open with...</div>
+    ` : `
+      <div class="context-menu-item" id="sftpOpenDir">📁 Open Folder</div>
+      <div class="context-menu-item" id="sftpCdTerminal">💻 cd terminal to this folder</div>
+    `}
     <div class="context-menu-item" id="sftpDownload">⬇ Download to Local PC</div>
-    <div class="context-menu-item" id="sftpCopyPath">📋 Copy Remote Path</div>
     <div class="context-menu-separator"></div>
     <div class="context-menu-item" id="sftpRename">✏️ Rename</div>
     <div class="context-menu-item danger" id="sftpDelete">🗑️ Delete</div>
+    <div class="context-menu-separator"></div>
+    <div class="context-menu-item" id="sftpCopyPath">📋 Copy file path</div>
+    <div class="context-menu-item" id="sftpCopyPathTerm">💻 Copy file path to terminal</div>
+    <div class="context-menu-item" id="sftpProperties">ℹ️ Properties / Permissions</div>
   `;
   posMenu(x, y);
 
   if (!item.isDir) {
-    contextMenuEl.querySelector("#sftpEdit").onclick = () => { hideContextMenu(); openRemoteFileEditor(item.path); };
+    contextMenuEl.querySelector("#sftpOpenExternal").onclick = () => {
+      hideContextMenu();
+      openRemoteFileExternal(item.path, false);
+    };
+    contextMenuEl.querySelector("#sftpEdit").onclick = () => {
+      hideContextMenu();
+      openRemoteFileEditor(item.path);
+    };
+    contextMenuEl.querySelector("#sftpOpenWith").onclick = () => {
+      hideContextMenu();
+      openRemoteFileExternal(item.path, true);
+    };
   } else {
-    contextMenuEl.querySelector("#sftpOpenDir").onclick = () => { hideContextMenu(); refreshSFTP(item.path); };
+    contextMenuEl.querySelector("#sftpOpenDir").onclick = () => {
+      hideContextMenu();
+      refreshSFTP(item.path);
+    };
     const cdTermBtn = contextMenuEl.querySelector("#sftpCdTerminal");
     if (cdTermBtn) {
       cdTermBtn.onclick = () => {
@@ -1737,6 +1767,19 @@ function showSFTPContextMenu(x, y, item) {
     hideContextMenu();
     navigator.clipboard.writeText(item.path);
     showToast("Copied remote path to clipboard", "info");
+  };
+
+  contextMenuEl.querySelector("#sftpCopyPathTerm").onclick = () => {
+    hideContextMenu();
+    if (activeTabId && tabs[activeTabId] && window.go && window.go.main && window.go.main.App) {
+      window.go.main.App.WriteToTerminal(activeTabId, `"${item.path}" `);
+      showToast("Pasted file path to terminal", "info");
+    }
+  };
+
+  contextMenuEl.querySelector("#sftpProperties").onclick = () => {
+    hideContextMenu();
+    showSFTPPropertiesDialog(item);
   };
 
   contextMenuEl.querySelector("#sftpDownload").onclick = async () => {
@@ -1787,6 +1830,136 @@ function showSFTPContextMenu(x, y, item) {
   };
 }
 
+async function showSFTPPropertiesDialog(item) {
+  let stats = item;
+  if (activeTabId && window.go && window.go.main && window.go.main.App) {
+    try {
+      const detailed = await window.go.main.App.SFTPGetFileProperties(activeTabId, item.path);
+      if (detailed) stats = detailed;
+    } catch (_) {}
+  }
+
+  showModal(`
+    <div class="modal-header">
+      <div class="modal-title">ℹ️ Properties — ${escapeHtml(stats.name)}</div>
+      <button class="modal-close-btn" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="prop-grid">
+        <span class="prop-label">Name:</span>
+        <span class="prop-val">${escapeHtml(stats.name)}</span>
+
+        <span class="prop-label">Full Path:</span>
+        <span class="prop-val">${escapeHtml(stats.path)}</span>
+
+        <span class="prop-label">Type:</span>
+        <span class="prop-val">${stats.isDir ? 'Directory (Folder)' : 'Regular File'}</span>
+
+        <span class="prop-label">Size:</span>
+        <span class="prop-val">${escapeHtml(stats.formattedSize || '')} (${stats.size || 0} bytes)</span>
+
+        <span class="prop-label">Permissions:</span>
+        <span class="prop-val"><code>${escapeHtml(stats.permissions || 'N/A')}</code></span>
+
+        <span class="prop-label">Last Modified:</span>
+        <span class="prop-val">${escapeHtml(stats.modTime || 'N/A')}</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" id="modalClose">OK</button>
+    </div>
+  `);
+}
+
+async function openRemoteFileExternal(remotePath, chooseApp = false) {
+  if (!activeTabId || !window.go || !window.go.main || !window.go.main.App) {
+    showToast("Open an SSH connection first", "warning");
+    return;
+  }
+  const fileName = remotePath.substring(remotePath.lastIndexOf("/") + 1);
+  showToast(`Downloading & opening ${fileName}...`, "info");
+
+  try {
+    await window.go.main.App.SFTPOpenExternal(activeTabId, remotePath, chooseApp);
+    showToast(`Opened ${fileName} (${chooseApp ? 'App Chooser' : 'Default Program'}). Live sync watching for edits.`, "success");
+  } catch (err) {
+    showToast("Failed to open file externally: " + err, "error");
+  }
+}
+
+function handleExternalFileModified(info) {
+  const { tabId, remotePath, localPath, fileName, modTime } = info;
+
+  // If user enabled auto-save:
+  if (userSettings.autoSaveExternalEdits) {
+    commitExternalChange(tabId, remotePath, localPath, fileName);
+    return;
+  }
+
+  // Otherwise, prompt user to allow the commit
+  showFileChangeNotificationBanner(tabId, remotePath, localPath, fileName, modTime);
+}
+
+function showFileChangeNotificationBanner(tabId, remotePath, localPath, fileName, modTime) {
+  const bannerId = "banner-" + btoa(tabId + ":" + remotePath).replace(/=/g, "");
+  let existing = document.getElementById(bannerId);
+  if (existing) existing.remove();
+
+  const banner = document.createElement("div");
+  banner.id = bannerId;
+  banner.className = "file-change-banner";
+  banner.innerHTML = `
+    <div class="file-change-info">
+      <div class="file-change-title">
+        <span>📝</span> <b>${escapeHtml(fileName)}</b> modified externally (${escapeHtml(modTime || '')})
+      </div>
+      <div class="file-change-desc" title="${escapeHtml(remotePath)}">
+        Allow changes to be committed & saved directly to <code>${escapeHtml(remotePath)}</code>?
+      </div>
+    </div>
+    <div class="file-change-actions">
+      <button class="btn-commit" id="btnCommit_${bannerId}">💾 Allow & Save</button>
+      <button class="btn-auto-commit" id="btnAuto_${bannerId}" title="Save now and always auto-commit future edits">⚡ Always Auto-Save</button>
+      <button class="btn-discard" id="btnDiscard_${bannerId}" title="Discard change notification">&times;</button>
+    </div>
+  `;
+
+  document.body.appendChild(banner);
+
+  banner.querySelector(`#btnCommit_${bannerId}`).onclick = () => {
+    banner.remove();
+    commitExternalChange(tabId, remotePath, localPath, fileName);
+  };
+
+  banner.querySelector(`#btnAuto_${bannerId}`).onclick = () => {
+    userSettings.autoSaveExternalEdits = true;
+    localStorage.setItem("nexterm_settings", JSON.stringify(userSettings));
+    banner.remove();
+    showToast("Always auto-save enabled: future modifications will save directly", "info");
+    commitExternalChange(tabId, remotePath, localPath, fileName);
+  };
+
+  banner.querySelector(`#btnDiscard_${bannerId}`).onclick = () => {
+    banner.remove();
+    showToast(`Discarded change notification for ${fileName}`, "info");
+  };
+}
+
+async function commitExternalChange(tabId, remotePath, localPath, fileName) {
+  if (window.go && window.go.main && window.go.main.App) {
+    try {
+      showToast(`Committing & saving ${fileName} to remote server...`, "info");
+      await window.go.main.App.SFTPCommitExternalChange(tabId, remotePath, localPath);
+      showToast(`✅ Changes committed & directly saved to ${fileName}!`, "success");
+      if (activeTabId === tabId) {
+        refreshSFTP(currentSFTPPath);
+      }
+    } catch (err) {
+      showToast("Failed to commit change to server: " + err, "error");
+    }
+  }
+}
+
 function showModal(htmlContent, extraClass = "") {
   if (!modalOverlayEl || !modalBoxEl) return null;
   modalBoxEl.className = "modal-card " + extraClass;
@@ -1823,38 +1996,87 @@ async function openRemoteFileEditor(remotePath) {
     const fileName = remotePath.substring(remotePath.lastIndexOf("/") + 1);
     const box = showModal(`
       <div class="modal-header">
-        <div class="modal-title">MobaTextEditor — ${escapeHtml(fileName)}</div>
+        <div class="modal-title">✏️ MobaTextEditor — ${escapeHtml(fileName)}</div>
         <button class="modal-close-btn" id="modalClose">&times;</button>
       </div>
-      <div class="modal-body">
-        <div style="font-size: 11px; color: var(--text-muted); font-family: 'Fira Code', monospace; margin-bottom: 6px;">
-          Remote File: <b>${escapeHtml(remotePath)}</b>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: var(--text-muted); font-family: 'Fira Code', monospace;">
+          <span>Remote: <b>${escapeHtml(remotePath)}</b></span>
+          <span id="editorStatusBadge" style="color: var(--accent-green);">Ready (Ctrl+S to Commit & Save)</span>
         </div>
-        <div class="form-group">
-          <textarea id="remoteEditTextarea" style="width: 100%; height: 320px; font-family: 'Fira Code', monospace; font-size: 12px; background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 8px;" spellcheck="false"></textarea>
+        <div class="form-group" style="margin-bottom: 0;">
+          <textarea id="remoteEditTextarea" style="width: 100%; height: 380px; font-family: 'Fira Code', Consolas, monospace; font-size: 12px; background: #0f141c; color: #f1f5f9; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 10px; line-height: 1.5; resize: vertical;" spellcheck="false"></textarea>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn-secondary" id="modalCancel">Close</button>
-        <button class="btn-primary" id="saveRemoteBtn">💾 Save & Upload</button>
+      <div class="modal-footer" style="display: flex; align-items: center; justify-content: space-between;">
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted); cursor: pointer;">
+          <input type="checkbox" id="autoCommitEditorCheck" checked /> Directly save to remote file on Ctrl+S
+        </label>
+        <div style="display: flex; gap: 6px;">
+          <button class="btn-secondary" id="modalCancel">Close</button>
+          <button class="btn-primary" id="saveRemoteBtn">💾 Save & Commit (Ctrl+S)</button>
+        </div>
       </div>
-    `);
+    `, "modal-large");
 
     const textarea = box.querySelector("#remoteEditTextarea");
+    const statusBadge = box.querySelector("#editorStatusBadge");
+    const saveBtn = box.querySelector("#saveRemoteBtn");
     textarea.value = content;
-    box.querySelector("#modalCancel").onclick = hideModal;
-    box.querySelector("#modalClose").onclick = hideModal;
+    textarea.focus();
 
-    box.querySelector("#saveRemoteBtn").onclick = async () => {
+    let isModified = false;
+    textarea.addEventListener("input", () => {
+      isModified = true;
+      if (statusBadge) {
+        statusBadge.textContent = "● Modified (Press Ctrl+S to save)";
+        statusBadge.style.color = "var(--accent-amber)";
+      }
+    });
+
+    const doSave = async () => {
       const newText = textarea.value;
+      if (statusBadge) {
+        statusBadge.textContent = "Saving to remote...";
+        statusBadge.style.color = "var(--accent-cyan)";
+      }
       try {
         await window.go.main.App.SFTPWriteFile(activeTabId, remotePath, newText);
-        showToast(`Saved and uploaded ${fileName}`, "success");
-        hideModal();
+        isModified = false;
+        if (statusBadge) {
+          statusBadge.textContent = "✅ Saved & Committed to Server!";
+          statusBadge.style.color = "var(--accent-green)";
+        }
+        showToast(`Saved & committed changes directly to ${fileName}`, "success");
         await refreshSFTP(currentSFTPPath);
       } catch (err) {
+        if (statusBadge) {
+          statusBadge.textContent = "❌ Save failed";
+          statusBadge.style.color = "var(--accent-rose)";
+        }
         showToast("Save failed: " + err, "error");
       }
+    };
+
+    textarea.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        doSave();
+      }
+    });
+
+    saveBtn.onclick = doSave;
+    box.querySelector("#modalCancel").onclick = () => {
+      if (isModified && !confirm(`You have unsaved modifications in "${fileName}". Close anyway?`)) {
+        return;
+      }
+      hideModal();
+    };
+    box.querySelector("#modalClose").onclick = () => {
+      if (isModified && !confirm(`You have unsaved modifications in "${fileName}". Close anyway?`)) {
+        return;
+      }
+      hideModal();
     };
   } catch (err) {
     showToast("Failed to open remote file: " + err, "error");
