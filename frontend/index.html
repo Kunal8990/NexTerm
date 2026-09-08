@@ -247,36 +247,82 @@
               </div>
             </div>
 
-            <!-- View B: Graphical SFTP Browser -->
-            <div id="viewSFTP" class="side-tab-view hidden">
-              <div class="sftp-header-title">
-                <span>📁 SFTP File Browser</span>
-                <span id="sftpActiveTabBadge" class="sftp-target-badge">No SSH Tab</span>
+            <!-- View B: Graphical SFTP Browser (MobaXterm Exact Clone) -->
+            <div id="viewSFTP" class="side-tab-view hidden moba-sftp-view">
+              
+              <!-- 1. MobaXterm Colorful Icon Toolbar -->
+              <div class="moba-sftp-toolbar">
+                <button id="sftpFollowTermBtn" class="moba-sftp-btn" title="Follow Terminal Directory / Home">
+                  <svg width="17" height="17" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="3" fill="#f59e0b"/><rect x="4" y="5" width="16" height="14" rx="2" fill="#0f172a"/><text x="12" y="16" font-size="12" font-family="sans-serif" font-weight="bold" fill="#38bdf8" text-anchor="middle">t</text></svg>
+                </button>
+                <button id="sftpDownloadBtn" class="moba-sftp-btn" title="Download selected file to local PC">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 3v10m0 0l-3.5-3.5m3.5 3.5l3.5-3.5" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" stroke="#38bdf8" stroke-width="2.5" stroke-linecap="round"/></svg>
+                </button>
+                <button id="sftpUploadBtn" class="moba-sftp-btn" title="Upload local file to current folder">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M12 14V4m0 0l-3.5 3.5m3.5-3.5l3.5 3.5" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"/></svg>
+                </button>
+                <button id="sftpRefreshBtn" class="moba-sftp-btn" title="Refresh directory">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M21 3v5h-5M3 21v-5h5M21 8A9 9 0 0 0 4.5 6.5M3 16a9 9 0 0 0 16.5 1.5" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <button id="sftpMkdirBtn" class="moba-sftp-btn" title="Create new directory">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M2 5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5z" fill="#f59e0b"/><circle cx="16.5" cy="14.5" r="4.5" fill="#22c55e"/><path d="M16.5 12v5M14 14.5h5" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/></svg>
+                </button>
+                <button id="sftpNewFileBtn" class="moba-sftp-btn" title="Create new empty file">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="#bae6fd" stroke="#0284c7" stroke-width="1.5"/><polyline points="14 2 14 8 20 8" fill="#7dd3fc"/><line x1="12" y1="11" x2="12" y2="17" stroke="#0284c7" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="14" x2="15" y2="14" stroke="#0284c7" stroke-width="2" stroke-linecap="round"/></svg>
+                </button>
+                <button id="sftpDeleteBtn" class="moba-sftp-btn" title="Delete selected file/folder">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.5" fill="#ef4444"/><path d="M8 8l8 8M16 8l-8 8" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg>
+                </button>
+                <button id="sftpEditBtn" class="moba-sftp-btn" title="Edit selected file in MobaTextEditor">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3" fill="#a855f7"/><text x="12" y="16.5" font-size="14" font-family="Segoe UI, sans-serif" font-weight="900" fill="#ffffff" text-anchor="middle">A</text></svg>
+                </button>
+                <button id="sftpToggleHiddenBtn" class="moba-sftp-btn" title="Show/Hide Hidden Files">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" fill="#3b82f6" stroke="#2563eb" stroke-width="1.5"/><line x1="12" y1="3" x2="12" y2="21" stroke="#ffffff" stroke-width="1.8"/><rect x="5.5" y="6" width="3" height="3" fill="#ffffff"/></svg>
+                </button>
+                <button id="sftpSyncBtn" class="moba-sftp-btn" title="Automatic Terminal-SFTP Directory Sync">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M15 4l5 5L7 21l-5-5L15 4z" fill="#ec4899" stroke="#db2777" stroke-width="1"/><circle cx="19" cy="3" r="1.5" fill="#facc15"/><circle cx="21" cy="7" r="1" fill="#facc15"/><circle cx="16" cy="1" r="1" fill="#facc15"/></svg>
+                </button>
               </div>
-              <div class="sftp-toolbar">
-                <button id="sftpUpBtn" class="sftp-tool-btn" title="Go Up (Parent Directory)">⬆ Up</button>
-                <button id="sftpRefreshBtn" class="sftp-tool-btn" title="Refresh Directory">↻</button>
-                <button id="sftpUploadBtn" class="sftp-tool-btn" title="Upload Local File">⬆ Upload</button>
-                <button id="sftpMkdirBtn" class="sftp-tool-btn" title="New Folder">📁＋ Dir</button>
-                <button id="sftpNewFileBtn" class="sftp-tool-btn" title="New Empty File">📄＋ File</button>
+
+              <!-- 2. Combobox Path Bar with Dropdown -->
+              <div class="moba-sftp-combobox-wrap">
+                <div class="moba-sftp-combobox">
+                  <input type="text" id="sftpPathInput" value="/" placeholder="/remote/path..." spellcheck="false" autocomplete="off" />
+                  <button type="button" id="sftpPathDropdownBtn" class="moba-sftp-dropdown-arrow" title="Select Path / Recent Paths">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </button>
+                </div>
+                <!-- Path History Dropdown Menu -->
+                <div id="sftpPathDropdownMenu" class="moba-path-dropdown-menu hidden">
+                  <div class="moba-path-item" data-path="/">/ (Root)</div>
+                  <div class="moba-path-item" data-path="~">~ (User Home)</div>
+                  <div class="moba-path-item" data-path="/opt">/opt</div>
+                  <div class="moba-path-item" data-path="/etc">/etc</div>
+                  <div class="moba-path-item" data-path="/var/log">/var/log</div>
+                  <div class="moba-path-item" data-path="/tmp">/tmp</div>
+                  <div class="moba-path-item" data-path="/home">/home</div>
+                  <div id="sftpRecentPathsContainer"></div>
+                </div>
               </div>
-              <div class="sftp-path-bar">
-                <input type="text" id="sftpPathInput" value="/" placeholder="/remote/path..." spellcheck="false" title="Press Enter to navigate" />
+
+              <!-- 3. Table Column Header -->
+              <div class="moba-sftp-table-header">
+                <div class="moba-col-name" id="sftpSortNameBtn" title="Sort by Name">
+                  <span class="moba-sort-arrow" id="sftpSortArrow">▲</span> Name
+                </div>
+                <div class="moba-col-divider"></div>
+                <div class="moba-col-size" id="sftpSortSizeBtn" title="Sort by Size">Size</div>
               </div>
-              <div class="sftp-quick-chips">
-                <button class="sftp-chip-btn" data-path="/">/</button>
-                <button class="sftp-chip-btn" data-path="~">~</button>
-                <button class="sftp-chip-btn" data-path="/var/log">/var/log</button>
-                <button class="sftp-chip-btn" data-path="/etc">/etc</button>
-                <button class="sftp-chip-btn" data-path="/opt">/opt</button>
-                <button class="sftp-chip-btn" data-path="/tmp">/tmp</button>
-              </div>
-              <div class="sftp-status-bar">
-                <span id="sftpCountBadge">0 items</span>
-                <span id="sftpCurrentPathDisplay" style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 140px;" title="/">/</span>
-              </div>
-              <div id="sftpFileList" class="sftp-file-list">
+
+              <!-- 4. SFTP File/Folder List -->
+              <div id="sftpFileList" class="moba-sftp-file-list">
                 <div class="sftp-empty-hint">Connect to an SSH server to browse remote files via SFTP</div>
+              </div>
+
+              <!-- 5. Bottom Status Bar -->
+              <div class="moba-sftp-footer">
+                <span id="sftpCountBadge">0 items</span>
+                <span id="sftpActiveTabBadge" class="sftp-target-badge">No SSH Tab</span>
               </div>
             </div>
 

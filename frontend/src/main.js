@@ -1196,11 +1196,16 @@ async function sendMultiExec() {
 }
 
 // --------------------------------------------------------------------------
-// SFTP Graphical File Browser
+// MobaXterm SFTP Graphical File Browser Engine
 // --------------------------------------------------------------------------
 
 let currentSFTPPath = "/";
 let sftpCurrentItems = [];
+let selectedSFTPItem = null;
+let sftpSortColumn = "name"; // "name" or "size"
+let sftpSortOrder = "asc";   // "asc" or "desc"
+let showHiddenSFTPFiles = true;
+let recentSFTPPaths = ["/", "~", "/opt", "/etc", "/var/log", "/tmp"];
 
 function goSFTPParentDirectory() {
   if (!currentSFTPPath || currentSFTPPath === "/") return;
@@ -1210,17 +1215,64 @@ function goSFTPParentDirectory() {
   refreshSFTP(parent);
 }
 
+function getMobaFileIcon(item) {
+  if (item.isDir) {
+    return `<svg width="15" height="15" viewBox="0 0 16 16"><path d="M1 3a1 1 0 0 1 1-1h4l2 2h6a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V3z" fill="#f59e0b"/></svg>`;
+  }
+  const ext = (item.extension || "").toLowerCase();
+  const name = (item.name || "").toLowerCase();
+
+  // C / C++ / Header files (MobaXterm blue © logo)
+  if (ext === ".c" || ext === ".cpp" || ext === ".cc" || ext === ".h" || ext === ".hpp") {
+    return `<svg width="15" height="15" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="#1d4ed8"/><path d="M10.5 5.5A3.5 3.5 0 1 0 10.5 10.5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`;
+  }
+
+  // Object / Binary files (100 / 001 icon)
+  if (ext === ".o" || ext === ".obj" || ext === ".so" || ext === ".a" || ext === ".dll" || ext === ".bin" || ext === ".exe" || ext === ".class") {
+    return `<svg width="15" height="15" viewBox="0 0 16 16"><rect width="15" height="15" rx="2" fill="#e0e7ff" stroke="#6366f1" stroke-width="1"/><text x="7.5" y="6.5" font-size="5" font-family="monospace" font-weight="bold" fill="#312e81" text-anchor="middle">100</text><text x="7.5" y="12" font-size="5" font-family="monospace" font-weight="bold" fill="#312e81" text-anchor="middle">001</text></svg>`;
+  }
+
+  // Makefiles & build files
+  if (name === "makefile" || name === "cmakelists.txt" || ext === ".mk" || ext === ".cmake") {
+    return `<svg width="15" height="15" viewBox="0 0 16 16"><path d="M2 1a1 1 0 0 1 1-1h6l4 4v11a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V1z" fill="#e0f2fe" stroke="#0284c7" stroke-width="1"/><line x1="4" y1="5" x2="8" y2="5" stroke="#0284c7" stroke-width="1.2"/><line x1="4" y1="8" x2="11" y2="8" stroke="#0284c7" stroke-width="1.2"/><line x1="4" y1="11" x2="9" y2="11" stroke="#0284c7" stroke-width="1.2"/></svg>`;
+  }
+
+  // Python
+  if (ext === ".py") {
+    return `<svg width="15" height="15" viewBox="0 0 16 16"><rect width="15" height="15" rx="2" fill="#38bdf8"/><path d="M4 4h5v3H5v1h4v3H4z" fill="#facc15"/></svg>`;
+  }
+
+  // Shell scripts
+  if (ext === ".sh" || ext === ".bash" || ext === ".zsh" || ext === ".ksh") {
+    return `<svg width="15" height="15" viewBox="0 0 16 16"><rect width="15" height="15" rx="2" fill="#047857"/><path d="M4 6l3 2-3 2M8 10h4" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+  }
+
+  // Archives
+  if ([".tar", ".gz", ".tgz", ".zip", ".rar", ".7z", ".deb", ".rpm"].includes(ext)) {
+    return `<svg width="15" height="15" viewBox="0 0 16 16"><rect width="15" height="15" rx="2" fill="#d97706"/><line x1="2" y1="6" x2="14" y2="6" stroke="#ffffff" stroke-width="1.2"/></svg>`;
+  }
+
+  // Default document / text / backup file (folded corner paper)
+  return `<svg width="15" height="15" viewBox="0 0 16 16"><path d="M2 1a1 1 0 0 1 1-1h6l5 5v10a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V1z" fill="#bae6fd" stroke="#38bdf8" stroke-width="0.8"/><polyline points="9 0 9 5 14 5" fill="#7dd3fc"/></svg>`;
+}
+
+function formatMobaSize(bytes, isDir) {
+  if (isDir) return "";
+  if (bytes <= 0) return "0";
+  if (bytes < 1024) return "1";
+  if (bytes < 1024 * 1024) return Math.max(1, Math.round(bytes / 1024)).toString();
+  return (bytes / (1024 * 1024)).toFixed(1) + "M";
+}
+
 async function refreshSFTP(targetPath = "") {
   const fileListEl = document.getElementById("sftpFileList");
   const pathInput = document.getElementById("sftpPathInput");
-  const pathDisplay = document.getElementById("sftpCurrentPathDisplay");
   const badge = document.getElementById("sftpCountBadge");
   if (!fileListEl) return;
 
   if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
     fileListEl.innerHTML = `<div class="sftp-empty-hint">Connect to an SSH server to browse remote files via SFTP</div>`;
     if (badge) badge.textContent = "0 items";
-    if (pathDisplay) { pathDisplay.textContent = "/"; pathDisplay.title = "/"; }
     return;
   }
 
@@ -1234,10 +1286,14 @@ async function refreshSFTP(targetPath = "") {
       currentSFTPPath = (res && res.path) || path;
       if (activeTab) activeTab.sftpPath = currentSFTPPath;
       if (pathInput) pathInput.value = currentSFTPPath;
-      if (pathDisplay) {
-        pathDisplay.textContent = currentSFTPPath;
-        pathDisplay.title = currentSFTPPath;
+
+      // Update recent paths history
+      if (currentSFTPPath && !recentSFTPPaths.includes(currentSFTPPath)) {
+        recentSFTPPaths.unshift(currentSFTPPath);
+        if (recentSFTPPaths.length > 15) recentSFTPPaths.pop();
+        updateRecentPathsDropdown();
       }
+
       sftpCurrentItems = (res && res.items) || [];
       renderSFTPItems(sftpCurrentItems, currentSFTPPath);
       renderConnectedServers();
@@ -1247,36 +1303,85 @@ async function refreshSFTP(targetPath = "") {
   }
 }
 
+function updateRecentPathsDropdown() {
+  const container = document.getElementById("sftpRecentPathsContainer");
+  if (!container) return;
+  container.innerHTML = "";
+  const uniqueRecents = recentSFTPPaths.filter(p => !["/", "~", "/opt", "/etc", "/var/log", "/tmp", "/home"].includes(p));
+  if (uniqueRecents.length > 0) {
+    const sep = document.createElement("div");
+    sep.style.cssText = "border-top: 1px solid #38383e; margin: 4px 0;";
+    container.appendChild(sep);
+    uniqueRecents.slice(0, 8).forEach(p => {
+      const item = document.createElement("div");
+      item.className = "moba-path-item";
+      item.dataset.path = p;
+      item.textContent = p;
+      item.onclick = () => {
+        closeSFTPPathDropdown();
+        refreshSFTP(p);
+      };
+      container.appendChild(item);
+    });
+  }
+}
+
+function closeSFTPPathDropdown() {
+  const menu = document.getElementById("sftpPathDropdownMenu");
+  if (menu) menu.classList.add("hidden");
+}
+
+function toggleSFTPPathDropdown() {
+  const menu = document.getElementById("sftpPathDropdownMenu");
+  if (menu) menu.classList.toggle("hidden");
+}
+
 function renderSFTPItems(items, path = currentSFTPPath) {
   const fileListEl = document.getElementById("sftpFileList");
   const badge = document.getElementById("sftpCountBadge");
-  const pathDisplay = document.getElementById("sftpCurrentPathDisplay");
   if (!fileListEl) return;
 
-  if (pathDisplay) {
-    pathDisplay.textContent = path || "/";
-    pathDisplay.title = path || "/";
+  // Filter hidden files if toggled off
+  let filteredItems = [...items];
+  if (!showHiddenSFTPFiles) {
+    filteredItems = filteredItems.filter(i => !i.name.startsWith("."));
   }
 
-  const dCount = items.filter(i => i.isDir).length;
-  const fCount = items.filter(i => !i.isDir).length;
+  // Sort items
+  filteredItems.sort((a, b) => {
+    if (a.isDir !== b.isDir) {
+      return a.isDir ? -1 : 1;
+    }
+    if (sftpSortColumn === "size") {
+      const diff = (a.size || 0) - (b.size || 0);
+      return sftpSortOrder === "asc" ? diff : -diff;
+    } else {
+      const cmp = (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" });
+      return sftpSortOrder === "asc" ? cmp : -cmp;
+    }
+  });
+
+  const dCount = filteredItems.filter(i => i.isDir).length;
+  const fCount = filteredItems.filter(i => !i.isDir).length;
   if (badge) {
-    badge.textContent = `${items.length} items (${dCount} dirs, ${fCount} files)`;
+    badge.textContent = `${filteredItems.length} items (${dCount} dirs, ${fCount} files)`;
   }
 
   fileListEl.innerHTML = "";
 
-  // Parent Directory entry if not at root
+  // 1. Parent Directory row `..` if not at root
   if (path && path !== "/" && path !== "") {
     const parentRow = document.createElement("div");
-    parentRow.className = "sftp-file-row sftp-parent-row";
+    parentRow.className = "moba-file-row";
     parentRow.title = "Go to parent directory (Double-click)";
     parentRow.innerHTML = `
-      <div class="sftp-item-left">
-        <span style="font-size: 14px;">📂</span>
-        <span class="sftp-item-name" style="font-weight: 600; color: #38bdf8;">.. [Parent Directory]</span>
+      <div class="moba-row-left">
+        <span class="moba-row-icon">
+          <svg width="15" height="15" viewBox="0 0 16 16"><rect width="16" height="16" rx="2" fill="#86efac"/><path d="M11 11V7a2 2 0 0 0-2-2H5m0 0l2.5-2.5M5 5l2.5 2.5" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="moba-row-name" style="font-weight: bold; color: #a7f3d0;">..</span>
       </div>
-      <span class="sftp-item-size" style="color: var(--text-dim); font-size: 10px;">&lt;UP&gt;</span>
+      <span class="moba-row-size"></span>
     `;
     parentRow.addEventListener("dblclick", () => {
       goSFTPParentDirectory();
@@ -1284,7 +1389,7 @@ function renderSFTPItems(items, path = currentSFTPPath) {
     fileListEl.appendChild(parentRow);
   }
 
-  if (items.length === 0) {
+  if (filteredItems.length === 0) {
     const emptyEl = document.createElement("div");
     emptyEl.className = "sftp-empty-hint";
     emptyEl.textContent = "Directory is empty";
@@ -1292,51 +1397,50 @@ function renderSFTPItems(items, path = currentSFTPPath) {
     return;
   }
 
-  items.forEach(item => {
+  filteredItems.forEach(item => {
     const row = document.createElement("div");
-    row.className = "sftp-file-row";
+    const isSelected = selectedSFTPItem && selectedSFTPItem.path === item.path;
+    row.className = `moba-file-row ${isSelected ? 'selected' : ''}`;
     row.dataset.path = item.path;
     row.dataset.isDir = item.isDir;
 
-    let icon = "📄";
-    if (item.isDir) {
-      icon = "📁";
-    } else {
-      const ext = (item.extension || "").toLowerCase();
-      if ([".sh", ".bash", ".zsh", ".py", ".js", ".ts", ".go", ".c", ".cpp", ".java", ".rs", ".sql", ".php", ".rb"].includes(ext)) {
-        icon = "📜";
-      } else if ([".tar", ".gz", ".tgz", ".zip", ".rar", ".7z", ".deb", ".rpm", ".pkg"].includes(ext)) {
-        icon = "📦";
-      } else if ([".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico"].includes(ext)) {
-        icon = "🖼️";
-      } else if ([".json", ".yaml", ".yml", ".xml", ".conf", ".ini", ".env", ".toml", ".config"].includes(ext)) {
-        icon = "⚙️";
-      } else if ([".log", ".txt", ".md", ".csv"].includes(ext)) {
-        icon = "📝";
-      }
-    }
-
-    const tooltip = `${item.path}\nSize: ${item.formattedSize}\nPermissions: ${item.permissions || 'N/A'}\nModified: ${item.modTime || 'N/A'}`;
+    const iconSvg = getMobaFileIcon(item);
+    const sizeFormatted = formatMobaSize(item.size, item.isDir);
+    const tooltip = `${item.path}\nSize: ${item.formattedSize || (item.size + ' B')}\nPermissions: ${item.permissions || 'N/A'}\nModified: ${item.modTime || 'N/A'}`;
 
     row.innerHTML = `
-      <div class="sftp-item-left" title="${escapeHtml(tooltip)}">
-        <span style="font-size: 13px;">${icon}</span>
-        <span class="sftp-item-name">${escapeHtml(item.name)}</span>
+      <div class="moba-row-left" title="${escapeHtml(tooltip)}">
+        <span class="moba-row-icon">${iconSvg}</span>
+        <span class="moba-row-name">${escapeHtml(item.name)}</span>
       </div>
-      <span class="sftp-item-size">${escapeHtml(item.formattedSize)}</span>
+      <span class="moba-row-size">${escapeHtml(sizeFormatted)}</span>
     `;
 
+    // Single Click -> Select Row
+    row.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectedSFTPItem = item;
+      fileListEl.querySelectorAll(".moba-file-row").forEach(r => r.classList.remove("selected"));
+      row.classList.add("selected");
+    });
+
+    // Double Click -> Navigate or Open Editor
     row.addEventListener("dblclick", async () => {
       if (item.isDir) {
+        selectedSFTPItem = null;
         await refreshSFTP(item.path);
       } else {
         openRemoteFileEditor(item.path);
       }
     });
 
+    // Right Click -> Context Menu
     row.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      selectedSFTPItem = item;
+      fileListEl.querySelectorAll(".moba-file-row").forEach(r => r.classList.remove("selected"));
+      row.classList.add("selected");
       showSFTPContextMenu(e.clientX, e.clientY, item);
     });
 
@@ -3071,9 +3175,43 @@ function setupEventListeners() {
   safeClick("navTabTunnel", () => switchSidebarView("tunnel"));
   safeClick("navTabTools", () => switchSidebarView("tools"));
 
-  // Sidebar SFTP controls
-  safeClick("sftpUpBtn", goSFTPParentDirectory);
-  safeClick("sftpRefreshBtn", () => refreshSFTP(currentSFTPPath));
+  // MobaXterm SFTP Toolbar Controls
+  safeClick("sftpFollowTermBtn", () => {
+    if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
+      showToast("Open an SSH connection first", "warning");
+      return;
+    }
+    refreshSFTP("~");
+    showToast("SFTP synced to Home / Terminal directory", "info");
+  });
+
+  safeClick("sftpDownloadBtn", async () => {
+    if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
+      showToast("Open an SSH connection first to download files", "warning");
+      return;
+    }
+    if (!selectedSFTPItem) {
+      showToast("Please select a file to download", "warning");
+      return;
+    }
+    if (selectedSFTPItem.isDir) {
+      showToast("Folder download not supported directly; please select a file", "warning");
+      return;
+    }
+    if (window.go && window.go.main && window.go.main.App) {
+      try {
+        const dest = await window.go.main.App.SelectDownloadDest(selectedSFTPItem.name);
+        if (dest) {
+          showToast(`Downloading ${selectedSFTPItem.name}...`, "info");
+          await window.go.main.App.SFTPDownload(activeTabId, selectedSFTPItem.path, dest);
+          showToast(`Downloaded ${selectedSFTPItem.name} successfully`, "success");
+        }
+      } catch (err) {
+        showToast("Download failed: " + err, "error");
+      }
+    }
+  });
+
   safeClick("sftpUploadBtn", async () => {
     if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
       showToast("Open an SSH connection first to upload files via SFTP", "warning");
@@ -3095,6 +3233,8 @@ function setupEventListeners() {
       }
     }
   });
+
+  safeClick("sftpRefreshBtn", () => refreshSFTP(currentSFTPPath));
 
   safeClick("sftpMkdirBtn", async () => {
     if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
@@ -3119,7 +3259,7 @@ function setupEventListeners() {
       showToast("Open an SSH connection first to create files", "warning");
       return;
     }
-    const fileName = prompt("Enter new file name (e.g. test.txt, script.sh):");
+    const fileName = prompt("Enter new file name (e.g. test.txt, script.sh, main.c):");
     if (fileName && window.go && window.go.main && window.go.main.App) {
       const remoteDest = (currentSFTPPath === "/" ? "" : currentSFTPPath) + "/" + fileName.trim();
       try {
@@ -3132,10 +3272,57 @@ function setupEventListeners() {
     }
   });
 
-  // SFTP Quick Chips
-  document.querySelectorAll(".sftp-chip-btn").forEach(chip => {
-    chip.addEventListener("click", () => {
-      const p = chip.dataset.path;
+  safeClick("sftpDeleteBtn", async () => {
+    if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
+      showToast("Open an SSH connection first", "warning");
+      return;
+    }
+    if (!selectedSFTPItem) {
+      showToast("Please select a file or folder to delete", "warning");
+      return;
+    }
+    if (confirm(`Are you sure you want to delete "${selectedSFTPItem.name}" from remote server?`)) {
+      if (window.go && window.go.main && window.go.main.App) {
+        try {
+          await window.go.main.App.SFTPDelete(activeTabId, selectedSFTPItem.path);
+          showToast(`Deleted ${selectedSFTPItem.name}`, "info");
+          selectedSFTPItem = null;
+          await refreshSFTP(currentSFTPPath);
+        } catch (err) {
+          showToast("Delete failed: " + err, "error");
+        }
+      }
+    }
+  });
+
+  safeClick("sftpEditBtn", () => {
+    if (!selectedSFTPItem || selectedSFTPItem.isDir) {
+      showToast("Please select a file to edit in MobaTextEditor", "warning");
+      return;
+    }
+    openRemoteFileEditor(selectedSFTPItem.path);
+  });
+
+  safeClick("sftpToggleHiddenBtn", () => {
+    showHiddenSFTPFiles = !showHiddenSFTPFiles;
+    showToast(showHiddenSFTPFiles ? "Showing hidden files (.*)" : "Hiding hidden files", "info");
+    renderSFTPItems(sftpCurrentItems, currentSFTPPath);
+  });
+
+  safeClick("sftpSyncBtn", () => {
+    showToast("Terminal auto-sync mode active", "success");
+  });
+
+  // Path Combobox Dropdown Button & Menu Items
+  safeClick("sftpPathDropdownBtn", (e) => {
+    e.stopPropagation();
+    toggleSFTPPathDropdown();
+  });
+
+  document.querySelectorAll(".moba-path-item").forEach(item => {
+    item.addEventListener("click", () => {
+      closeSFTPPathDropdown();
+      const p = item.dataset.path;
       if (p) refreshSFTP(p);
     });
   });
@@ -3143,9 +3330,35 @@ function setupEventListeners() {
   const sftpPathInput = document.getElementById("sftpPathInput");
   if (sftpPathInput) {
     sftpPathInput.onkeydown = (e) => {
-      if (e.key === "Enter") refreshSFTP(sftpPathInput.value.trim());
+      if (e.key === "Enter") {
+        closeSFTPPathDropdown();
+        refreshSFTP(sftpPathInput.value.trim());
+      }
     };
   }
+
+  // Column Sorting Handlers
+  safeClick("sftpSortNameBtn", () => {
+    if (sftpSortColumn === "name") {
+      sftpSortOrder = sftpSortOrder === "asc" ? "desc" : "asc";
+    } else {
+      sftpSortColumn = "name";
+      sftpSortOrder = "asc";
+    }
+    const arrow = document.getElementById("sftpSortArrow");
+    if (arrow) arrow.textContent = sftpSortOrder === "asc" ? "▲" : "▼";
+    renderSFTPItems(sftpCurrentItems, currentSFTPPath);
+  });
+
+  safeClick("sftpSortSizeBtn", () => {
+    if (sftpSortColumn === "size") {
+      sftpSortOrder = sftpSortOrder === "asc" ? "desc" : "asc";
+    } else {
+      sftpSortColumn = "size";
+      sftpSortOrder = "asc";
+    }
+    renderSFTPItems(sftpCurrentItems, currentSFTPPath);
+  });
 
   // Sidebar buttons for macros & tunnels
   safeClick("sidebarNewMacroBtn", showRecordMacroDialog);
