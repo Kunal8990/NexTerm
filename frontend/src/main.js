@@ -882,32 +882,103 @@ function resolveTerminalPath(currentDir, target, lastDir = "~") {
   return cleanPathSegments(base + "/" + target);
 }
 
+function getTerminalCurrentPromptDir(term) {
+  if (!term || !term.buffer || !term.buffer.active) return null;
+  const buf = term.buffer.active;
+  const startY = Math.min(buf.baseY + buf.cursorY, buf.length - 1);
+  for (let y = startY; y >= Math.max(0, startY - 20); y--) {
+    const line = buf.getLine(y);
+    if (!line) continue;
+    const str = line.translateToString(true);
+    if (!str || !str.trim()) continue;
+
+    // Pattern 1: [user@host dir]$ or [user@host dir]# or [user@host:dir]$ or [dir]$
+    const bracketMatch = str.match(/\[(?:[^@\s]+@)?[^\]\s:]+[\s:]([^\]]+)\][\$#%>\s]?/);
+    if (bracketMatch && bracketMatch[1]) {
+      const raw = bracketMatch[1].replace(/\s*\([^\)]*\)\s*$/, "").replace(/[\$#%>\s]+$/, "").trim();
+      if (raw) return raw;
+    }
+
+    // Pattern 2: user@host:dir$ or user@host:dir# or [user@host:dir]
+    const colonMatch = str.match(/(?:[^@\s]+@)?[^:\s]+:([^\$#%>\r\n]+)[\$#%>\s]?/);
+    if (colonMatch && colonMatch[1]) {
+      const raw = colonMatch[1].replace(/\s*\([^\)]*\)\s*$/, "").replace(/[\$#%>\s]+$/, "").trim();
+      if (raw) return raw;
+    }
+
+    // Pattern 3: Simple [~/dir] or [/dir]
+    const simpleBracket = str.match(/\[([~/][^\]\s]*)\][\$#%>\s]?/);
+    if (simpleBracket && simpleBracket[1]) {
+      return simpleBracket[1].trim();
+    }
+  }
+  return null;
+}
+
+function syncSFTPToCurrentTerminalCwd(tabId = activeTabId) {
+  const tab = tabs[tabId];
+  if (!tab || tab.isLocal) return;
+
+  // 1. Try reading the active prompt line directly from the terminal screen buffer
+  let promptDir = null;
+  try {
+    promptDir = getTerminalCurrentPromptDir(tab.term);
+  } catch (_) {}
+
+  let target = "";
+  if (promptDir) {
+    if (promptDir === "~" || promptDir.startsWith("/") || promptDir.startsWith("~/")) {
+      target = promptDir;
+    } else {
+      // Relative directory name from bash \W prompt
+      const base = tab.terminalCwd && tab.terminalCwd !== "~" ? tab.terminalCwd : "~";
+      const baseClean = base.replace(/\/+$/, "");
+      if (baseClean.split("/").pop() === promptDir) {
+        target = base;
+      } else {
+        target = resolveTerminalPath(base, promptDir, tab.lastSftpPath);
+      }
+    }
+    tab.terminalCwd = target;
+  } else if (tab.terminalCwd) {
+    target = tab.terminalCwd;
+  } else {
+    target = tab.sftpPath || currentSFTPPath || "~";
+  }
+
+  tab.sftpPath = target;
+  currentSFTPPath = target;
+  refreshSFTP(target);
+}
+
 let cdNavDebounceTimer = null;
 function handleTerminalCdCommand(tabId, cmd) {
-  if (!isFollowTerminalFolderEnabled()) return;
-
   const target = extractCdTarget(cmd);
   if (target === null) return;
 
   const tab = tabs[tabId];
   if (!tab || tab.isLocal) return;
 
-  const currentPath = tab.sftpPath || currentSFTPPath || "~";
+  const currentPath = tab.terminalCwd || tab.sftpPath || currentSFTPPath || "~";
   const newPath = resolveTerminalPath(currentPath, target, tab.lastSftpPath);
+
+  // ALWAYS track terminal CWD in background even if follow checkbox is off
+  tab.lastSftpPath = tab.terminalCwd || tab.sftpPath;
+  tab.terminalCwd = newPath;
+
+  // Only refresh SFTP view if follow terminal checkbox is currently checked
+  if (!isFollowTerminalFolderEnabled()) return;
 
   if (cdNavDebounceTimer) clearTimeout(cdNavDebounceTimer);
   cdNavDebounceTimer = setTimeout(async () => {
-    if (tabs[tabId] && activeTabId === tabId) {
-      tab.lastSftpPath = tab.sftpPath;
+    if (tabs[tabId] && activeTabId === tabId && isFollowTerminalFolderEnabled()) {
       tab.sftpPath = newPath;
       await refreshSFTP(newPath);
     }
-  }, 400);
+  }, 350);
 }
 
 function handleTerminalTitleChange(tabId, title) {
-  if (!isFollowTerminalFolderEnabled()) return;
-
   let candidate = "";
   if (title.includes(":")) {
     const parts = title.split(":");
@@ -919,10 +990,11 @@ function handleTerminalTitleChange(tabId, title) {
   if (candidate && (candidate.startsWith("/") || candidate.startsWith("~"))) {
     candidate = candidate.split(/[\s\$#]/)[0].trim();
     const tab = tabs[tabId];
-    if (candidate && tab && tab.sftpPath !== candidate) {
-      tab.lastSftpPath = tab.sftpPath;
-      tab.sftpPath = candidate;
-      if (activeTabId === tabId) {
+    if (candidate && tab) {
+      tab.lastSftpPath = tab.terminalCwd || tab.sftpPath;
+      tab.terminalCwd = candidate;
+      if (isFollowTerminalFolderEnabled() && activeTabId === tabId && tab.sftpPath !== candidate) {
+        tab.sftpPath = candidate;
         refreshSFTP(candidate);
       }
     }
@@ -930,8 +1002,6 @@ function handleTerminalTitleChange(tabId, title) {
 }
 
 function handleTerminalOsc7(tabId, data) {
-  if (!isFollowTerminalFolderEnabled()) return;
-
   let dir = data;
   if (dir.startsWith("file://")) {
     try {
@@ -943,10 +1013,11 @@ function handleTerminalOsc7(tabId, data) {
   }
   if (dir && dir.startsWith("/")) {
     const tab = tabs[tabId];
-    if (tab && tab.sftpPath !== dir) {
-      tab.lastSftpPath = tab.sftpPath;
-      tab.sftpPath = dir;
-      if (activeTabId === tabId) {
+    if (tab) {
+      tab.lastSftpPath = tab.terminalCwd || tab.sftpPath;
+      tab.terminalCwd = dir;
+      if (isFollowTerminalFolderEnabled() && activeTabId === tabId && tab.sftpPath !== dir) {
+        tab.sftpPath = dir;
         refreshSFTP(dir);
       }
     }
@@ -955,8 +1026,6 @@ function handleTerminalOsc7(tabId, data) {
 
 let lastPromptSyncDir = "";
 function handleTerminalOutputPrompt(tabId, buffer) {
-  if (!isFollowTerminalFolderEnabled()) return;
-
   // Strip ANSI color and control codes
   const clean = buffer
     .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "")
@@ -989,18 +1058,19 @@ function syncPromptDir(tabId, dirToken) {
     targetPath = dirToken;
   } else {
     // Basename directory from shell prompt \W (e.g. "Videos" or "Desktop")
-    const current = tab.sftpPath || currentSFTPPath || "~";
+    const current = tab.terminalCwd || tab.sftpPath || currentSFTPPath || "~";
     const currentClean = current.replace(/\/+$/, "");
     const baseName = currentClean.split("/").pop();
     if (baseName === dirToken) return;
     targetPath = resolveTerminalPath(current, dirToken, tab.lastSftpPath);
   }
 
-  if (targetPath && targetPath !== tab.sftpPath && targetPath !== lastPromptSyncDir) {
-    lastPromptSyncDir = targetPath;
-    tab.lastSftpPath = tab.sftpPath;
-    tab.sftpPath = targetPath;
-    if (activeTabId === tabId) {
+  if (targetPath) {
+    tab.lastSftpPath = tab.terminalCwd || tab.sftpPath;
+    tab.terminalCwd = targetPath;
+    if (isFollowTerminalFolderEnabled() && activeTabId === tabId && targetPath !== tab.sftpPath && targetPath !== lastPromptSyncDir) {
+      lastPromptSyncDir = targetPath;
+      tab.sftpPath = targetPath;
       refreshSFTP(targetPath);
     }
   }
@@ -1284,7 +1354,9 @@ function createTab(tabId, profile, isLocal = false) {
     tabEl,
     isConnected: true,
     isLocal,
-    sftpPath: profile.initialDir || "~"
+    sftpPath: profile.initialDir || "~",
+    terminalCwd: profile.initialDir || "~",
+    lastSftpPath: "~"
   };
 
   activateTab(tabId);
@@ -1381,9 +1453,13 @@ function activateTab(tabId) {
     const sftpBadge = document.getElementById("sftpActiveTabBadge");
     if (!currentTab.isLocal) {
       if (sftpBadge) sftpBadge.textContent = currentTab.profile.name || currentTab.profile.host;
-      currentSFTPPath = currentTab.sftpPath || (currentTab.profile && currentTab.profile.initialDir) || "~";
       switchSidebarView("sftp");
-      refreshSFTP(currentSFTPPath);
+      if (isFollowTerminalFolderEnabled()) {
+        syncSFTPToCurrentTerminalCwd(tabId);
+      } else {
+        currentSFTPPath = currentTab.sftpPath || (currentTab.profile && currentTab.profile.initialDir) || "~";
+        refreshSFTP(currentSFTPPath);
+      }
     } else {
       if (sftpBadge) sftpBadge.textContent = "Local Terminal";
       switchSidebarView("sessions");
@@ -3671,9 +3747,12 @@ function setupEventListeners() {
       showToast("Open an SSH connection first", "warning");
       return;
     }
-    const cur = tabs[activeTabId].sftpPath || currentSFTPPath || "~";
-    refreshSFTP(cur);
-    showToast(`SFTP synchronized with terminal directory (${cur})`, "success");
+    const chk = document.getElementById("sftpFollowTermCheckbox");
+    if (chk && !chk.checked) {
+      chk.checked = true;
+    }
+    syncSFTPToCurrentTerminalCwd(activeTabId);
+    showToast(`SFTP synchronized with terminal folder (${tabs[activeTabId].sftpPath || currentSFTPPath})`, "success");
   });
 
   safeClick("sftpDownloadBtn", async () => {
@@ -3806,7 +3885,7 @@ function setupEventListeners() {
       chk.checked = !chk.checked;
       showToast(chk.checked ? "Automatic Terminal-SFTP Directory Sync: ON" : "Automatic Terminal-SFTP Directory Sync: OFF", chk.checked ? "success" : "info");
       if (chk.checked && activeTabId && tabs[activeTabId] && !tabs[activeTabId].isLocal) {
-        refreshSFTP(tabs[activeTabId].sftpPath || "~");
+        syncSFTPToCurrentTerminalCwd(activeTabId);
       }
     }
   });
@@ -3816,7 +3895,7 @@ function setupEventListeners() {
     followCheckbox.addEventListener("change", () => {
       showToast(followCheckbox.checked ? "Follow terminal folder: ON" : "Follow terminal folder: OFF", followCheckbox.checked ? "success" : "info");
       if (followCheckbox.checked && activeTabId && tabs[activeTabId] && !tabs[activeTabId].isLocal) {
-        refreshSFTP(tabs[activeTabId].sftpPath || "~");
+        syncSFTPToCurrentTerminalCwd(activeTabId);
       }
     });
   }
