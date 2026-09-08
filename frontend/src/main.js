@@ -451,6 +451,7 @@ async function init() {
   }
 
   await refreshTree();
+  initWorkspace();
   activateHomeTab();
   updateStatus();
 }
@@ -2036,7 +2037,6 @@ function createTab(tabId, profile, isLocal = false) {
   const paneEl = document.createElement("div");
   paneEl.className = "terminal-pane active";
   paneEl.dataset.tabId = tabId;
-  panesEl.appendChild(paneEl);
 
   let termCanvas = paneEl;
   if (!isLocal) {
@@ -2305,12 +2305,19 @@ function createTab(tabId, profile, isLocal = false) {
     }
   });
 
+  const targetPane = getActiveWorkspacePane();
+  if (!targetPane.tabIds.includes(tabId)) {
+    targetPane.tabIds.push(tabId);
+  }
+  targetPane.activeTabId = tabId;
+
   tabs[tabId] = {
     term,
     fitAddon,
     profile,
     paneEl,
     tabEl,
+    paneId: targetPane.id,
     isConnected: true,
     isLocal,
     sftpPath: profile.initialDir || "~",
@@ -2318,66 +2325,479 @@ function createTab(tabId, profile, isLocal = false) {
     lastSftpPath: "~"
   };
 
+  renderWorkspace();
   activateTab(tabId);
   renderTree();
 }
 
-let currentSplitMode = "single"; // "single", "split-v", "split-h", "grid-4"
+// ==========================================================================
+// Workspace & Split Panes Subsystem
+// ==========================================================================
 
-function setSplitMode(mode) {
-  currentSplitMode = mode;
-  panesEl.className = "panes" + (mode === "single" ? "" : " " + mode);
-  applySplitVisibility();
-  showToast(`Split mode changed to: ${mode}`, "info");
+let workspaceState = {
+  layout: "single", // "single", "split-v", "split-h", "2-top-1-bot", "1-top-2-bot", "grid-4", "3-cols"
+  activePaneId: "pane-1",
+  panes: [
+    {
+      id: "pane-1",
+      title: "Terminal 1",
+      activeTabId: null,
+      tabIds: [],
+      maximized: false
+    }
+  ]
+};
+
+function initWorkspace() {
+  renderWorkspace();
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.GetWorkspace().then(ws => {
+      if (ws && ws.panes && ws.panes.length > 0) {
+        workspaceState.layout = ws.layout || "single";
+        workspaceState.activePaneId = ws.activePaneId || "pane-1";
+        renderWorkspace();
+      }
+    }).catch(() => {});
+  }
 }
 
-function applySplitVisibility() {
-  const allTabs = Object.values(tabs);
-  if (currentSplitMode === "single") {
-    allTabs.forEach(t => {
-      const isActive = t.paneEl.dataset.tabId === activeTabId;
-      t.paneEl.classList.toggle("active", isActive);
-      t.paneEl.classList.remove("split-visible");
-      if (isActive && t.fitAddon) setTimeout(() => t.fitAddon.fit(), 30);
-    });
-    return;
+function getActiveWorkspacePane() {
+  let p = workspaceState.panes.find(p => p.id === workspaceState.activePaneId);
+  if (!p && workspaceState.panes.length > 0) {
+    p = workspaceState.panes[0];
+    workspaceState.activePaneId = p.id;
   }
+  if (!p) {
+    p = { id: "pane-1", title: "Terminal 1", activeTabId: null, tabIds: [], maximized: false };
+    workspaceState.panes = [p];
+    workspaceState.activePaneId = p.id;
+  }
+  return p;
+}
 
-  let limit = 2;
-  if (currentSplitMode === "grid-4") limit = 4;
+function setActiveWorkspacePane(paneId) {
+  workspaceState.activePaneId = paneId;
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.FocusWorkspacePane(paneId).catch(() => {});
+  }
+  updateWorkspacePaneActiveClasses();
+}
 
-  const visibleTabs = allTabs.slice(0, limit);
-  allTabs.forEach(t => {
-    const isVisible = visibleTabs.includes(t);
-    t.paneEl.classList.toggle("split-visible", isVisible);
-    const isActive = t.paneEl.dataset.tabId === activeTabId;
-    t.paneEl.classList.toggle("active", isActive);
-    if (isVisible && t.fitAddon) {
-      setTimeout(() => {
-        try {
-          t.fitAddon.fit();
-          if (window.go && window.go.main && window.go.main.App) {
-            window.go.main.App.ResizeTerminal(t.paneEl.dataset.tabId, t.term.cols || 80, t.term.rows || 24);
-          }
-        } catch (_) {}
-      }, 50);
-    }
+function updateWorkspacePaneActiveClasses() {
+  document.querySelectorAll(".workspace-pane").forEach(el => {
+    const isAct = el.dataset.paneId === workspaceState.activePaneId;
+    el.classList.toggle("active", isAct);
   });
 }
 
-function showSplitMenu(x, y) {
-  contextMenuEl.innerHTML = `
-    <div class="context-menu-item" id="smSingle">🔲 1 Terminal (Default)</div>
-    <div class="context-menu-item" id="smSplitV">▮▮ 2 Terminals Vertical (Ctrl+Shift+\\)</div>
-    <div class="context-menu-item" id="smSplitH">〓 2 Terminals Horizontal (Ctrl+Shift+-)</div>
-    <div class="context-menu-item" id="smGrid4">⊞ 4 Terminals Grid (2x2)</div>
-  `;
-  posMenu(x, y);
+function getLayoutDisplayName(layout) {
+  switch (layout) {
+    case "single": return "1 Terminal (Single)";
+    case "split-v": return "2 Terminals Vertical";
+    case "split-h": return "2 Terminals Horizontal";
+    case "2-top-1-bot": return "2 Top + 1 Bottom Wide";
+    case "1-top-2-bot": return "1 Top Wide + 2 Bottom";
+    case "grid-4": return "4 Terminals (2x2 Grid)";
+    case "3-cols": return "3 Columns Vertical";
+    default: return layout;
+  }
+}
 
-  contextMenuEl.querySelector("#smSingle").onclick = () => { hideContextMenu(); setSplitMode("single"); };
-  contextMenuEl.querySelector("#smSplitV").onclick = () => { hideContextMenu(); setSplitMode("split-v"); };
-  contextMenuEl.querySelector("#smSplitH").onclick = () => { hideContextMenu(); setSplitMode("split-h"); };
-  contextMenuEl.querySelector("#smGrid4").onclick = () => { hideContextMenu(); setSplitMode("grid-4"); };
+function setSplitMode(layout) {
+  workspaceState.layout = layout;
+  let needed = 1;
+  if (layout === "split-v" || layout === "split-h") needed = 2;
+  else if (layout === "2-top-1-bot" || layout === "1-top-2-bot" || layout === "3-cols") needed = 3;
+  else if (layout === "grid-4") needed = 4;
+
+  while (workspaceState.panes.length < needed) {
+    const nextIdx = workspaceState.panes.length + 1;
+    workspaceState.panes.push({
+      id: `pane-${nextIdx}`,
+      title: `Terminal ${nextIdx}`,
+      activeTabId: null,
+      tabIds: [],
+      maximized: false
+    });
+  }
+
+  // Un-maximize any maximized panes
+  workspaceState.panes.forEach(p => p.maximized = false);
+
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.SetWorkspaceLayout(layout).catch(() => {});
+  }
+
+  renderWorkspace();
+  showToast(`Layout switched to: ${getLayoutDisplayName(layout)}`, "info");
+  refitAllTerminals();
+}
+
+function renderWorkspace() {
+  panesEl.className = "panes layout-" + (workspaceState.layout || "single");
+
+  // Determine which panes to show based on layout
+  let visibleLimit = 1;
+  if (workspaceState.layout === "split-v" || workspaceState.layout === "split-h") visibleLimit = 2;
+  else if (workspaceState.layout === "2-top-1-bot" || workspaceState.layout === "1-top-2-bot" || workspaceState.layout === "3-cols") visibleLimit = 3;
+  else if (workspaceState.layout === "grid-4") visibleLimit = 4;
+
+  const visiblePanes = workspaceState.panes.slice(0, visibleLimit);
+
+  // Remove stale pane DOM elements
+  const existingDomPanes = Array.from(panesEl.querySelectorAll(".workspace-pane"));
+  existingDomPanes.forEach(domP => {
+    const pid = domP.dataset.paneId;
+    if (!visiblePanes.find(p => p.id === pid)) {
+      domP.remove();
+    }
+  });
+
+  visiblePanes.forEach((pane, idx) => {
+    let domPane = panesEl.querySelector(`.workspace-pane[data-pane-id="${pane.id}"]`);
+    if (!domPane) {
+      domPane = document.createElement("div");
+      domPane.className = "workspace-pane";
+      domPane.dataset.paneId = pane.id;
+      domPane.innerHTML = `
+        <div class="workspace-pane-header">
+          <div class="pane-tab-strip"></div>
+          <div class="pane-header-actions">
+            <button class="pane-tool-btn" data-action="split-right" title="Split Right (Ctrl+Shift+E)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
+            </button>
+            <button class="pane-tool-btn" data-action="split-down" title="Split Down (Ctrl+Shift+O)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="3" y1="12" x2="21" y2="12"></line></svg>
+            </button>
+            <button class="pane-tool-btn" data-action="maximize" title="Maximize / Restore Pane">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            </button>
+            <button class="pane-tool-btn pane-close-btn" data-action="close" title="Close Pane">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </div>
+        </div>
+        <div class="workspace-pane-body"></div>
+      `;
+
+      domPane.addEventListener("mousedown", () => {
+        setActiveWorkspacePane(pane.id);
+      });
+
+      // Action buttons
+      domPane.querySelector('[data-action="split-right"]').onclick = (e) => {
+        e.stopPropagation();
+        splitPane(pane.id, "right");
+      };
+      domPane.querySelector('[data-action="split-down"]').onclick = (e) => {
+        e.stopPropagation();
+        splitPane(pane.id, "down");
+      };
+      domPane.querySelector('[data-action="maximize"]').onclick = (e) => {
+        e.stopPropagation();
+        toggleMaximizePane(pane.id);
+      };
+      domPane.querySelector('[data-action="close"]').onclick = (e) => {
+        e.stopPropagation();
+        closePane(pane.id);
+      };
+
+      // Drag & Drop tab drop target on pane
+      domPane.addEventListener("dragover", (e) => {
+        if (e.dataTransfer.types.includes("application/x-nexterm-tab")) {
+          e.preventDefault();
+          domPane.classList.add("pane-drop-target");
+        }
+      });
+      domPane.addEventListener("dragleave", () => {
+        domPane.classList.remove("pane-drop-target");
+      });
+      domPane.addEventListener("drop", (e) => {
+        domPane.classList.remove("pane-drop-target");
+        const movedTabId = e.dataTransfer.getData("application/x-nexterm-tab");
+        if (movedTabId) {
+          e.preventDefault();
+          moveTabToPane(movedTabId, pane.id);
+        }
+      });
+
+      panesEl.appendChild(domPane);
+    }
+
+    // Set classes
+    domPane.classList.toggle("active", pane.id === workspaceState.activePaneId);
+    domPane.classList.toggle("maximized", !!pane.maximized);
+
+    // Render Tab Strip
+    const stripEl = domPane.querySelector(".pane-tab-strip");
+    stripEl.innerHTML = "";
+
+    pane.tabIds.forEach(tId => {
+      const tabObj = tabs[tId];
+      if (!tabObj) return;
+
+      const itemEl = document.createElement("div");
+      itemEl.className = `pane-tab-item ${tId === pane.activeTabId ? 'active' : ''}`;
+      itemEl.draggable = true;
+      itemEl.innerHTML = `
+        <span class="pane-tab-dot" style="background: ${tabObj.isConnected ? '#22c55e' : '#ef4444'}"></span>
+        <span class="pane-tab-title" title="${escapeHtml(tabObj.profile.name || '')}">${escapeHtml(tabObj.profile.name || 'Terminal')}</span>
+        <span class="pane-tab-close" title="Close Tab">&times;</span>
+      `;
+
+      itemEl.onclick = (e) => {
+        e.stopPropagation();
+        activateTab(tId);
+      };
+
+      itemEl.querySelector(".pane-tab-close").onclick = (e) => {
+        e.stopPropagation();
+        closeTab(tId);
+      };
+
+      itemEl.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("application/x-nexterm-tab", tId);
+      });
+
+      stripEl.appendChild(itemEl);
+    });
+
+    const addTabBtn = document.createElement("button");
+    addTabBtn.className = "pane-add-tab-btn";
+    addTabBtn.title = "New Terminal in this pane";
+    addTabBtn.textContent = "＋";
+    addTabBtn.onclick = (e) => {
+      e.stopPropagation();
+      setActiveWorkspacePane(pane.id);
+      showNewSessionDialog();
+    };
+    stripEl.appendChild(addTabBtn);
+
+    // Render Pane Body
+    const bodyEl = domPane.querySelector(".workspace-pane-body");
+    // Detach any other tab paneEls
+    Array.from(bodyEl.children).forEach(child => {
+      if (child.classList.contains("terminal-pane") && child.dataset.tabId !== pane.activeTabId) {
+        child.classList.remove("active");
+        child.remove();
+      }
+    });
+
+    if (pane.activeTabId && tabs[pane.activeTabId]) {
+      const activeTabObj = tabs[pane.activeTabId];
+      if (!bodyEl.contains(activeTabObj.paneEl)) {
+        bodyEl.appendChild(activeTabObj.paneEl);
+      }
+      activeTabObj.paneEl.classList.add("active");
+      const emptyHint = bodyEl.querySelector(".pane-empty-placeholder");
+      if (emptyHint) emptyHint.remove();
+    } else {
+      let emptyHint = bodyEl.querySelector(".pane-empty-placeholder");
+      if (!emptyHint) {
+        emptyHint = document.createElement("div");
+        emptyHint.className = "pane-empty-placeholder";
+        emptyHint.innerHTML = `
+          <div class="empty-icon">🖥️</div>
+          <div>${escapeHtml(pane.title || `Terminal ${idx+1}`)}</div>
+          <button class="btn-empty-connect" type="button">＋ Connect Session</button>
+        `;
+        emptyHint.querySelector(".btn-empty-connect").onclick = () => {
+          setActiveWorkspacePane(pane.id);
+          showNewSessionDialog();
+        };
+        bodyEl.appendChild(emptyHint);
+      }
+    }
+  });
+
+  // Hide close button if only 1 pane visible
+  const closeBtns = panesEl.querySelectorAll('.workspace-pane .pane-close-btn');
+  closeBtns.forEach(b => b.style.display = visiblePanes.length <= 1 ? 'none' : 'flex');
+}
+
+function splitPane(paneId, direction) {
+  let nextLayout = "split-v";
+  if (direction === "down") {
+    if (workspaceState.layout === "single") nextLayout = "split-h";
+    else if (workspaceState.layout === "split-v" || workspaceState.layout === "split-h") nextLayout = "2-top-1-bot";
+    else if (workspaceState.layout === "2-top-1-bot" || workspaceState.layout === "1-top-2-bot") nextLayout = "grid-4";
+  } else {
+    if (workspaceState.layout === "single") nextLayout = "split-v";
+    else if (workspaceState.layout === "split-v" || workspaceState.layout === "split-h") nextLayout = "2-top-1-bot";
+    else if (workspaceState.layout === "2-top-1-bot" || workspaceState.layout === "1-top-2-bot") nextLayout = "grid-4";
+  }
+
+  setSplitMode(nextLayout);
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.AddWorkspacePane(direction).catch(() => {});
+  }
+}
+
+function closePane(paneId) {
+  if (workspaceState.panes.length <= 1) return;
+
+  const paneIdx = workspaceState.panes.findIndex(p => p.id === paneId);
+  if (paneIdx === -1) return;
+
+  const closingPane = workspaceState.panes[paneIdx];
+  workspaceState.panes.splice(paneIdx, 1);
+
+  // Redistribute orphan tabs
+  const remaining = workspaceState.panes[0];
+  if (closingPane.tabIds.length > 0) {
+    closingPane.tabIds.forEach(tId => {
+      remaining.tabIds.push(tId);
+      if (tabs[tId]) tabs[tId].paneId = remaining.id;
+    });
+    if (!remaining.activeTabId) remaining.activeTabId = closingPane.tabIds[0];
+  }
+
+  if (workspaceState.activePaneId === paneId) {
+    workspaceState.activePaneId = remaining.id;
+  }
+
+  // Adjust layout downwards
+  if (workspaceState.panes.length === 1) workspaceState.layout = "single";
+  else if (workspaceState.panes.length === 2 && (workspaceState.layout === "2-top-1-bot" || workspaceState.layout === "grid-4")) workspaceState.layout = "split-v";
+  else if (workspaceState.panes.length === 3 && workspaceState.layout === "grid-4") workspaceState.layout = "2-top-1-bot";
+
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.CloseWorkspacePane(paneId).catch(() => {});
+  }
+
+  renderWorkspace();
+  refitAllTerminals();
+}
+
+function moveTabToPane(tabId, targetPaneId) {
+  const currentPane = workspaceState.panes.find(p => p.tabIds && p.tabIds.includes(tabId));
+  const targetPane = workspaceState.panes.find(p => p.id === targetPaneId);
+  if (!targetPane) return;
+
+  if (currentPane) {
+    const idx = currentPane.tabIds.indexOf(tabId);
+    if (idx !== -1) currentPane.tabIds.splice(idx, 1);
+    if (currentPane.activeTabId === tabId) {
+      currentPane.activeTabId = currentPane.tabIds.length > 0 ? currentPane.tabIds[currentPane.tabIds.length - 1] : null;
+    }
+  }
+
+  if (!targetPane.tabIds.includes(tabId)) {
+    targetPane.tabIds.push(tabId);
+  }
+  targetPane.activeTabId = tabId;
+  workspaceState.activePaneId = targetPane.id;
+
+  if (tabs[tabId]) {
+    tabs[tabId].paneId = targetPane.id;
+  }
+
+  if (window.go && window.go.main && window.go.main.App) {
+    window.go.main.App.MoveWorkspaceTab(tabId, targetPaneId, -1).catch(() => {});
+  }
+
+  renderWorkspace();
+  activateTab(tabId);
+}
+
+function toggleMaximizePane(paneId) {
+  const pane = workspaceState.panes.find(p => p.id === paneId);
+  if (!pane) return;
+  pane.maximized = !pane.maximized;
+  renderWorkspace();
+  refitAllTerminals();
+}
+
+function refitAllTerminals() {
+  setTimeout(() => {
+    Object.entries(tabs).forEach(([tId, t]) => {
+      if (t && t.fitAddon && t.term) {
+        try {
+          t.fitAddon.fit();
+          if (window.go && window.go.main && window.go.main.App) {
+            window.go.main.App.ResizeTerminal(tId, t.term.cols || 80, t.term.rows || 24);
+          }
+        } catch (_) {}
+      }
+    });
+  }, 80);
+}
+
+function showSplitMenu(x, y) {
+  let menu = document.getElementById("splitLayoutMenu");
+  if (!menu) {
+    menu = document.createElement("div");
+    menu.id = "splitLayoutMenu";
+    menu.className = "split-layout-menu";
+    document.body.appendChild(menu);
+  }
+
+  menu.innerHTML = `
+    <div class="split-layout-title">Terminal Layout Presets</div>
+    <div class="split-layout-grid">
+      <div class="layout-card ${workspaceState.layout === 'single' ? 'active' : ''}" data-layout="single">
+        <div class="card-preview pv-single"><div class="pv-box"></div></div>
+        <span class="card-label">1 Terminal</span>
+      </div>
+      <div class="layout-card ${workspaceState.layout === 'split-v' ? 'active' : ''}" data-layout="split-v">
+        <div class="card-preview pv-split-v"><div class="pv-box"></div><div class="pv-box"></div></div>
+        <span class="card-label">2 Vertical</span>
+      </div>
+      <div class="layout-card ${workspaceState.layout === 'split-h' ? 'active' : ''}" data-layout="split-h">
+        <div class="card-preview pv-split-h"><div class="pv-box"></div><div class="pv-box"></div></div>
+        <span class="card-label">2 Horizontal</span>
+      </div>
+      <div class="layout-card ${workspaceState.layout === '2-top-1-bot' ? 'active' : ''}" data-layout="2-top-1-bot">
+        <div class="card-preview pv-2-top-1-bot">
+          <div class="pv-box"></div>
+          <div class="pv-box"></div>
+          <div class="pv-box b3"></div>
+        </div>
+        <span class="card-label">2 Top + 1 Bottom</span>
+      </div>
+      <div class="layout-card ${workspaceState.layout === '1-top-2-bot' ? 'active' : ''}" data-layout="1-top-2-bot">
+        <div class="card-preview pv-1-top-2-bot">
+          <div class="pv-box b1"></div>
+          <div class="pv-box"></div>
+          <div class="pv-box"></div>
+        </div>
+        <span class="card-label">1 Top + 2 Bottom</span>
+      </div>
+      <div class="layout-card ${workspaceState.layout === 'grid-4' ? 'active' : ''}" data-layout="grid-4">
+        <div class="card-preview pv-grid-4">
+          <div class="pv-box"></div><div class="pv-box"></div>
+          <div class="pv-box"></div><div class="pv-box"></div>
+        </div>
+        <span class="card-label">4 Grid (2x2)</span>
+      </div>
+      <div class="layout-card ${workspaceState.layout === '3-cols' ? 'active' : ''}" data-layout="3-cols">
+        <div class="card-preview pv-3-cols">
+          <div class="pv-box"></div><div class="pv-box"></div><div class="pv-box"></div>
+        </div>
+        <span class="card-label">3 Columns</span>
+      </div>
+    </div>
+  `;
+
+  menu.style.left = Math.min(x, window.innerWidth - 310) + "px";
+  menu.style.top = y + "px";
+  menu.classList.remove("hidden");
+
+  menu.querySelectorAll(".layout-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const layout = card.dataset.layout;
+      setSplitMode(layout);
+      menu.classList.add("hidden");
+    });
+  });
+
+  const closeMenuHandler = (e) => {
+    if (!menu.contains(e.target) && e.target.id !== "tbSplitBtn" && !e.target.closest("#tbSplitBtn")) {
+      menu.classList.add("hidden");
+      document.removeEventListener("mousedown", closeMenuHandler);
+    }
+  };
+  setTimeout(() => document.addEventListener("mousedown", closeMenuHandler), 10);
 }
 
 function activateTab(tabId) {
@@ -2390,13 +2810,23 @@ function activateTab(tabId) {
   welcomeStateEl.classList.remove("active");
   floatingControlsEl.classList.remove("hidden");
 
+  activeTabId = tabId;
+
+  // Find pane that owns tabId
+  const ownerPane = workspaceState.panes.find(p => p.tabIds && p.tabIds.includes(tabId));
+  if (ownerPane) {
+    ownerPane.activeTabId = tabId;
+    workspaceState.activePaneId = ownerPane.id;
+  }
+
+  // Update top tabbar tabs
   Object.entries(tabs).forEach(([id, t]) => {
     const isActive = id === tabId;
-    t.tabEl.classList.toggle("active", isActive);
-    t.paneEl.classList.toggle("active", isActive);
+    if (t.tabEl) t.tabEl.classList.toggle("active", isActive);
   });
 
-  activeTabId = tabId;
+  renderWorkspace();
+
   const currentTab = tabs[tabId];
   if (currentTab) {
     setTimeout(() => {
@@ -2425,7 +2855,6 @@ function activateTab(tabId) {
     }
   }
 
-  applySplitVisibility();
   updateStatus();
 }
 
@@ -2437,14 +2866,30 @@ function closeTab(tabId) {
     window.go.main.App.CloseTab(tabId);
   }
 
-  t.term.dispose();
-  t.tabEl.remove();
-  t.paneEl.remove();
+  // Remove from pane
+  const ownerPane = workspaceState.panes.find(p => p.tabIds && p.tabIds.includes(tabId));
+  if (ownerPane) {
+    const idx = ownerPane.tabIds.indexOf(tabId);
+    if (idx !== -1) ownerPane.tabIds.splice(idx, 1);
+    if (ownerPane.activeTabId === tabId) {
+      ownerPane.activeTabId = ownerPane.tabIds.length > 0 ? ownerPane.tabIds[ownerPane.tabIds.length - 1] : null;
+    }
+  }
+
+  try { t.term.dispose(); } catch (_) {}
+  if (t.tabEl) t.tabEl.remove();
+  if (t.paneEl) t.paneEl.remove();
   delete tabs[tabId];
+
+  renderWorkspace();
 
   const remaining = Object.keys(tabs);
   if (remaining.length > 0) {
-    activateTab(remaining[remaining.length - 1]);
+    if (ownerPane && ownerPane.activeTabId) {
+      activateTab(ownerPane.activeTabId);
+    } else {
+      activateTab(remaining[remaining.length - 1]);
+    }
   } else {
     activateHomeTab();
   }
@@ -6581,20 +7026,32 @@ function setupEventListeners() {
 
   // Window Resize
   window.addEventListener("resize", () => {
-    applySplitVisibility();
+    refitAllTerminals();
   });
 
   // Global Shortcuts
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { hideContextMenu(); hideModal(); }
     if (e.ctrlKey || e.metaKey) {
-      if (e.shiftKey && e.key === "|") {
+      if (e.shiftKey && (e.key === "E" || e.key === "e")) {
         e.preventDefault();
-        setSplitMode(currentSplitMode === "split-v" ? "single" : "split-v");
+        splitPane(workspaceState.activePaneId, "right");
       }
-      if (e.shiftKey && e.key === "_") {
+      if (e.shiftKey && (e.key === "O" || e.key === "o")) {
         e.preventDefault();
-        setSplitMode(currentSplitMode === "split-h" ? "single" : "split-h");
+        splitPane(workspaceState.activePaneId, "down");
+      }
+      if (e.shiftKey && (e.key === "M" || e.key === "m")) {
+        e.preventDefault();
+        toggleMaximizePane(workspaceState.activePaneId);
+      }
+      if (e.shiftKey && (e.key === "|" || e.key === "\\")) {
+        e.preventDefault();
+        setSplitMode(workspaceState.layout === "split-v" ? "single" : "split-v");
+      }
+      if (e.shiftKey && (e.key === "_" || e.key === "-")) {
+        e.preventDefault();
+        setSplitMode(workspaceState.layout === "split-h" ? "single" : "split-h");
       }
       if (e.key === "n" && !e.shiftKey) { e.preventDefault(); showNewSessionDialog(); }
       if (e.key === "w" && !e.shiftKey && activeTabId && activeTabId !== "home") { e.preventDefault(); closeTab(activeTabId); }

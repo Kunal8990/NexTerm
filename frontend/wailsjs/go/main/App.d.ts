@@ -13,9 +13,13 @@ export function AddFolder(arg1:string,arg2:string):Promise<model.TreeNode>;
 
 export function AddSession(arg1:string,arg2:model.SessionProfile):Promise<model.TreeNode>;
 
+export function AddWorkspacePane(arg1:string):Promise<model.Pane>;
+
 export function BroadcastCommand(arg1:string):Promise<void>;
 
 export function CloseTab(arg1:string):Promise<void>;
+
+export function CloseWorkspacePane(arg1:string):Promise<model.Workspace>;
 
 export function DeleteKnownHost(arg1:string,arg2:number):Promise<void>;
 
@@ -37,6 +41,8 @@ export function ExpandAllFolders(arg1:boolean):Promise<model.TreeNode>;
 
 export function ExportSessions():Promise<string>;
 
+export function FocusWorkspacePane(arg1:string):Promise<void>;
+
 export function GetAvailableSerialPorts():Promise<Array<string>>;
 
 export function GetCustomizerConfig():Promise<security.CustomizerConfig>;
@@ -55,6 +61,8 @@ export function GetSessionTree():Promise<model.TreeNode>;
 
 export function GetTunnels():Promise<Array<tunnel.TunnelConfig>>;
 
+export function GetWorkspace():Promise<model.Workspace>;
+
 export function HasSavedPassword(arg1:string):Promise<boolean>;
 
 export function ImportSessions(arg1:string):Promise<model.TreeNode>;
@@ -66,6 +74,8 @@ export function LaunchSystemTool(arg1:string):Promise<void>;
 export function MoveNode(arg1:string,arg2:string,arg3:number):Promise<model.TreeNode>;
 
 export function MoveSession(arg1:string,arg2:string):Promise<model.TreeNode>;
+
+export function MoveWorkspaceTab(arg1:string,arg2:string,arg3:number):Promise<model.Workspace>;
 
 export function NetCalculateHash(arg1:string,arg2:string):Promise<string>;
 
@@ -142,6 +152,10 @@ export function SelectDownloadDest(arg1:string):Promise<string>;
 export function SelectPrivateKeyFile():Promise<string>;
 
 export function SelectUploadFile():Promise<string>;
+
+export function SetWorkspaceActiveTab(arg1:string,arg2:string):Promise<void>;
+
+export function SetWorkspaceLayout(arg1:string):Promise<model.Workspace>;
 
 export function StartTunnel(arg1:string,arg2:string):Promise<void>;
 

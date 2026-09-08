@@ -10,12 +10,20 @@ export function AddSession(arg1, arg2) {
   return window['go']['main']['App']['AddSession'](arg1, arg2);
 }
 
+export function AddWorkspacePane(arg1) {
+  return window['go']['main']['App']['AddWorkspacePane'](arg1);
+}
+
 export function BroadcastCommand(arg1) {
   return window['go']['main']['App']['BroadcastCommand'](arg1);
 }
 
 export function CloseTab(arg1) {
   return window['go']['main']['App']['CloseTab'](arg1);
+}
+
+export function CloseWorkspacePane(arg1) {
+  return window['go']['main']['App']['CloseWorkspacePane'](arg1);
 }
 
 export function DeleteKnownHost(arg1, arg2) {
@@ -58,6 +66,10 @@ export function ExportSessions() {
   return window['go']['main']['App']['ExportSessions']();
 }
 
+export function FocusWorkspacePane(arg1) {
+  return window['go']['main']['App']['FocusWorkspacePane'](arg1);
+}
+
 export function GetAvailableSerialPorts() {
   return window['go']['main']['App']['GetAvailableSerialPorts']();
 }
@@ -94,6 +106,10 @@ export function GetTunnels() {
   return window['go']['main']['App']['GetTunnels']();
 }
 
+export function GetWorkspace() {
+  return window['go']['main']['App']['GetWorkspace']();
+}
+
 export function HasSavedPassword(arg1) {
   return window['go']['main']['App']['HasSavedPassword'](arg1);
 }
@@ -116,6 +132,10 @@ export function MoveNode(arg1, arg2, arg3) {
 
 export function MoveSession(arg1, arg2) {
   return window['go']['main']['App']['MoveSession'](arg1, arg2);
+}
+
+export function MoveWorkspaceTab(arg1, arg2, arg3) {
+  return window['go']['main']['App']['MoveWorkspaceTab'](arg1, arg2, arg3);
 }
 
 export function NetCalculateHash(arg1, arg2) {
@@ -268,6 +288,14 @@ export function SelectPrivateKeyFile() {
 
 export function SelectUploadFile() {
   return window['go']['main']['App']['SelectUploadFile']();
+}
+
+export function SetWorkspaceActiveTab(arg1, arg2) {
+  return window['go']['main']['App']['SetWorkspaceActiveTab'](arg1, arg2);
+}
+
+export function SetWorkspaceLayout(arg1) {
+  return window['go']['main']['App']['SetWorkspaceLayout'](arg1);
 }
 
 export function StartTunnel(arg1, arg2) {

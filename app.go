@@ -47,6 +47,7 @@ type App struct {
 	mu        sync.Mutex
 	tabs      map[string]*sshsession.Session // tabID -> live SSH session
 	localTabs map[string]*pty.Terminal       // tabID -> live local ConPTY session
+	workspace *model.Workspace               // active multi-pane workspace
 
 	sftpMgr   *sftpmanager.SFTPManager
 	tunnelMgr *tunnel.TunnelManager
@@ -65,6 +66,7 @@ func NewApp() *App {
 	return &App{
 		tabs:            make(map[string]*sshsession.Session),
 		localTabs:       make(map[string]*pty.Terminal),
+		workspace:       model.NewWorkspace("default", "Default Workspace"),
 		sftpMgr:         sftpmanager.NewSFTPManager(),
 		tunnelMgr:       tunnel.NewTunnelManager(),
 		macroMgr:        macro.NewMacroManager(),
@@ -565,11 +567,24 @@ func (a *App) OpenSession(profile model.SessionProfile, password string) (string
 		wailsruntime.EventsEmit(a.ctx, "terminal:closed:"+tabID, reason)
 		a.mu.Lock()
 		delete(a.tabs, tabID)
+		if a.workspace != nil {
+			_, _ = a.workspace.RemoveTab(tabID)
+		}
 		a.mu.Unlock()
 	}
 
 	a.mu.Lock()
 	a.tabs[tabID] = sess
+	if a.workspace != nil {
+		_, _ = a.workspace.AddTabToPane("", &model.TabSession{
+			ID:          tabID,
+			Title:       profile.Name,
+			Profile:     profile,
+			IsConnected: true,
+			IsLocal:     false,
+			CreatedAt:   time.Now().Format(time.RFC3339),
+		})
+	}
 	a.mu.Unlock()
 
 	return tabID, nil
@@ -621,12 +636,15 @@ func (a *App) ImportSessions(jsonContent string) (*model.TreeNode, error) {
 	return a.root, a.store.Save(a.root)
 }
 
-// OpenLocalTerminal starts a local PowerShell / CMD process attached to Windows ConPTY.
-func (a *App) OpenLocalTerminal(shellType string) (string, error) {
+// OpenLocalTerminal spawns a local PowerShell or Command Prompt via ConPTY.
+func (a *App) OpenLocalTerminal(shell string) (string, error) {
 	tabID := uuid.NewString()
-	cmdLine := "powershell.exe -NoLogo"
-	if shellType == "cmd" {
+
+	cmdLine := "powershell.exe"
+	title := "Local PowerShell"
+	if shell == "cmd" {
 		cmdLine = "cmd.exe"
+		title = "Local Command Prompt"
 	}
 
 	term, err := pty.Start(cmdLine, 120, 30)
@@ -650,6 +668,16 @@ func (a *App) OpenLocalTerminal(shellType string) (string, error) {
 
 	a.mu.Lock()
 	a.localTabs[tabID] = term
+	if a.workspace != nil {
+		_, _ = a.workspace.AddTabToPane("", &model.TabSession{
+			ID:          tabID,
+			Title:       title,
+			Profile:     model.SessionProfile{Name: title, Protocol: "local"},
+			IsConnected: true,
+			IsLocal:     true,
+			CreatedAt:   time.Now().Format(time.RFC3339),
+		})
+	}
 	a.mu.Unlock()
 
 	return tabID, nil
@@ -725,6 +753,9 @@ func (a *App) CloseTab(tabID string) error {
 	delete(a.tabs, tabID)
 	local, isLocal := a.localTabs[tabID]
 	delete(a.localTabs, tabID)
+	if a.workspace != nil {
+		_, _ = a.workspace.RemoveTab(tabID)
+	}
 	a.mu.Unlock()
 
 	if isSSH {
@@ -734,6 +765,69 @@ func (a *App) CloseTab(tabID string) error {
 		_ = local.Close()
 	}
 	return nil
+}
+
+// =========================================================================
+// Workspace & Split Panes Subsystem
+// =========================================================================
+
+// GetWorkspace returns the current workspace layout and pane hierarchy.
+func (a *App) GetWorkspace() model.Workspace {
+	if a.workspace == nil {
+		a.workspace = model.NewWorkspace("default", "Default Workspace")
+	}
+	return a.workspace.GetState()
+}
+
+// SetWorkspaceLayout applies a layout preset ("2-top-1-bot", "single", "split-v", "split-h", "grid-4", "1-top-2-bot", "3-cols").
+func (a *App) SetWorkspaceLayout(layout string) (model.Workspace, error) {
+	if a.workspace == nil {
+		a.workspace = model.NewWorkspace("default", "Default Workspace")
+	}
+	err := a.workspace.SetLayout(layout)
+	return a.workspace.GetState(), err
+}
+
+// AddWorkspacePane splits the active pane into two panes.
+func (a *App) AddWorkspacePane(direction string) (*model.Pane, error) {
+	if a.workspace == nil {
+		a.workspace = model.NewWorkspace("default", "Default Workspace")
+	}
+	return a.workspace.SplitPane(a.workspace.ActivePaneID, direction)
+}
+
+// CloseWorkspacePane closes a pane and reallocates its tabs to remaining panes.
+func (a *App) CloseWorkspacePane(paneID string) (model.Workspace, error) {
+	if a.workspace == nil {
+		a.workspace = model.NewWorkspace("default", "Default Workspace")
+	}
+	err := a.workspace.ClosePane(paneID)
+	return a.workspace.GetState(), err
+}
+
+// MoveWorkspaceTab moves a session tab between panes.
+func (a *App) MoveWorkspaceTab(tabID, targetPaneID string, targetIndex int) (model.Workspace, error) {
+	if a.workspace == nil {
+		a.workspace = model.NewWorkspace("default", "Default Workspace")
+	}
+	err := a.workspace.MoveTab(tabID, targetPaneID, targetIndex)
+	return a.workspace.GetState(), err
+}
+
+// FocusWorkspacePane sets the currently active pane.
+func (a *App) FocusWorkspacePane(paneID string) error {
+	if a.workspace == nil {
+		a.workspace = model.NewWorkspace("default", "Default Workspace")
+	}
+	return a.workspace.FocusPane(paneID)
+}
+
+// SetWorkspaceActiveTab activates a specific tab inside a pane.
+func (a *App) SetWorkspaceActiveTab(paneID, tabID string) error {
+	if a.workspace == nil {
+		a.workspace = model.NewWorkspace("default", "Default Workspace")
+	}
+	return a.workspace.SetActiveTab(paneID, tabID)
 }
 
 // =========================================================================

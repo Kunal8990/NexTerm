@@ -227,6 +227,93 @@ export namespace model {
 	        this.rdpFullScreen = source["rdpFullScreen"];
 	    }
 	}
+	export class TabSession {
+	    id: string;
+	    title: string;
+	    profile: SessionProfile;
+	    isConnected: boolean;
+	    isLocal: boolean;
+	    createdAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new TabSession(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.profile = this.convertValues(source["profile"], SessionProfile);
+	        this.isConnected = source["isConnected"];
+	        this.isLocal = source["isLocal"];
+	        this.createdAt = source["createdAt"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Pane {
+	    id: string;
+	    title?: string;
+	    activeTabId: string;
+	    tabs: TabSession[];
+	    row: number;
+	    col: number;
+	    rowSpan: number;
+	    colSpan: number;
+	    maximized?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Pane(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.activeTabId = source["activeTabId"];
+	        this.tabs = this.convertValues(source["tabs"], TabSession);
+	        this.row = source["row"];
+	        this.col = source["col"];
+	        this.rowSpan = source["rowSpan"];
+	        this.colSpan = source["colSpan"];
+	        this.maximized = source["maximized"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class TreeNode {
 	    id: string;
 	    name: string;
@@ -245,6 +332,44 @@ export namespace model {
 	        this.session = this.convertValues(source["session"], SessionProfile);
 	        this.children = this.convertValues(source["children"], TreeNode);
 	        this.expanded = source["expanded"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Workspace {
+	    id: string;
+	    name: string;
+	    layout: string;
+	    activePaneId: string;
+	    panes: Pane[];
+	
+	    static createFrom(source: any = {}) {
+	        return new Workspace(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.layout = source["layout"];
+	        this.activePaneId = source["activePaneId"];
+	        this.panes = this.convertValues(source["panes"], Pane);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

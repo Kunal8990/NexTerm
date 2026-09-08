@@ -2222,48 +2222,435 @@ html, body, #app {
 }
 
 /* =========================================================================
-   Split Terminal Layouts
+   Workspace & Split Terminal Panes Subsystem
    ========================================================================= */
+.panes {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #090c11;
+  position: relative;
+}
+
+/* 1. Layout Presets */
+.panes.layout-single {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.panes.layout-split-v,
 .panes.split-v {
   display: grid !important;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr;
-  gap: 3px;
+  gap: 4px;
   background: #090c11;
-  padding: 2px;
+  padding: 3px;
 }
 
+.panes.layout-split-h,
 .panes.split-h {
   display: grid !important;
   grid-template-columns: 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 3px;
+  gap: 4px;
   background: #090c11;
-  padding: 2px;
+  padding: 3px;
 }
 
+/* 2 Top + 1 Bottom Wide (Target Layout) */
+.panes.layout-2-top-1-bot,
+.panes.split-2-top-1-bot {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  background: #090c11;
+  padding: 3px;
+}
+.panes.layout-2-top-1-bot .workspace-pane:nth-child(1),
+.panes.split-2-top-1-bot .workspace-pane:nth-child(1) {
+  grid-column: 1;
+  grid-row: 1;
+}
+.panes.layout-2-top-1-bot .workspace-pane:nth-child(2),
+.panes.split-2-top-1-bot .workspace-pane:nth-child(2) {
+  grid-column: 2;
+  grid-row: 1;
+}
+.panes.layout-2-top-1-bot .workspace-pane:nth-child(3),
+.panes.split-2-top-1-bot .workspace-pane:nth-child(3) {
+  grid-column: 1 / span 2;
+  grid-row: 2;
+}
+
+/* 1 Top Wide + 2 Bottom */
+.panes.layout-1-top-2-bot,
+.panes.split-1-top-2-bot {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  background: #090c11;
+  padding: 3px;
+}
+.panes.layout-1-top-2-bot .workspace-pane:nth-child(1),
+.panes.split-1-top-2-bot .workspace-pane:nth-child(1) {
+  grid-column: 1 / span 2;
+  grid-row: 1;
+}
+.panes.layout-1-top-2-bot .workspace-pane:nth-child(2),
+.panes.split-1-top-2-bot .workspace-pane:nth-child(2) {
+  grid-column: 1;
+  grid-row: 2;
+}
+.panes.layout-1-top-2-bot .workspace-pane:nth-child(3),
+.panes.split-1-top-2-bot .workspace-pane:nth-child(3) {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+/* 4 Terminals 2x2 Grid */
+.panes.layout-grid-4,
 .panes.grid-4 {
   display: grid !important;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 3px;
+  gap: 4px;
   background: #090c11;
+  padding: 3px;
+}
+.panes.layout-grid-4 .workspace-pane:nth-child(1),
+.panes.grid-4 .workspace-pane:nth-child(1) {
+  grid-column: 1;
+  grid-row: 1;
+}
+.panes.layout-grid-4 .workspace-pane:nth-child(2),
+.panes.grid-4 .workspace-pane:nth-child(2) {
+  grid-column: 2;
+  grid-row: 1;
+}
+.panes.layout-grid-4 .workspace-pane:nth-child(3),
+.panes.grid-4 .workspace-pane:nth-child(3) {
+  grid-column: 1;
+  grid-row: 2;
+}
+.panes.layout-grid-4 .workspace-pane:nth-child(4),
+.panes.grid-4 .workspace-pane:nth-child(4) {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+/* 3 Vertical Columns */
+.panes.layout-3-cols,
+.panes.split-3-cols {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr;
+  gap: 4px;
+  background: #090c11;
+  padding: 3px;
+}
+
+/* 2. Workspace Pane Container */
+.workspace-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0d1117;
+  overflow: hidden;
+  position: relative;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.workspace-pane.active {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
+}
+
+.workspace-pane.maximized {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 60 !important;
+}
+
+/* 3. Pane Header & Mini Tab Strip */
+.workspace-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  background: #161b22;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0 4px;
+  user-select: none;
+}
+
+.workspace-pane.active .workspace-pane-header {
+  background: linear-gradient(90deg, #1e293b, #0f172a);
+  border-bottom-color: rgba(59, 130, 246, 0.3);
+}
+
+.pane-tab-strip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 100%;
+  scrollbar-width: none;
+}
+.pane-tab-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.pane-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #94a3b8;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s ease;
+}
+
+.pane-tab-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+}
+
+.pane-tab-item.active {
+  background: #090c11;
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #60a5fa;
+  font-weight: 500;
+}
+
+.pane-tab-item .pane-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+.pane-tab-item .pane-tab-close {
+  font-size: 13px;
+  line-height: 1;
+  color: #64748b;
+  border-radius: 2px;
+  padding: 1px 3px;
+  margin-left: 2px;
+}
+.pane-tab-item .pane-tab-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.pane-add-tab-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  width: 20px;
+  height: 20px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.pane-add-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+}
+
+/* 4. Pane Header Action Buttons */
+.pane-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 8px;
+}
+
+.pane-tool-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.pane-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #38bdf8;
+}
+
+.pane-tool-btn.pane-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* 5. Pane Body & Empty State */
+.workspace-pane-body {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  width: 100%;
+  background: #090c11;
+  overflow: hidden;
+}
+
+.workspace-pane-body .terminal-pane {
+  display: none;
+  width: 100%;
+  height: 100%;
+}
+
+.workspace-pane-body .terminal-pane.active {
+  display: block;
+}
+
+.pane-empty-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #475569;
+  font-size: 12px;
+  gap: 8px;
+  user-select: none;
+}
+.pane-empty-placeholder .empty-icon {
+  font-size: 26px;
+  opacity: 0.6;
+}
+.pane-empty-placeholder .btn-empty-connect {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.pane-empty-placeholder .btn-empty-connect:hover {
+  background: #3b82f6;
+  color: #fff;
+}
+
+/* 6. Visual Split Layout Selector Popover */
+.split-layout-menu {
+  position: absolute;
+  background: #161b22;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+  padding: 10px;
+  z-index: 1000;
+  width: 290px;
+  backdrop-filter: blur(12px);
+}
+
+.split-layout-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.split-layout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.layout-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.layout-card:hover {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+}
+
+.layout-card.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #60a5fa;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+}
+
+.layout-card .card-preview {
+  width: 44px;
+  height: 32px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  display: grid;
+  gap: 2px;
   padding: 2px;
 }
 
-.panes.split-v .terminal-pane.split-visible,
-.panes.split-h .terminal-pane.split-visible,
-.panes.grid-4 .terminal-pane.split-visible {
-  display: block !important;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-  position: relative;
+.layout-card:hover .card-preview {
+  border-color: #60a5fa;
 }
 
-.panes.split-v .terminal-pane.active,
-.panes.split-h .terminal-pane.active,
-.panes.grid-4 .terminal-pane.active {
-  border-color: #3b82f6 !important;
-  box-shadow: 0 0 8px rgba(59, 130, 246, 0.2);
+.card-preview .pv-box {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+}
+
+.layout-card.active .card-preview .pv-box {
+  background: #3b82f6;
+}
+
+/* Previews */
+.pv-single { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.pv-split-v { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+.pv-split-h { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+.pv-2-top-1-bot { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.pv-2-top-1-bot .b3 { grid-column: 1 / span 2; }
+.pv-1-top-2-bot { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.pv-1-top-2-bot .b1 { grid-column: 1 / span 2; }
+.pv-grid-4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.pv-3-cols { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr; }
+
+.layout-card .card-label {
+  font-size: 11px;
+  color: #cbd5e1;
+  text-align: center;
 }
 
 /* =========================================================================
