@@ -839,7 +839,7 @@ func (a *App) SFTPGetFileProperties(tabID, remotePath string) (*sftpmanager.SFTP
 }
 
 // =========================================================================
-// MobaSSHTunnel Management
+// Nexterm Tunnel Management
 // =========================================================================
 
 func (a *App) GetTunnels() []tunnel.TunnelConfig {

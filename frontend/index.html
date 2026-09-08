@@ -57,7 +57,7 @@
       </div>
       <div class="menu-item" data-menu="menu-tunneling">Tunneling
         <div class="dropdown-menu hidden" id="menu-tunneling">
-          <div class="menu-option" id="mOpenTunneling">MobaSSHTunnel Manager...</div>
+          <div class="menu-option" id="mOpenTunneling">Nexterm Tunnel Manager...</div>
         </div>
       </div>
       <div class="menu-item" data-menu="menu-settings">Settings
@@ -78,7 +78,7 @@
       </div>
     </nav>
 
-    <!-- 2. Main Icon Toolbar (MobaXterm Style) -->
+    <!-- 2. Main Icon Toolbar -->
     <header id="mainToolbar" class="main-toolbar">
       <div class="toolbar-left">
         <button id="tbSessionBtn" class="tb-btn" title="New Session">
@@ -199,7 +199,7 @@
             <button class="nav-strip-btn" id="navTabMacros" title="Terminal Macros (📜)">
               📜
             </button>
-            <button class="nav-strip-btn" id="navTabTunnel" title="MobaSSHTunnel Port Forwarding (🔑)">
+            <button class="nav-strip-btn" id="navTabTunnel" title="Nexterm Tunnel Port Forwarding (🔑)">
               🔑
             </button>
             <button class="nav-strip-btn" id="navTabTools" title="System & Network Tools (⚡)">
@@ -247,10 +247,10 @@
               </div>
             </div>
 
-            <!-- View B: Graphical SFTP Browser (MobaXterm Exact Clone) -->
+            <!-- View B: Graphical SFTP Browser -->
             <div id="viewSFTP" class="side-tab-view hidden moba-sftp-view">
               
-              <!-- 1. MobaXterm Colorful Icon Toolbar -->
+              <!-- 1. SFTP Icon Toolbar -->
               <div class="moba-sftp-toolbar">
                 <button id="sftpFollowTermBtn" class="moba-sftp-btn" title="Follow Terminal Directory / Home">
                   <svg width="17" height="17" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="3" fill="#f59e0b"/><rect x="4" y="5" width="16" height="14" rx="2" fill="#0f172a"/><text x="12" y="16" font-size="12" font-family="sans-serif" font-weight="bold" fill="#38bdf8" text-anchor="middle">t</text></svg>
@@ -273,7 +273,7 @@
                 <button id="sftpDeleteBtn" class="moba-sftp-btn" title="Delete selected file/folder">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.5" fill="#ef4444"/><path d="M8 8l8 8M16 8l-8 8" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"/></svg>
                 </button>
-                <button id="sftpEditBtn" class="moba-sftp-btn" title="Edit selected file in MobaTextEditor">
+                <button id="sftpEditBtn" class="moba-sftp-btn" title="Edit selected file in Nexterm Editor">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="3" fill="#a855f7"/><text x="12" y="16.5" font-size="14" font-family="Segoe UI, sans-serif" font-weight="900" fill="#ffffff" text-anchor="middle">A</text></svg>
                 </button>
                 <button id="sftpToggleHiddenBtn" class="moba-sftp-btn" title="Show/Hide Hidden Files">
@@ -319,7 +319,7 @@
                 <div class="sftp-empty-hint">Connect to an SSH server to browse remote files via SFTP</div>
               </div>
 
-              <!-- 5. MobaXterm Bottom SFTP Options -->
+              <!-- 5. Bottom SFTP Options -->
               <div class="moba-sftp-bottom-options">
                 <label class="moba-sftp-opt-label">
                   <input type="checkbox" id="sftpRemoteMonitorCheckbox" />
@@ -349,10 +349,10 @@
               <div id="macrosList" class="macros-list-container"></div>
             </div>
 
-            <!-- View D: SSH Tunnels (MobaSSHTunnel) -->
+            <!-- View D: SSH Tunnels (Nexterm Tunnel) -->
             <div id="viewTunnel" class="side-tab-view hidden">
               <div class="sftp-header-title">
-                <span>🔑 MobaSSHTunnel</span>
+                <span>🔑 Nexterm Tunnel</span>
               </div>
               <div style="padding: 6px 8px;">
                 <button id="sidebarNewTunnelBtn" class="btn-primary" style="width: 100%; font-size: 11px; padding: 5px;">＋ New SSH Tunnel...</button>
@@ -360,12 +360,12 @@
               <div id="sidebarTunnelList" class="tunnel-list-container"></div>
             </div>
 
-            <!-- View E: Tools & Utilities (MobaXterm Menu) -->
+            <!-- View E: Tools & Utilities -->
             <div id="viewTools" class="side-tab-view hidden">
               <div class="tools-category-header">System</div>
               <div class="tool-item" id="toolPkgMgr">
                 <span class="tool-icon">📦</span>
-                <span class="tool-text">MobApt packages manager</span>
+                <span class="tool-text">Nexterm Packages Manager</span>
               </div>
               <div class="tool-item" id="toolHardware">
                 <span class="tool-icon">💻</span>
@@ -387,11 +387,11 @@
               <div class="tools-category-header">Office & Editors</div>
               <div class="tool-item" id="toolTextEditor">
                 <span class="tool-icon">📄</span>
-                <span class="tool-text">MobaTextEditor</span>
+                <span class="tool-text">Nexterm Text Editor</span>
               </div>
               <div class="tool-item" id="toolDiff">
                 <span class="tool-icon">📑</span>
-                <span class="tool-text">MobaDiff</span>
+                <span class="tool-text">Nexterm Diff</span>
               </div>
               <div class="tool-item" id="toolAscii">
                 <span class="tool-icon">🔤</span>
@@ -417,11 +417,11 @@
               </div>
               <div class="tool-item" id="toolKeyGen">
                 <span class="tool-icon">🗝️</span>
-                <span class="tool-text">MobaKeyGen (SSH key generator)</span>
+                <span class="tool-text">Nexterm KeyGen (SSH key generator)</span>
               </div>
               <div class="tool-item" id="toolTunnel">
                 <span class="tool-icon">🔑</span>
-                <span class="tool-text">MobaSSHTunnel manager</span>
+                <span class="tool-text">Nexterm Tunnel Manager</span>
               </div>
               <div class="tool-item" id="toolPorts">
                 <span class="tool-icon">🔍</span>
@@ -454,7 +454,7 @@
           <!-- A. Home / Welcome Screen (Dashboard) -->
           <div id="welcomeState" class="welcome-dashboard active">
             <div class="welcome-content">
-              <!-- Moba Logo & Title -->
+              <!-- Nexterm Logo & Title -->
               <div class="moba-logo-row">
                 <div class="moba-logo-box">
                   <span class="logo-prompt">&gt;_</span>

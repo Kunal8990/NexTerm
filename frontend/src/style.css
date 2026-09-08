@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Nexterm — Professional Desktop SSH Client Theme (MobaXterm Style)
+   Nexterm — Professional Desktop SSH Client Theme
    Dark, Compact, Tool-Oriented Server Management UI
    ========================================================================== */
 
@@ -369,7 +369,7 @@ html, body, #app {
 }
 
 /* --------------------------------------------------------------------------
-   2. Main Icon Toolbar (MobaXterm Style)
+   2. Main Icon Toolbar
    -------------------------------------------------------------------------- */
 .main-toolbar {
   height: 64px;
@@ -1090,7 +1090,7 @@ html, body, #app {
 }
 
 /* --------------------------------------------------------------------------
-   Home Dashboard / Welcome Screen (MobaXterm Exact Clone)
+   Home Dashboard / Welcome Screen
    -------------------------------------------------------------------------- */
 .welcome-dashboard {
   position: absolute;
@@ -1742,9 +1742,9 @@ html, body, #app {
   border-color: #2563eb;
 }
 
-/* =========================================================================
-   MobaXterm Exact SFTP File Browser Styles
-   ========================================================================= */
+/* ==========================================================================
+   Nexterm SFTP File Browser Styles
+   ========================================================================== */
 .moba-sftp-view {
   display: flex;
   flex-direction: column;
@@ -2046,7 +2046,7 @@ html, body, #app {
   line-height: 1.5;
 }
 
-/* File Modification Notification Banner (MobaXterm External Editor Sync) */
+/* File Modification Notification Banner (External Editor Sync) */
 .file-change-banner {
   position: fixed;
   top: 72px;

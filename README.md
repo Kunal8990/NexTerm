@@ -8,7 +8,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-MIT-green.badge?style=for-the-badge)](#license)
 
-**NexTerm** is an all-in-one desktop SSH client, terminal emulator, SFTP browser, and remote infrastructure workstation built with **Go**, **Wails v2**, and **xterm.js**. It is designed as a modern, high-performance alternative to **MobaXterm Professional Edition**, featuring zero artificial limits, enterprise-grade security controls, visual SSH tunnel management, bastion jump hosts, multi-execution command broadcasting, macro automation, and multi-protocol remote desktop connectivity.
+**NexTerm** is an all-in-one desktop SSH client, terminal emulator, SFTP browser, and remote infrastructure workstation built with **Go**, **Wails v2**, and **xterm.js**. It features zero artificial limits, enterprise-grade security controls, visual SSH tunnel management, bastion jump hosts, multi-execution command broadcasting, macro automation, and multi-protocol remote desktop connectivity.
 
 </div>
 
@@ -31,17 +31,17 @@
 │ 📜 │ ├─ conf         │ $ df -h                        │ $ tail -f /var/log/syslog      │
 │ 🛠  │ └─ pin.conf     │ /dev/sda1   500G  120G   380G   │ Mar 08 14:30:00 kernel: OK     │
 ├────┴─────────────────┴────────────────────────────────┴────────────────────────────────┤
-│ 🟢 CONNECTED (4) • MultiExec Broadcast [Active] • MobaSSHTunnel: 2 Active • DPAPI Vault│
+│ 🟢 CONNECTED (4) • MultiExec Broadcast [Active] • Nexterm Tunnel: 2 Active • DPAPI Vault│
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 📁 1. Graphical SFTP Browser & Embedded Editor (`MobaTextEditor`)
+### 📁 1. Graphical SFTP Browser & Embedded Editor (Nexterm Editor)
 - **Shared Authentication**: Reuses the active SSH connection seamlessly without asking for passwords again.
 - **Remote File Management**: Browse remote directory trees, create folders (`mkdir`), delete, rename, and download with native file save dialogs.
 - **Drag-and-Drop Remote Upload**: Drop local files or directories directly onto the SFTP grid to upload in background.
 - **Embedded Text Editor**: 1-click **Edit** opens remote configuration files, scripts, and logs in an in-app syntax editor with instant remote saving.
 
-### ⇄ 2. MobaSSHTunnel Graphical Port Forwarding Manager
+### ⇄ 2. Nexterm Tunnel Graphical Port Forwarding Manager
 - **Local Port Forwarding**: Expose remote database ports (e.g., Oracle `1521`, MySQL `3306`, Postgres `5432`) locally on `127.0.0.1`.
 - **Remote Port Forwarding**: Expose local test servers and services to remote SSH destinations.
 - **Dynamic SOCKS5 Proxy**: Turn any remote SSH server into a secure local SOCKS5 proxy (e.g., `127.0.0.1:1080`).
@@ -103,8 +103,8 @@
 graph TD
     subgraph Frontend ["Frontend (HTML5 / Vanilla CSS / xterm.js)"]
         UI[Workspace & Tabbar]
-        SFTPUI[SFTP Browser & MobaTextEditor]
-        TunnelUI[MobaSSHTunnel Manager]
+        SFTPUI[SFTP Browser & Nexterm Editor]
+        TunnelUI[Nexterm Tunnel Manager]
         MacroUI[Macro Recorder & Runner]
         ToolsUI[Network Toolbox Modal]
         SplitMgr[Split Layout Controller]
@@ -117,7 +117,7 @@ graph TD
     subgraph Backend ["Go Backend (internal/)"]
         SSH[sshsession: SSH & Bastion Engine]
         SFTPMgr[sftp: SFTP Manager]
-        TunnelMgr[tunnel: MobaSSHTunnel Engine]
+        TunnelMgr[tunnel: SSH Tunnel Engine]
         MacroMgr[macro: Macro Manager]
         NetTools[nettools: Ping, DNS, PortScan, Hash]
         SecMgr[security: Policy & Customizer]

@@ -1,5 +1,5 @@
 // ==========================================================================
-// Nexterm — Professional Desktop SSH Client Controller (MobaXterm Clone)
+// Nexterm — Professional Desktop SSH Client Controller
 // ==========================================================================
 
 let rootNode = null;
@@ -272,7 +272,7 @@ const THEMES = {
 const THEME_METADATA = {
   "dark-modern": {
     name: "Dark Modern",
-    desc: "MobaXterm professional compact dark theme with slate and azure accents",
+    desc: "Nexterm professional compact dark theme with slate and azure accents",
     icon: "🌌",
     swatches: ["#1a1c23", "#232733", "#3b82f6", "#10b981", "#06b6d4"]
   },
@@ -811,7 +811,7 @@ function updateRecentSessionsGrid() {
 }
 
 // --------------------------------------------------------------------------
-// Follow Terminal Folder Tracking (MobaXterm Automatic Directory Sync)
+// Follow Terminal Folder Tracking (Automatic Directory Sync)
 // --------------------------------------------------------------------------
 
 function isFollowTerminalFolderEnabled() {
@@ -1277,7 +1277,7 @@ function createTab(tabId, profile, isLocal = false) {
     });
   }
 
-  // 1. MobaXterm-style Right-Click Paste
+  // 1. Right-Click Quick Paste
   paneEl.addEventListener("contextmenu", async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1306,7 +1306,7 @@ function createTab(tabId, profile, isLocal = false) {
     }
   });
 
-  // 3. PuTTY / MobaXterm Auto-Copy on Selection
+  // 3. Auto-Copy on Selection
   term.onSelectionChange(() => {
     if (userSettings.autoCopySelection !== false) {
       const selection = term.getSelection();
@@ -1519,7 +1519,7 @@ async function sendMultiExec() {
 }
 
 // --------------------------------------------------------------------------
-// MobaXterm SFTP Graphical File Browser Engine
+// Nexterm SFTP Graphical File Browser Engine
 // --------------------------------------------------------------------------
 
 let currentSFTPPath = "/";
@@ -1545,7 +1545,7 @@ function getMobaFileIcon(item) {
   const ext = (item.extension || "").toLowerCase();
   const name = (item.name || "").toLowerCase();
 
-  // C / C++ / Header files (MobaXterm blue © logo)
+  // C / C++ / Header files (Nexterm blue © logo)
   if (ext === ".c" || ext === ".cpp" || ext === ".cc" || ext === ".h" || ext === ".hpp") {
     return `<svg width="15" height="15" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.5" fill="#1d4ed8"/><path d="M10.5 5.5A3.5 3.5 0 1 0 10.5 10.5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" fill="none"/></svg>`;
   }
@@ -1763,7 +1763,7 @@ function renderSFTPItems(items, path = currentSFTPPath) {
       }
     });
 
-    // Double Click -> Open with external app or MobaTextEditor
+    // Double Click -> Open with external app or Nexterm Text Editor
     row.addEventListener("dblclick", async (e) => {
       e.stopPropagation();
       if (item.isDir) {
@@ -2072,7 +2072,7 @@ async function openRemoteFileEditor(remotePath) {
     const fileName = remotePath.substring(remotePath.lastIndexOf("/") + 1);
     const box = showModal(`
       <div class="modal-header">
-        <div class="modal-title">✏️ MobaTextEditor — ${escapeHtml(fileName)}</div>
+        <div class="modal-title">✏️ Nexterm Editor — ${escapeHtml(fileName)}</div>
         <button class="modal-close-btn" id="modalClose">&times;</button>
       </div>
       <div class="modal-body" style="display: flex; flex-direction: column; gap: 8px;">
@@ -2160,7 +2160,7 @@ async function openRemoteFileEditor(remotePath) {
 }
 
 // --------------------------------------------------------------------------
-// MobaSSHTunnel Management
+// Nexterm SSH Tunnel Management
 // --------------------------------------------------------------------------
 
 async function renderSidebarTunnels() {
@@ -2242,7 +2242,7 @@ async function renderSidebarTunnels() {
 function showTunnelingDialog() {
   const box = showModal(`
     <div class="modal-header">
-      <div class="modal-title">MobaSSHTunnel — Visual Port Forwarding Manager</div>
+      <div class="modal-title">Nexterm Tunnel — Visual Port Forwarding Manager</div>
       <button class="modal-close-btn" id="modalClose">&times;</button>
     </div>
     <div class="modal-body">
@@ -2684,7 +2684,7 @@ function showNewSessionDialog(parentFolderId = "", editProfile = null) {
 
   const box = showModal(`
     <div class="modal-header">
-      <div class="modal-title">${isEdit ? "Edit Session" : "New Session Wizard — MobaXterm Edition"}</div>
+      <div class="modal-title">${isEdit ? "Edit Session" : "New Session Wizard — Nexterm"}</div>
       <button class="modal-close-btn" id="modalClose">&times;</button>
     </div>
 
@@ -2996,7 +2996,7 @@ async function showSettingsDialog() {
         <div class="form-group">
           <label>Terminal Color Scheme</label>
           <select id="cfgTheme">
-            <option value="dark-modern" ${userSettings.theme === 'dark-modern' ? 'selected' : ''}>Dark Modern (MobaXterm Default)</option>
+            <option value="dark-modern" ${userSettings.theme === 'dark-modern' ? 'selected' : ''}>Dark Modern (Nexterm Default)</option>
             <option value="solarized-dark" ${userSettings.theme === 'solarized-dark' ? 'selected' : ''}>Solarized Dark</option>
             <option value="monokai" ${userSettings.theme === 'monokai' ? 'selected' : ''}>Monokai Pro</option>
             <option value="nord" ${userSettings.theme === 'nord' ? 'selected' : ''}>Nordic Frost</option>
@@ -3041,7 +3041,7 @@ async function showSettingsDialog() {
         <div class="form-group" style="margin-top: 4px;">
           <label class="checkbox-label">
             <input type="checkbox" id="cfgRightClickPaste" ${userSettings.rightClickPaste !== false ? 'checked' : ''} />
-            <span>Right-Click Quick Paste (MobaXterm behavior)</span>
+            <span>Right-Click Quick Paste</span>
           </label>
         </div>
         <div class="form-group">
@@ -3365,7 +3365,7 @@ function showFolderDialog(parentFolderId = "", editNode = null) {
 function showPkgMgrDialog() {
   const box = showModal(`
     <div class="modal-header">
-      <div class="modal-title">MobApt Package Manager</div>
+      <div class="modal-title">Nexterm Package Manager</div>
       <button class="modal-close-btn" id="modalClose">&times;</button>
     </div>
     <div class="modal-body">
@@ -3399,7 +3399,7 @@ function showPkgMgrDialog() {
 function showTextEditorDialog() {
   const box = showModal(`
     <div class="modal-header">
-      <div class="modal-title">MobaTextEditor — Quick Text / Script Editor</div>
+      <div class="modal-title">Nexterm Text Editor — Quick Script & Notes</div>
       <button class="modal-close-btn" id="modalClose">&times;</button>
     </div>
     <div class="modal-body">
@@ -3434,7 +3434,7 @@ function showTextEditorDialog() {
 function showDiffDialog() {
   const box = showModal(`
     <div class="modal-header">
-      <div class="modal-title">MobaDiff — Quick Text Comparison</div>
+      <div class="modal-title">Nexterm Diff — Quick Text Comparison</div>
       <button class="modal-close-btn" id="modalClose">&times;</button>
     </div>
     <div class="modal-body">
@@ -3500,7 +3500,7 @@ function showAsciiDialog() {
 function showKeyGenDialog() {
   const box = showModal(`
     <div class="modal-header">
-      <div class="modal-title">MobaKeyGen — SSH Key Pair Generator</div>
+      <div class="modal-title">Nexterm KeyGen — SSH Key Pair Generator</div>
       <button class="modal-close-btn" id="modalClose">&times;</button>
     </div>
     <div class="modal-body">
@@ -3741,7 +3741,7 @@ function setupEventListeners() {
   safeClick("navTabTunnel", () => switchSidebarView("tunnel"));
   safeClick("navTabTools", () => switchSidebarView("tools"));
 
-  // MobaXterm SFTP Toolbar Controls
+  // Nexterm SFTP Toolbar Controls
   safeClick("sftpFollowTermBtn", () => {
     if (!activeTabId || activeTabId === "home" || !tabs[activeTabId] || tabs[activeTabId].isLocal) {
       showToast("Open an SSH connection first", "warning");
@@ -3867,7 +3867,7 @@ function setupEventListeners() {
 
   safeClick("sftpEditBtn", () => {
     if (!selectedSFTPItem || selectedSFTPItem.isDir) {
-      showToast("Please select a file to edit in MobaTextEditor", "warning");
+      showToast("Please select a file to edit in Nexterm Editor", "warning");
       return;
     }
     openRemoteFileEditor(selectedSFTPItem.path);
