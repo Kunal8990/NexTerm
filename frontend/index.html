@@ -24,6 +24,7 @@
           <div class="menu-option" id="mNewSSH">＋ New SSH Session... (Ctrl+N)</div>
           <div class="menu-separator"></div>
           <div class="menu-option" id="mDuplicateTab">Duplicate Current Tab</div>
+          <div class="menu-option" id="mFindInTerm">🔍 Find in Terminal... (Ctrl+Shift+F)</div>
           <div class="menu-option" id="mClearTab">Clear Terminal Screen</div>
           <div class="menu-option" id="mCloseTab">Close Tab (Ctrl+W)</div>
         </div>
@@ -504,6 +505,7 @@
 
           <!-- Floating Terminal In-Session Controls -->
           <div id="terminalFloatingControls" class="floating-controls hidden">
+            <button id="searchTermBtn" class="float-btn" title="Search terminal (Ctrl+Shift+F)">🔍 Search</button>
             <button id="reconnectBtn" class="float-btn" title="Reconnect Session">↻</button>
             <button id="clearTermBtn" class="float-btn" title="Clear Buffer">⌫</button>
             <button id="zoomOutBtn" class="float-btn" title="Zoom Out">A-</button>
@@ -545,6 +547,7 @@
   <!-- Scripts -->
   <script src="vendor/xterm.js"></script>
   <script src="vendor/addon-fit.js"></script>
+  <script src="vendor/addon-search.js"></script>
   <script src="src/main.js"></script>
 </body>
 </html>

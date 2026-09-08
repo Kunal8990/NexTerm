@@ -2998,6 +2998,224 @@ function setupDualPaneSFTP(tabId, profile, paneEl, fitAddon, term) {
   setTimeout(() => loadRemoteList(curRemotePath), 400);
 }
 
+// ==========================================================================
+// Terminal Search Subsystem (xterm-addon-search)
+// ==========================================================================
+
+function setupTerminalSearch(tabId, paneEl, term, searchAddon) {
+  if (!searchAddon) return null;
+
+  const targetContainer = paneEl.querySelector(".pane-terminal-top") || paneEl;
+
+  const searchBar = document.createElement("div");
+  searchBar.className = "terminal-search-bar hidden";
+  searchBar.id = `termSearchBar_${tabId}`;
+  searchBar.setAttribute("role", "search");
+  searchBar.innerHTML = `
+    <div class="search-input-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="termSearchInput_${tabId}" placeholder="Search terminal..." spellcheck="false" autocomplete="off" />
+      <span class="search-count-badge" id="termSearchBadge_${tabId}"></span>
+    </div>
+    <div class="search-btn-group">
+      <button type="button" class="btn-search btn-search-prev" id="termSearchPrev_${tabId}" title="Previous match (Shift+Enter)">▲</button>
+      <button type="button" class="btn-search btn-search-next" id="termSearchNext_${tabId}" title="Next match (Enter)">▼</button>
+      <button type="button" class="btn-search btn-search-toggle" id="termSearchCase_${tabId}" title="Match case (Alt+C)">Aa</button>
+      <button type="button" class="btn-search btn-search-toggle" id="termSearchRegex_${tabId}" title="Regex (Alt+R)">.*</button>
+      <button type="button" class="btn-search btn-search-close" id="termSearchClose_${tabId}" title="Close (Escape)">✕</button>
+    </div>
+  `;
+
+  targetContainer.appendChild(searchBar);
+
+  const inputEl = searchBar.querySelector(`#termSearchInput_${tabId}`);
+  const badgeEl = searchBar.querySelector(`#termSearchBadge_${tabId}`);
+  const prevBtn = searchBar.querySelector(`#termSearchPrev_${tabId}`);
+  const nextBtn = searchBar.querySelector(`#termSearchNext_${tabId}`);
+  const caseBtn = searchBar.querySelector(`#termSearchCase_${tabId}`);
+  const regexBtn = searchBar.querySelector(`#termSearchRegex_${tabId}`);
+  const closeBtn = searchBar.querySelector(`#termSearchClose_${tabId}`);
+
+  const state = {
+    isOpen: false,
+    query: "",
+    caseSensitive: false,
+    regex: false,
+    barEl: searchBar,
+    inputEl,
+    badgeEl,
+    caseBtn,
+    regexBtn
+  };
+
+  if (typeof searchAddon.onDidChangeResults === "function") {
+    searchAddon.onDidChangeResults((e) => {
+      if (!state.isOpen) return;
+      if (!state.query) {
+        badgeEl.textContent = "";
+        badgeEl.classList.remove("no-matches");
+        return;
+      }
+      if (e.resultCount === 0) {
+        badgeEl.textContent = "No results";
+        badgeEl.classList.add("no-matches");
+      } else {
+        badgeEl.classList.remove("no-matches");
+        const idx = e.resultIndex >= 0 ? e.resultIndex + 1 : 0;
+        badgeEl.textContent = `${idx} of ${e.resultCount}`;
+      }
+    });
+  }
+
+  const getSearchOptions = (incremental = false) => ({
+    regex: state.regex,
+    caseSensitive: state.caseSensitive,
+    incremental,
+    decorations: {
+      matchOverviewRulerColor: "#3b82f6",
+      activeMatchColorOverviewRuler: "#f59e0b",
+      matchBackground: "rgba(59, 130, 246, 0.35)",
+      activeMatchBackground: "rgba(245, 158, 11, 0.65)"
+    }
+  });
+
+  const doSearch = (forward = true, incremental = false) => {
+    const q = inputEl.value;
+    state.query = q;
+
+    if (!q) {
+      badgeEl.textContent = "";
+      badgeEl.classList.remove("no-matches");
+      if (typeof searchAddon.clearDecorations === "function") {
+        try { searchAddon.clearDecorations(); } catch (_) {}
+      }
+      return;
+    }
+
+    if (state.regex) {
+      try {
+        new RegExp(q);
+      } catch (err) {
+        badgeEl.textContent = "Invalid regex";
+        badgeEl.classList.add("no-matches");
+        return;
+      }
+    }
+
+    const options = getSearchOptions(incremental);
+    try {
+      if (forward) {
+        searchAddon.findNext(q, options);
+      } else {
+        searchAddon.findPrevious(q, options);
+      }
+    } catch (err) {
+      console.warn("Search execution error:", err);
+    }
+  };
+
+  inputEl.addEventListener("input", () => {
+    doSearch(true, true);
+  });
+
+  inputEl.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      doSearch(!e.shiftKey, false);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      closeTerminalSearch(tabId);
+    } else if (e.altKey && (e.key === "c" || e.key === "C")) {
+      e.preventDefault();
+      e.stopPropagation();
+      caseBtn.click();
+    } else if (e.altKey && (e.key === "r" || e.key === "R")) {
+      e.preventDefault();
+      e.stopPropagation();
+      regexBtn.click();
+    }
+  });
+
+  prevBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    doSearch(false, false);
+    inputEl.focus();
+  });
+
+  nextBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    doSearch(true, false);
+    inputEl.focus();
+  });
+
+  caseBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    state.caseSensitive = !state.caseSensitive;
+    caseBtn.classList.toggle("active", state.caseSensitive);
+    doSearch(true, false);
+    inputEl.focus();
+  });
+
+  regexBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    state.regex = !state.regex;
+    regexBtn.classList.toggle("active", state.regex);
+    doSearch(true, false);
+    inputEl.focus();
+  });
+
+  closeBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeTerminalSearch(tabId);
+  });
+
+  return state;
+}
+
+function openTerminalSearch(tabId) {
+  if (!tabId || !tabs[tabId]) return;
+  const t = tabs[tabId];
+  if (!t.searchState) return;
+
+  t.searchState.isOpen = true;
+  t.searchState.barEl.classList.remove("hidden");
+  t.searchState.inputEl.focus();
+  t.searchState.inputEl.select();
+
+  if (t.searchState.inputEl.value && t.searchAddon) {
+    try {
+      t.searchAddon.findNext(t.searchState.inputEl.value, {
+        regex: t.searchState.regex,
+        caseSensitive: t.searchState.caseSensitive,
+        incremental: true,
+        decorations: {
+          matchOverviewRulerColor: "#3b82f6",
+          activeMatchColorOverviewRuler: "#f59e0b",
+          matchBackground: "rgba(59, 130, 246, 0.35)",
+          activeMatchBackground: "rgba(245, 158, 11, 0.65)"
+        }
+      });
+    } catch (_) {}
+  }
+}
+
+function closeTerminalSearch(tabId) {
+  if (!tabId || !tabs[tabId]) return;
+  const t = tabs[tabId];
+  if (!t.searchState) return;
+
+  t.searchState.isOpen = false;
+  t.searchState.barEl.classList.add("hidden");
+  if (t.searchAddon && typeof t.searchAddon.clearDecorations === "function") {
+    try { t.searchAddon.clearDecorations(); } catch (_) {}
+  }
+  if (t.term) {
+    try { t.term.focus(); } catch (_) {}
+  }
+}
+
 function createTab(tabId, profile, isLocal = false, initialState = "Connected") {
   welcomeStateEl.classList.remove("active");
   homeTabBtnEl.classList.remove("active");
@@ -3148,7 +3366,36 @@ function createTab(tabId, profile, isLocal = false, initialState = "Connected") 
     console.warn("FitAddon error:", e);
   }
 
+  let searchAddon = null;
+  try {
+    if (typeof SearchAddon !== "undefined") {
+      searchAddon = typeof SearchAddon.SearchAddon === "function" ? new SearchAddon.SearchAddon() : new SearchAddon();
+      term.loadAddon(searchAddon);
+    }
+  } catch (e) {
+    console.warn("SearchAddon error:", e);
+  }
+
   term.open(termCanvas);
+
+  // Terminal search keyboard intercept (Ctrl+Shift+F and Ctrl+F)
+  term.attachCustomKeyEventHandler((e) => {
+    if ((e.ctrlKey || e.metaKey) && ((e.shiftKey && (e.key === "F" || e.key === "f")) || (!e.shiftKey && (e.key === "f" || e.key === "F")))) {
+      if (e.type === "keydown") {
+        openTerminalSearch(tabId);
+      }
+      return false;
+    }
+    if (e.key === "Escape" && tabs[tabId] && tabs[tabId].searchState && tabs[tabId].searchState.isOpen) {
+      if (e.type === "keydown") {
+        closeTerminalSearch(tabId);
+      }
+      return false;
+    }
+    return true;
+  });
+
+  const searchState = setupTerminalSearch(tabId, paneEl, term, searchAddon);
 
   if (!isLocal) {
     setupDualPaneSFTP(tabId, profile, paneEl, fitAddon, term);
@@ -3374,6 +3621,8 @@ function createTab(tabId, profile, isLocal = false, initialState = "Connected") 
   tabs[tabId] = {
     term,
     fitAddon,
+    searchAddon,
+    searchState,
     profile,
     paneEl,
     tabEl,
@@ -3971,6 +4220,9 @@ function closeTab(tabId) {
     }
   }
 
+  if (t.searchAddon && typeof t.searchAddon.dispose === "function") {
+    try { t.searchAddon.dispose(); } catch (_) {}
+  }
   try { t.term.dispose(); } catch (_) {}
   if (t.tabEl) t.tabEl.remove();
   if (t.paneEl) t.paneEl.remove();
@@ -7955,6 +8207,9 @@ function setupEventListeners() {
   safeClick("mRecordMacro", showRecordMacroDialog);
   safeClick("mCloseTab", () => { if (activeTabId && activeTabId !== "home") closeTab(activeTabId); });
   safeClick("mClearTab", () => { if (activeTabId && tabs[activeTabId]) tabs[activeTabId].term.clear(); });
+  safeClick("mFindInTerm", () => {
+    if (activeTabId && tabs[activeTabId]) openTerminalSearch(activeTabId);
+  });
   safeClick("mDuplicateTab", () => {
     if (activeTabId && tabs[activeTabId]) {
       const p = tabs[activeTabId].profile;
@@ -8283,6 +8538,15 @@ function setupEventListeners() {
   safeClick("toolTunnel", showTunnelingDialog);
 
   // Floating controls
+  safeClick("searchTermBtn", () => {
+    if (!activeTabId || !tabs[activeTabId]) return;
+    const t = tabs[activeTabId];
+    if (t.searchState && t.searchState.isOpen) {
+      closeTerminalSearch(activeTabId);
+    } else {
+      openTerminalSearch(activeTabId);
+    }
+  });
   safeClick("reconnectBtn", () => {
     if (!activeTabId || !tabs[activeTabId]) return;
     const t = tabs[activeTabId];
@@ -8342,6 +8606,12 @@ function setupEventListeners() {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { hideContextMenu(); hideModal(); }
     if (e.ctrlKey || e.metaKey) {
+      if ((e.shiftKey && (e.key === "F" || e.key === "f")) || (!e.shiftKey && (e.key === "f" || e.key === "F"))) {
+        if (activeTabId && tabs[activeTabId]) {
+          e.preventDefault();
+          openTerminalSearch(activeTabId);
+        }
+      }
       if (e.shiftKey && (e.key === "E" || e.key === "e")) {
         e.preventDefault();
         splitPane(workspaceState.activePaneId, "right");
