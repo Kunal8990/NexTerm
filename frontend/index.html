@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexterm — Professional Desktop SSH Client & Terminal Workspace</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- xterm.js local assets -->
+  <link rel="stylesheet" href="vendor/xterm.css" />
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 1. Top Windows Menu Bar -->
+    <nav id="menuBar" class="menubar">
+      <div class="menu-item" data-menu="menu-terminal">Terminal
+        <div class="dropdown-menu hidden" id="menu-terminal">
+          <div class="menu-option" id="mStartLocal">＋ New Local Terminal</div>
+          <div class="menu-option" id="mNewSSH">＋ New SSH Session... (Ctrl+N)</div>
+          <div class="menu-separator"></div>
+          <div class="menu-option" id="mDuplicateTab">Duplicate Current Tab</div>
+          <div class="menu-option" id="mClearTab">Clear Terminal Screen</div>
+          <div class="menu-option" id="mCloseTab">Close Tab (Ctrl+W)</div>
+        </div>
+      </div>
+      <div class="menu-item" data-menu="menu-sessions">Sessions
+        <div class="dropdown-menu hidden" id="menu-sessions">
+          <div class="menu-option" id="mNewSession">New Session...</div>
+          <div class="menu-option" id="mNewFolder">New Folder...</div>
+          <div class="menu-separator"></div>
+          <div class="menu-option" id="mImportSessions">Import Sessions from JSON...</div>
+          <div class="menu-option" id="mExportSessions">Export Sessions to JSON...</div>
+        </div>
+      </div>
+      <div class="menu-item" data-menu="menu-view">View
+        <div class="dropdown-menu hidden" id="menu-view">
+          <div class="menu-option" id="mToggleSidebar">Toggle Sidebar (Ctrl+B)</div>
+          <div class="menu-option" id="mToggleMultiExec">Toggle MultiExec Bar</div>
+          <div class="menu-option" id="mToggleFullscreen">Toggle Fullscreen</div>
+        </div>
+      </div>
+      <div class="menu-item" data-menu="menu-tools">Tools
+        <div class="dropdown-menu hidden" id="menu-tools">
+          <div class="menu-option" id="mToolTaskMgr">Windows Task Manager</div>
+          <div class="menu-option" id="mToolDevMgmt">Device Manager</div>
+          <div class="menu-option" id="mToolResMon">Resource Monitor</div>
+          <div class="menu-separator"></div>
+          <div class="menu-option" id="mToolCmdAdmin">Command Prompt (Admin)</div>
+          <div class="menu-option" id="mToolPSAdmin">PowerShell (Admin)</div>
+        </div>
+      </div>
+      <div class="menu-item" data-menu="menu-tunneling">Tunneling
+        <div class="dropdown-menu hidden" id="menu-tunneling">
+          <div class="menu-option" id="mOpenTunneling">MobaSSHTunnel Manager...</div>
+        </div>
+      </div>
+      <div class="menu-item" data-menu="menu-settings">Settings
+        <div class="dropdown-menu hidden" id="menu-settings">
+          <div class="menu-option" id="mOpenSettings">Configuration & Preferences...</div>
+        </div>
+      </div>
+      <div class="menu-item" data-menu="menu-macros">Macros
+        <div class="dropdown-menu hidden" id="menu-macros">
+          <div class="menu-option" id="mRecordMacro">Record New Macro...</div>
+        </div>
+      </div>
+      <div class="menu-item" data-menu="menu-help">Help
+        <div class="dropdown-menu hidden" id="menu-help">
+          <div class="menu-option" id="mShortcuts">Keyboard Shortcuts</div>
+          <div class="menu-option" id="mAbout">About Nexterm Professional</div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 2. Main Icon Toolbar (MobaXterm Style) -->
+    <header id="mainToolbar" class="main-toolbar">
+      <div class="toolbar-left">
+        <button id="tbSessionBtn" class="tb-btn" title="New Session">
+          <div class="tb-icon tb-session-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+          </div>
+          <span class="tb-label">Session</span>
+        </button>
+
+        <button id="tbServersBtn" class="tb-btn" title="Session Tree">
+          <div class="tb-icon tb-servers-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          </div>
+          <span class="tb-label">Servers</span>
+        </button>
+
+        <button id="tbToolsBtn" class="tb-btn" title="Tools & Utilities">
+          <div class="tb-icon tb-tools-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
+          </div>
+          <span class="tb-label">Tools</span>
+        </button>
+
+        <button id="tbSplitBtn" class="tb-btn" title="Split Terminal Layout (1 / 2-Vertical / 2-Horizontal / 4-Grid)">
+          <div class="tb-icon tb-split-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
+          </div>
+          <span class="tb-label">Split</span>
+        </button>
+
+        <button id="tbMultiExecBtn" class="tb-btn" title="Multi-Execution Across All Terminals">
+          <div class="tb-icon tb-multiexec-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12"></path><path d="M18 3v12"></path><path d="M6 9h12"></path><circle cx="12" cy="18" r="3"></circle></svg>
+          </div>
+          <span class="tb-label">MultiExec</span>
+        </button>
+
+        <button id="tbMacrosBtn" class="tb-btn" title="Terminal Macros (Record & Replay)">
+          <div class="tb-icon tb-macros-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          </div>
+          <span class="tb-label">Macros</span>
+        </button>
+
+        <button id="tbTunnelingBtn" class="tb-btn" title="SSH Tunneling / Port Forwarding">
+          <div class="tb-icon tb-tunneling-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="12" r="3"></circle><line x1="9" y1="12" x2="15" y2="12"></line></svg>
+          </div>
+          <span class="tb-label">Tunneling</span>
+        </button>
+
+        <button id="tbPackagesBtn" class="tb-btn" title="Package Manager">
+          <div class="tb-icon tb-packages-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          </div>
+          <span class="tb-label">Packages</span>
+        </button>
+
+        <button id="tbSettingsBtn" class="tb-btn" title="Settings">
+          <div class="tb-icon tb-settings-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </div>
+          <span class="tb-label">Settings</span>
+        </button>
+
+        <button id="tbHelpBtn" class="tb-btn" title="Help & Shortcuts">
+          <div class="tb-icon tb-help-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          </div>
+          <span class="tb-label">Help</span>
+        </button>
+      </div>
+
+      <div class="toolbar-right">
+        <button id="tbExitBtn" class="tb-btn exit-btn" title="Exit Application">
+          <div class="tb-icon tb-exit-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+          </div>
+          <span class="tb-label">Exit</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MultiExec Broadcast Bar (Toggleable) -->
+    <div id="multiExecBar" class="multiexec-bar hidden">
+      <div class="multiexec-badge">⚡ MULTIEXEC BROADCAST</div>
+      <input type="text" id="multiExecInput" placeholder="Type command to send simultaneously to ALL active terminal tabs..." autocomplete="off" />
+      <button id="multiExecSendBtn" class="btn-action primary">Broadcast (Enter)</button>
+      <button id="multiExecCloseBtn" class="btn-action">&times;</button>
+    </div>
+
+    <!-- 3. Central Application Split: Left Panel & Main Workspace -->
+    <div id="mainLayout" class="main-layout">
+      <!-- Left Panel (Sidebar) -->
+      <aside id="sidebar" class="sidebar">
+        <!-- Quick Connect Box at the Top of Left Panel -->
+        <div class="sidebar-quick-connect">
+          <input type="text" id="sidebarQuickConnectInput" placeholder="Quick connect..." autocomplete="off" spellcheck="false" />
+        </div>
+
+        <!-- Sidebar Body with Vertical Strip + Content -->
+        <div class="sidebar-body">
+          <!-- Vertical Icon Strip on the Far Left -->
+          <nav class="vertical-nav-strip">
+            <button class="nav-strip-btn active" id="navTabSessions" title="User Sessions (★)">
+              ★
+            </button>
+            <button class="nav-strip-btn" id="navTabSFTP" title="Graphical SFTP Browser (📁)">
+              📁
+            </button>
+            <button class="nav-strip-btn" id="navTabMacros" title="Terminal Macros (📜)">
+              📜
+            </button>
+            <button class="nav-strip-btn" id="navTabTunnel" title="MobaSSHTunnel Port Forwarding (🔑)">
+              🔑
+            </button>
+            <button class="nav-strip-btn" id="navTabTools" title="System & Network Tools (⚡)">
+              ⚡
+            </button>
+          </nav>
+
+          <!-- Sidebar Content Area -->
+          <div class="sidebar-content-view">
+            <!-- View A: Sessions Panel (Connected & Saved) -->
+            <div id="viewSessions" class="side-tab-view active">
+              
+              <!-- 1. Connected Servers Section (Active Live Sessions) -->
+              <div class="sidebar-section-container connected-section">
+                <div class="sidebar-section-header connected-header">
+                  <div class="section-title-wrap">
+                    <span class="live-dot-pulse">●</span>
+                    <span class="section-title-text">CONNECTED</span>
+                  </div>
+                  <span class="connected-badge" id="connectedCountBadge">0</span>
+                </div>
+                <div id="connectedServersList" class="connected-servers-list">
+                  <div class="connected-empty-msg">No active connections</div>
+                </div>
+              </div>
+
+              <!-- 2. Saved Sessions Section (Structured Folder Tree) -->
+              <div class="sidebar-section-container saved-sessions-section">
+                <div class="sessions-header-row saved-header-row">
+                  <span class="sessions-root-label">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="color: #60a5fa; margin-right: 5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    SAVED SESSIONS
+                  </span>
+                  <div class="session-tree-tools">
+                    <button id="treeAddSessionBtn" title="New Session">＋</button>
+                    <button id="treeAddFolderBtn" title="New Folder">📁</button>
+                    <button id="treeRefreshBtn" title="Refresh">↻</button>
+                  </div>
+                </div>
+
+                <!-- Tree Container for Production, UAT, Testing, Local, Client, User -->
+                <div id="tree" class="tree-container">
+                  <!-- Dynamically rendered folder tree with drag & drop support -->
+                </div>
+              </div>
+            </div>
+
+            <!-- View B: Graphical SFTP Browser -->
+            <div id="viewSFTP" class="side-tab-view hidden">
+              <div class="sftp-header-title">
+                <span>📁 SFTP File Browser</span>
+                <span id="sftpActiveTabBadge" class="sftp-target-badge">No SSH Tab</span>
+              </div>
+              <div class="sftp-toolbar">
+                <button id="sftpUpBtn" class="sftp-tool-btn" title="Go Up (Parent Directory)">⬆</button>
+                <button id="sftpRefreshBtn" class="sftp-tool-btn" title="Refresh">↻</button>
+                <button id="sftpUploadBtn" class="sftp-tool-btn" title="Upload Local File">⬆ Upload</button>
+                <button id="sftpMkdirBtn" class="sftp-tool-btn" title="New Folder">＋ Dir</button>
+              </div>
+              <div class="sftp-path-bar">
+                <input type="text" id="sftpPathInput" value="/" placeholder="/remote/path..." spellcheck="false" />
+              </div>
+              <div id="sftpFileList" class="sftp-file-list">
+                <div class="sftp-empty-hint">Connect to an SSH server to browse remote files via SFTP</div>
+              </div>
+            </div>
+
+            <!-- View C: Macros Engine -->
+            <div id="viewMacros" class="side-tab-view hidden">
+              <div class="sftp-header-title">
+                <span>📜 Terminal Macros</span>
+              </div>
+              <div style="padding: 6px 8px;">
+                <button id="sidebarNewMacroBtn" class="btn-primary" style="width: 100%; font-size: 11px; padding: 5px;">＋ Record New Macro...</button>
+              </div>
+              <div id="macrosList" class="macros-list-container"></div>
+            </div>
+
+            <!-- View D: SSH Tunnels (MobaSSHTunnel) -->
+            <div id="viewTunnel" class="side-tab-view hidden">
+              <div class="sftp-header-title">
+                <span>🔑 MobaSSHTunnel</span>
+              </div>
+              <div style="padding: 6px 8px;">
+                <button id="sidebarNewTunnelBtn" class="btn-primary" style="width: 100%; font-size: 11px; padding: 5px;">＋ New SSH Tunnel...</button>
+              </div>
+              <div id="sidebarTunnelList" class="tunnel-list-container"></div>
+            </div>
+
+            <!-- View E: Tools & Utilities (MobaXterm Menu) -->
+            <div id="viewTools" class="side-tab-view hidden">
+              <div class="tools-category-header">System</div>
+              <div class="tool-item" id="toolPkgMgr">
+                <span class="tool-icon">📦</span>
+                <span class="tool-text">MobApt packages manager</span>
+              </div>
+              <div class="tool-item" id="toolHardware">
+                <span class="tool-icon">💻</span>
+                <span class="tool-text">List hardware devices</span>
+              </div>
+              <div class="tool-item" id="toolProcesses">
+                <span class="tool-icon">🏃</span>
+                <span class="tool-text">List running processes (TaskMgr)</span>
+              </div>
+              <div class="tool-item" id="toolCmdAdmin">
+                <span class="tool-icon">⬛</span>
+                <span class="tool-text">Command Prompt (admin)</span>
+              </div>
+              <div class="tool-item" id="toolPSAdmin">
+                <span class="tool-icon">🔷</span>
+                <span class="tool-text">Windows PowerShell (admin)</span>
+              </div>
+
+              <div class="tools-category-header">Office & Editors</div>
+              <div class="tool-item" id="toolTextEditor">
+                <span class="tool-icon">📄</span>
+                <span class="tool-text">MobaTextEditor</span>
+              </div>
+              <div class="tool-item" id="toolDiff">
+                <span class="tool-icon">📑</span>
+                <span class="tool-text">MobaDiff</span>
+              </div>
+              <div class="tool-item" id="toolAscii">
+                <span class="tool-icon">🔤</span>
+                <span class="tool-text">ASCII table viewer</span>
+              </div>
+
+              <div class="tools-category-header">Network Toolbox</div>
+              <div class="tool-item" id="toolPing">
+                <span class="tool-icon">🏓</span>
+                <span class="tool-text">Ping & Traceroute</span>
+              </div>
+              <div class="tool-item" id="toolDNS">
+                <span class="tool-icon">🌐</span>
+                <span class="tool-text">DNS & MX Lookup</span>
+              </div>
+              <div class="tool-item" id="toolScanner">
+                <span class="tool-icon">📶</span>
+                <span class="tool-text">Multi-Port Scanner</span>
+              </div>
+              <div class="tool-item" id="toolHash">
+                <span class="tool-icon">🔒</span>
+                <span class="tool-text">Checksum / Hash Generator</span>
+              </div>
+              <div class="tool-item" id="toolKeyGen">
+                <span class="tool-icon">🗝️</span>
+                <span class="tool-text">MobaKeyGen (SSH key generator)</span>
+              </div>
+              <div class="tool-item" id="toolTunnel">
+                <span class="tool-icon">🔑</span>
+                <span class="tool-text">MobaSSHTunnel manager</span>
+              </div>
+              <div class="tool-item" id="toolPorts">
+                <span class="tool-icon">🔍</span>
+                <span class="tool-text">List open network ports (ResMon)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- 4. Main Workspace & Tabbed Terminals -->
+      <main id="workspace" class="workspace">
+        <!-- Workspace Tab Bar -->
+        <div id="tabbarContainer" class="tabbar-container">
+          <div id="tabbar" class="tabbar">
+            <!-- Home Dashboard Tab -->
+            <div class="tab-item home-tab active" id="homeTabBtn" title="Dashboard">
+              <span class="home-tab-icon">🏠</span>
+            </div>
+            <!-- Dynamic Connection Tabs inserted here -->
+          </div>
+          <div class="tabbar-end-tools">
+            <button id="newTabAddBtn" class="tab-add-icon-btn" title="New Tab">＋</button>
+            <button id="wsSettingsBtn" class="tab-tool-icon-btn" title="Settings">⚙</button>
+          </div>
+        </div>
+
+        <!-- Panes Container -->
+        <div id="panesContainer" class="panes-container">
+          <!-- A. Home / Welcome Screen (Dashboard) -->
+          <div id="welcomeState" class="welcome-dashboard active">
+            <div class="welcome-content">
+              <!-- Moba Logo & Title -->
+              <div class="moba-logo-row">
+                <div class="moba-logo-box">
+                  <span class="logo-prompt">&gt;_</span>
+                  <div class="logo-cubes">
+                    <span class="cube red"></span>
+                    <span class="cube blue"></span>
+                    <span class="cube green"></span>
+                    <span class="cube yellow"></span>
+                  </div>
+                </div>
+                <h1 class="moba-brand-title">Nexterm</h1>
+              </div>
+
+              <!-- Main Action Buttons -->
+              <div class="welcome-big-actions">
+                <button id="startLocalTerminalBtn" class="big-action-btn local-btn">
+                  <span class="action-icon">＋</span>
+                  <span>Start local terminal</span>
+                </button>
+                <button id="newSSHSessionBigBtn" class="big-action-btn session-btn">
+                  <span class="action-icon">↻</span>
+                  <span>New SSH session</span>
+                </button>
+              </div>
+
+              <!-- Center Search Field -->
+              <div class="welcome-search-box">
+                <input type="text" id="welcomeSearchInput" placeholder="Find existing session or server name..." autocomplete="off" />
+              </div>
+
+              <!-- Saved / Recent Sessions Section (Only visible when user creates sessions) -->
+              <div class="recent-sessions-section" id="recentSessionsSection" style="display: none;">
+                <div class="recent-sessions-title">Saved Sessions</div>
+                <div class="recent-sessions-grid" id="recentSessionsGrid"></div>
+              </div>
+
+              <div class="welcome-footer-notice">
+                Enable advanced features and enhance security with Nexterm Professional Edition!
+              </div>
+            </div>
+          </div>
+
+          <!-- B. Live Terminal Panes -->
+          <div id="panes" class="panes"></div>
+
+          <!-- Floating Terminal In-Session Controls -->
+          <div id="terminalFloatingControls" class="floating-controls hidden">
+            <button id="reconnectBtn" class="float-btn" title="Reconnect Session">↻</button>
+            <button id="clearTermBtn" class="float-btn" title="Clear Buffer">⌫</button>
+            <button id="zoomOutBtn" class="float-btn" title="Zoom Out">A-</button>
+            <button id="zoomInBtn" class="float-btn" title="Zoom In">A+</button>
+            <button id="copyAllBtn" class="float-btn" title="Copy Selected Text">📋 Copy</button>
+            <button id="pasteBtn" class="float-btn" title="Paste Clipboard (or Right-Click)">📥 Paste</button>
+          </div>
+        </div>
+      </main>
+    </div>
+
+    <!-- 5. Bottom Status Bar -->
+    <footer id="statusBar" class="statusbar">
+      <div class="status-left">
+        <span class="unregistered-tag">COMMUNITY VERSION</span>
+        <span class="status-msg" id="statusMessage">Professional SSH & Terminal Manager • Ready</span>
+      </div>
+      <div class="status-right">
+        <span id="activeTargetText">No active session</span>
+        <span class="sep">|</span>
+        <span id="activeSessionsCount">0 active tabs</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Modals & Dialogs Container -->
+  <div id="modalOverlay" class="modal-overlay hidden">
+    <div id="modalBox" class="modal-card">
+      <!-- Dynamically filled -->
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div id="contextMenu" class="context-menu hidden"></div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="vendor/xterm.js"></script>
+  <script src="vendor/addon-fit.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>

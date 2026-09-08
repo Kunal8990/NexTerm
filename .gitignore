@@ -1,0 +1,25 @@
+# Binaries and build outputs
+build/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Go test / coverage
+*.out
+*.test
+
+# Wails
+.wails/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.user
+*.userossc
+*.sln.docstates
