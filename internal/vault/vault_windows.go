@@ -3,6 +3,9 @@
 package vault
 
 import (
+	"errors"
+	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"unsafe"
@@ -11,39 +14,50 @@ import (
 )
 
 // Vault stores secrets (passwords, key passphrases) encrypted with Windows
-// DPAPI, scoped to the current Windows user — the same mechanism the WPF
-// scaffold uses via System.Security.Cryptography.ProtectedData. No master
-// password needed for this MVP; DPAPI already ties the secret to the
-// logged-in account.
+// DPAPI, scoped to the current Windows user profile (CryptProtectData).
+// Credentials are bound to the hardware and user account and never written in plaintext.
 type Vault struct {
 	dir string
 }
 
+// NewVaultAt creates a DPAPI vault at the specified directory path.
+func NewVaultAt(dir string) (*Vault, error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, fmt.Errorf("create vault dir: %w", err)
+	}
+	return &Vault{dir: dir}, nil
+}
+
+// NewVault initializes the DPAPI vault at %AppData%\Nexterm\vault.
 func NewVault() (*Vault, error) {
 	appData, err := os.UserConfigDir()
 	if err != nil {
 		return nil, err
 	}
 	dir := filepath.Join(appData, "Nexterm", "vault")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return nil, err
-	}
-	return &Vault{dir: dir}, nil
+	return NewVaultAt(dir)
 }
 
 func (v *Vault) path(key string) string {
-	return filepath.Join(v.dir, key+".bin")
+	safeKey := url.QueryEscape(key)
+	return filepath.Join(v.dir, safeKey+".bin")
 }
 
 func (v *Vault) Save(key, secret string) error {
+	if key == "" {
+		return errors.New("vault: key cannot be empty")
+	}
 	encrypted, err := protect([]byte(secret))
 	if err != nil {
-		return err
+		return fmt.Errorf("dpapi protect: %w", err)
 	}
 	return os.WriteFile(v.path(key), encrypted, 0o600)
 }
 
 func (v *Vault) Load(key string) (string, bool, error) {
+	if key == "" {
+		return "", false, nil
+	}
 	data, err := os.ReadFile(v.path(key))
 	if os.IsNotExist(err) {
 		return "", false, nil
@@ -53,12 +67,15 @@ func (v *Vault) Load(key string) (string, bool, error) {
 	}
 	plain, err := unprotect(data)
 	if err != nil {
-		return "", false, err
+		return "", false, fmt.Errorf("dpapi unprotect: %w", err)
 	}
 	return string(plain), true, nil
 }
 
 func (v *Vault) Delete(key string) error {
+	if key == "" {
+		return nil
+	}
 	err := os.Remove(v.path(key))
 	if os.IsNotExist(err) {
 		return nil
