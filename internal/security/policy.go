@@ -44,7 +44,7 @@ func NewSecurityManager() *SecurityManager {
 		appData = "."
 	}
 	dir := filepath.Join(appData, "Nexterm")
-	_ = os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0700)
 
 	sm := &SecurityManager{
 		policy: SecurityPolicy{
@@ -79,6 +79,7 @@ func (sm *SecurityManager) load() error {
 	if err != nil {
 		return err
 	}
+	_ = os.Chmod(sm.filePath, 0600)
 	var cfg struct {
 		Policy SecurityPolicy   `json:"policy"`
 		Custom CustomizerConfig `json:"custom"`
@@ -103,7 +104,11 @@ func (sm *SecurityManager) save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(sm.filePath, data, 0644)
+	if err := os.WriteFile(sm.filePath, data, 0600); err != nil {
+		return err
+	}
+	_ = os.Chmod(sm.filePath, 0600)
+	return nil
 }
 
 func (sm *SecurityManager) GetPolicy() SecurityPolicy {

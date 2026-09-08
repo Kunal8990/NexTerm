@@ -57,7 +57,7 @@ func NewTunnelManager() *TunnelManager {
 		appData = "."
 	}
 	dir := filepath.Join(appData, "Nexterm")
-	_ = os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0700)
 
 	tm := &TunnelManager{
 		tunnels:  make(map[string]TunnelConfig),
@@ -73,6 +73,7 @@ func (tm *TunnelManager) load() error {
 	if err != nil {
 		return err
 	}
+	_ = os.Chmod(tm.filePath, 0600)
 	var list []TunnelConfig
 	if err := json.Unmarshal(data, &list); err != nil {
 		return err
@@ -100,7 +101,11 @@ func (tm *TunnelManager) save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(tm.filePath, data, 0644)
+	if err := os.WriteFile(tm.filePath, data, 0600); err != nil {
+		return err
+	}
+	_ = os.Chmod(tm.filePath, 0600)
+	return nil
 }
 
 func (tm *TunnelManager) GetTunnels() []TunnelConfig {

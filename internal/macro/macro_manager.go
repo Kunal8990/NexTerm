@@ -30,7 +30,7 @@ func NewMacroManager() *MacroManager {
 		appData = "."
 	}
 	dir := filepath.Join(appData, "Nexterm")
-	_ = os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0700)
 
 	mm := &MacroManager{
 		macros:   make(map[string]Macro),
@@ -98,6 +98,7 @@ func (mm *MacroManager) load() error {
 	if err != nil {
 		return err
 	}
+	_ = os.Chmod(mm.filePath, 0600)
 	var list []Macro
 	if err := json.Unmarshal(data, &list); err != nil {
 		return err
@@ -117,7 +118,11 @@ func (mm *MacroManager) save() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(mm.filePath, data, 0644)
+	if err := os.WriteFile(mm.filePath, data, 0600); err != nil {
+		return err
+	}
+	_ = os.Chmod(mm.filePath, 0600)
+	return nil
 }
 
 func (mm *MacroManager) GetMacros() []Macro {

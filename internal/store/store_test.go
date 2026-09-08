@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"testing"
 
@@ -320,3 +321,60 @@ func TestStore_DirectoryCreation(t *testing.T) {
 		t.Fatalf("nested file does not exist: %v", err)
 	}
 }
+
+func TestStore_TightenedFilePermissions(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "secure_dir", "sessions.json")
+
+	store, err := NewSessionStoreAt(filePath)
+	if err != nil {
+		t.Fatalf("NewSessionStoreAt failed: %v", err)
+	}
+
+	root := seedDefaultTree()
+	if err := store.Save(root); err != nil {
+		t.Fatalf("Save failed: %v", err)
+	}
+
+	fi, err := os.Stat(filePath)
+	if err != nil {
+		t.Fatalf("Stat failed: %v", err)
+	}
+
+	// On POSIX systems, verify mode is 0600 and dir is 0700
+	if runtime.GOOS != "windows" {
+		if fi.Mode().Perm() != 0o600 {
+			t.Errorf("expected file mode 0600, got %o", fi.Mode().Perm())
+		}
+		dirFi, err := os.Stat(filepath.Dir(filePath))
+		if err != nil {
+			t.Fatalf("dir Stat failed: %v", err)
+		}
+		if dirFi.Mode().Perm() != 0o700 {
+			t.Errorf("expected dir mode 0700, got %o", dirFi.Mode().Perm())
+		}
+	} else {
+		// On Windows, verify file is writable and readable by owner
+		if fi.Mode().Perm()&0o600 == 0 {
+			t.Errorf("expected owner read/write permissions on Windows, got %o", fi.Mode().Perm())
+		}
+	}
+
+	// Verify existing file permissions are tightened upon LoadRoot
+	if err := os.Chmod(filePath, 0o644); err == nil {
+		_, err = store.LoadRoot()
+		if err != nil {
+			t.Fatalf("LoadRoot failed: %v", err)
+		}
+		if runtime.GOOS != "windows" {
+			newFi, err := os.Stat(filePath)
+			if err != nil {
+				t.Fatalf("Stat failed after LoadRoot: %v", err)
+			}
+			if newFi.Mode().Perm() != 0o600 {
+				t.Errorf("expected file mode to be tightened to 0600 after LoadRoot, got %o", newFi.Mode().Perm())
+			}
+		}
+	}
+}
+

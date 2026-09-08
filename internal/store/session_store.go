@@ -43,7 +43,7 @@ type SessionStore struct {
 // ensuring parent directories are created.
 func NewSessionStoreAt(filePath string) (*SessionStore, error) {
 	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("create store dir: %w", err)
 	}
 	return &SessionStore{filePath: filePath}, nil
@@ -67,7 +67,7 @@ func NewSessionStore() (*SessionStore, error) {
 		oldDir := filepath.Join(appData, "MobaCloneGo")
 		oldFile := filepath.Join(oldDir, "sessions.json")
 		if oldData, err := os.ReadFile(oldFile); err == nil {
-			_ = os.WriteFile(store.filePath, oldData, 0o644)
+			_ = os.WriteFile(store.filePath, oldData, 0o600)
 		}
 	}
 
@@ -95,6 +95,9 @@ func (s *SessionStore) LoadRoot() (*model.TreeNode, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Tighten permissions on existing sessions file
+	_ = os.Chmod(s.filePath, 0o600)
 
 	// 1. Try parsing versioned envelope: {"version": 1, "root": {...}}
 	var envelope PersistedSessions
@@ -128,7 +131,8 @@ func (s *SessionStore) LoadRoot() (*model.TreeNode, error) {
 // 3. Flush to disk (Sync)
 // 4. Close file handle
 // 5. Atomic rename (sessions.json.tmp -> sessions.json)
-// 6. Clean up temporary file on failure
+// 6. Enforce 0600 file permissions
+// 7. Clean up temporary file on failure
 func (s *SessionStore) Save(root *model.TreeNode) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -151,13 +155,13 @@ func (s *SessionStore) saveLocked(root *model.TreeNode) error {
 	}
 
 	dir := filepath.Dir(s.filePath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("create store dir: %w", err)
 	}
 
 	tmpPath := s.filePath + ".tmp"
 
-	tmpFile, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	tmpFile, err := os.OpenFile(tmpPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return fmt.Errorf("create tmp session file: %w", err)
 	}
@@ -188,8 +192,11 @@ func (s *SessionStore) saveLocked(root *model.TreeNode) error {
 
 	// Atomic rename to target file
 	if err := os.Rename(tmpPath, s.filePath); err != nil {
-		return fmt.Errorf("rename tmp session file: %w", err)
+		return fmt.Errorf("rename tmp session file to target: %w", err)
 	}
+
+	// Tighten permissions on target file
+	_ = os.Chmod(s.filePath, 0o600)
 
 	success = true
 	return nil

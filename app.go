@@ -1064,7 +1064,7 @@ func (a *App) SFTPOpenExternal(tabID, remotePath string, chooseApp bool) error {
 	}
 
 	cacheDir := filepath.Join(os.TempDir(), "nexterm_cache", tabID)
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0700); err != nil {
 		return fmt.Errorf("create local cache dir: %w", err)
 	}
 
@@ -1337,7 +1337,7 @@ func (a *App) LaunchRDPSession(profile model.SessionProfile, password string) er
 		rdpContent += fmt.Sprintf("desktopwidth:i:%d\r\ndesktopheight:i:%d\r\nscreen mode id:i:1\r\n", profile.RDPWidth, profile.RDPHeight)
 	}
 
-	if err := os.WriteFile(tempRDP, []byte(rdpContent), 0644); err != nil {
+	if err := os.WriteFile(tempRDP, []byte(rdpContent), 0600); err != nil {
 		return fmt.Errorf("failed to generate RDP profile: %w", err)
 	}
 
