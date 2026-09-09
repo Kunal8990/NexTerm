@@ -1452,16 +1452,32 @@ export function showTabContextMenu(x, y, tabId) {
       const text = lines.join("\n").trimEnd();
       const safeTitle = (t.profile?.name || 'terminal').replace(/[^a-zA-Z0-9_-]/g, '_');
       const filename = `${safeTitle}_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
-      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      showToast(`Saved terminal output as ${filename}`, "success");
+
+      const downloadBlobFallback = () => {
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast(`Saved terminal output as ${filename}`, "success");
+      };
+
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.SaveTerminalOutput) {
+        window.go.main.App.SaveTerminalOutput(filename, text).then((savedPath) => {
+          if (savedPath) {
+            showToast(`Terminal output saved: ${savedPath}`, "success");
+          }
+        }).catch((err) => {
+          console.warn("Native SaveTerminalOutput failed, falling back to browser download:", err);
+          downloadBlobFallback();
+        });
+      } else {
+        downloadBlobFallback();
+      }
     };
   }
 

@@ -119,7 +119,19 @@ func (s *SessionStore) LoadRoot() (*model.TreeNode, error) {
 		return &legacyRoot, nil
 	}
 
-	// 3. If file is empty or corrupted, recover with seed default tree
+	// 2.5 Try recovering from backup file if available (GAP-16)
+	bakPath := s.filePath + ".bak"
+	if bakData, err := os.ReadFile(bakPath); err == nil && len(bakData) > 0 {
+		var bakEnvelope PersistedSessions
+		if err := json.Unmarshal(bakData, &bakEnvelope); err == nil && bakEnvelope.Root != nil && bakEnvelope.Root.ID != "" {
+			root := bakEnvelope.Root
+			_ = ensureDefaultFolders(root)
+			_ = s.saveLocked(root)
+			return root, nil
+		}
+	}
+
+	// 3. If file is empty or corrupted and no valid backup exists, recover with seed default tree
 	root := seedDefaultTree()
 	_ = s.saveLocked(root)
 	return root, nil
@@ -188,6 +200,12 @@ func (s *SessionStore) saveLocked(root *model.TreeNode) error {
 	// Close before renaming (critical on Windows to avoid file sharing/locking errors)
 	if err := tmpFile.Close(); err != nil {
 		return fmt.Errorf("close tmp session file: %w", err)
+	}
+
+	// Maintain backup of previous valid session store (GAP-16)
+	bakPath := s.filePath + ".bak"
+	if curData, err := os.ReadFile(s.filePath); err == nil && len(curData) > 0 {
+		_ = os.WriteFile(bakPath, curData, 0o600)
 	}
 
 	// Atomic rename to target file

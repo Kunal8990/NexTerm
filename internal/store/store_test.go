@@ -260,6 +260,80 @@ func TestStore_CorruptedFileFallback(t *testing.T) {
 	}
 }
 
+func TestStore_BackupRecoveryAfterCorruption(t *testing.T) {
+	tempDir := t.TempDir()
+	filePath := filepath.Join(tempDir, "sessions.json")
+
+	store, err := NewSessionStoreAt(filePath)
+	if err != nil {
+		t.Fatalf("failed to create store: %v", err)
+	}
+
+	// 1. Initial save with custom session
+	customRoot := &model.TreeNode{
+		ID:   "custom-root-id",
+		Name: "Custom Corporate Tree",
+		Children: []*model.TreeNode{
+			{
+				ID:   "prod-folder",
+				Name: "Production Cluster",
+				Children: []*model.TreeNode{
+					{
+						ID:   "srv-1",
+						Name: "Prod Database Primary",
+						Session: &model.SessionProfile{
+							ID:   "sess-db-1",
+							Name: "Prod Database Primary",
+							Host: "192.168.10.50",
+							Port: 22,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	if err := store.Save(customRoot); err != nil {
+		t.Fatalf("first save failed: %v", err)
+	}
+
+	// 2. Second save to create sessions.json.bak
+	if err := store.Save(customRoot); err != nil {
+		t.Fatalf("second save failed: %v", err)
+	}
+
+	bakPath := filePath + ".bak"
+	if _, err := os.Stat(bakPath); err != nil {
+		t.Fatalf("expected backup file %s to exist: %v", bakPath, err)
+	}
+
+	// 3. Corrupt sessions.json
+	if err := os.WriteFile(filePath, []byte("{CORRUPTED CRASH ARTIFACT..."), 0o600); err != nil {
+		t.Fatalf("failed to corrupt file: %v", err)
+	}
+
+	// 4. LoadRoot should recover from sessions.json.bak, preserving custom sessions!
+	recoveredRoot, err := store.LoadRoot()
+	if err != nil {
+		t.Fatalf("LoadRoot failed to recover: %v", err)
+	}
+	if recoveredRoot.Name != "Custom Corporate Tree" {
+		t.Fatalf("expected recovered root name 'Custom Corporate Tree', got '%s'", recoveredRoot.Name)
+	}
+
+	foundDB := false
+	for _, f := range recoveredRoot.Children {
+		for _, s := range f.Children {
+			if s.Session != nil && s.Session.Host == "192.168.10.50" {
+				foundDB = true
+			}
+		}
+	}
+	if !foundDB {
+		t.Fatalf("expected to recover Prod Database Primary session from backup")
+	}
+}
+
 func TestStore_ConcurrentSaves(t *testing.T) {
 	tempDir := t.TempDir()
 	filePath := filepath.Join(tempDir, "sessions.json")

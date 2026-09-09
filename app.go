@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -221,12 +222,20 @@ func (a *App) GetSavedPasswords() ([]service.SavedCredential, error) {
 }
 
 func (a *App) SaveSessionPassword(vaultKey, password string) error {
-	return a.credentialService.SaveSessionPassword(vaultKey, password)
+	if err := a.settingsService.CheckPasswordSaving(); err != nil {
+		a.loggingService.LogAudit("POLICY_DENIED", "vault", "", "", vaultKey, "DENIED", err.Error())
+		return err
+	}
+	err := a.credentialService.SaveSessionPassword(vaultKey, password)
+	if err == nil {
+		a.loggingService.LogAudit("PASSWORD_SAVED", "vault", "", "", vaultKey, "SUCCESS", "Credentials saved securely to DPAPI platform vault")
+	}
+	return err
 }
 
 // SavePassword is a compatibility alias for SaveSessionPassword.
 func (a *App) SavePassword(vaultKey, password string) error {
-	return a.credentialService.SaveSessionPassword(vaultKey, password)
+	return a.SaveSessionPassword(vaultKey, password)
 }
 
 func (a *App) HasSavedPassword(vaultKey string) (bool, error) {
@@ -234,7 +243,11 @@ func (a *App) HasSavedPassword(vaultKey string) (bool, error) {
 }
 
 func (a *App) DeleteSavedPassword(vaultKey string) error {
-	return a.credentialService.DeleteSavedPassword(vaultKey)
+	err := a.credentialService.DeleteSavedPassword(vaultKey)
+	if err == nil {
+		a.loggingService.LogAudit("PASSWORD_DELETED", "vault", "", "", vaultKey, "SUCCESS", "Credential removed from vault")
+	}
+	return err
 }
 
 func (a *App) GetSessionPassword(vaultKey string) (string, error) {
@@ -277,9 +290,23 @@ func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, p
 		tabID = uuid.NewString()
 	}
 
-	if err := a.connectionManager.OpenSession(a.ctx, tabID, profile, password); err != nil {
+	proto := profile.Protocol
+	if proto == "" {
+		proto = "ssh"
+	}
+
+	// Security Policy Check (GAP-12)
+	if err := a.settingsService.CheckProtocol(proto); err != nil {
+		a.loggingService.LogAudit("POLICY_DENIED", proto, profile.Host, profile.Username, tabID, "DENIED", err.Error())
 		return err
 	}
+
+	if err := a.connectionManager.OpenSession(a.ctx, tabID, profile, password); err != nil {
+		a.loggingService.LogAudit("AUTH_FAILED", proto, profile.Host, profile.Username, tabID, "FAILURE", err.Error())
+		return err
+	}
+
+	a.loggingService.LogAudit("CONNECTED", proto, profile.Host, profile.Username, tabID, "SUCCESS", fmt.Sprintf("Connected to %s (%s)", profile.Name, profile.Host))
 
 	_, _ = a.settingsService.AddTabToPane("", &model.TabSession{
 		ID:          tabID,
@@ -544,15 +571,39 @@ func (a *App) SFTPList(tabID, remotePath string) (*service.SFTPListResult, error
 }
 
 func (a *App) SFTPDownload(tabID, remotePath, localDest string) error {
-	return a.sftpService.Download(tabID, remotePath, localDest)
+	if err := a.settingsService.CheckFileTransfers(); err != nil {
+		a.loggingService.LogAudit("POLICY_DENIED", "sftp", "", "", tabID, "DENIED", err.Error())
+		return err
+	}
+	err := a.sftpService.Download(tabID, remotePath, localDest)
+	if err == nil {
+		a.loggingService.LogAudit("FILE_DOWNLOADED", "sftp", "", "", tabID, "SUCCESS", fmt.Sprintf("%s -> %s", remotePath, localDest))
+	} else {
+		a.loggingService.LogAudit("FILE_DOWNLOAD_FAILED", "sftp", "", "", tabID, "FAILURE", err.Error())
+	}
+	return err
 }
 
 func (a *App) SFTPUpload(tabID, localSrc, remoteDest string) error {
-	return a.sftpService.Upload(tabID, localSrc, remoteDest)
+	if err := a.settingsService.CheckFileTransfers(); err != nil {
+		a.loggingService.LogAudit("POLICY_DENIED", "sftp", "", "", tabID, "DENIED", err.Error())
+		return err
+	}
+	err := a.sftpService.Upload(tabID, localSrc, remoteDest)
+	if err == nil {
+		a.loggingService.LogAudit("FILE_UPLOADED", "sftp", "", "", tabID, "SUCCESS", fmt.Sprintf("%s -> %s", localSrc, remoteDest))
+	} else {
+		a.loggingService.LogAudit("FILE_UPLOAD_FAILED", "sftp", "", "", tabID, "FAILURE", err.Error())
+	}
+	return err
 }
 
 func (a *App) SFTPDelete(tabID, remotePath string) error {
-	return a.sftpService.Delete(tabID, remotePath)
+	err := a.sftpService.Delete(tabID, remotePath)
+	if err == nil {
+		a.loggingService.LogAudit("FILE_DELETED", "sftp", "", "", tabID, "SUCCESS", remotePath)
+	}
+	return err
 }
 
 func (a *App) SFTPRename(tabID, oldPath, newPath string) error {
@@ -774,4 +825,42 @@ func (a *App) GetAvailableSerialPorts() []string {
 
 func (a *App) GetRecentLogs(count int) []service.LogEntry {
 	return a.loggingService.GetRecentLogs(count)
+}
+
+// =========================================================================
+// Audit Logging & Security Compliance (GAP-11)
+// =========================================================================
+
+func (a *App) GetAuditLogs(limit int) []service.AuditEvent {
+	return a.loggingService.GetAuditLogs(limit)
+}
+
+func (a *App) ExportAuditLogsJSON() (string, error) {
+	return a.loggingService.ExportAuditJSON()
+}
+
+func (a *App) ExportAuditLogsCSV() (string, error) {
+	return a.loggingService.ExportAuditCSV()
+}
+
+func (a *App) ClearAuditLogs() error {
+	return a.loggingService.ClearAuditLogs()
+}
+
+// SaveTerminalOutput saves terminal scrollback buffer to a local text file (GAP-27).
+func (a *App) SaveTerminalOutput(suggestedFilename, content string) (string, error) {
+	if suggestedFilename == "" {
+		suggestedFilename = fmt.Sprintf("terminal_transcript_%s.txt", time.Now().Format("20060102_150405"))
+	}
+	savePath, err := a.sftpService.SelectDownloadDest(a.ctx, suggestedFilename)
+	if err != nil || savePath == "" {
+		return "", err
+	}
+
+	if err := os.WriteFile(savePath, []byte(content), 0644); err != nil {
+		return "", fmt.Errorf("failed to save terminal transcript: %w", err)
+	}
+
+	a.loggingService.LogAudit("TRANSCRIPT_SAVED", "terminal", "", "", "", "SUCCESS", savePath)
+	return savePath, nil
 }

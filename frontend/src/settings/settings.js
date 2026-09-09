@@ -468,6 +468,7 @@ export async function showSettingsDialog() {
       <button class="modal-tab-btn" data-tab="tab-settings-sec">🛡️ Security Policies</button>
       <button class="modal-tab-btn" data-tab="tab-settings-custom">🏢 Customizer</button>
       <button class="modal-tab-btn" data-tab="tab-settings-knownhosts">🛡️ Known Hosts</button>
+      <button class="modal-tab-btn" data-tab="tab-settings-audit">📜 Audit Log</button>
     </div>
     <div class="modal-body" style="max-height: 480px; overflow-y: auto;">
       <!-- 1. Terminal & UI Settings Tab -->
@@ -628,6 +629,25 @@ export async function showSettingsDialog() {
           <div style="color: #94a3b8; padding: 12px; text-align: center;">Loading known hosts...</div>
         </div>
       </div>
+
+      <!-- 6. Audit Log Tab -->
+      <div id="tab-settings-audit" class="tab-content hidden">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; flex-wrap: wrap;">
+          <div>
+            <h4 style="margin: 0; color: #fff; font-size: 13px;">Enterprise Audit Trail</h4>
+            <p style="margin: 3px 0 0; color: #94a3b8; font-size: 11.5px;">Append-only security log stored in <code>%APPDATA%\\Nexterm\\audit_log.jsonl</code> (0600)</p>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button class="btn btn-secondary btn-sm" id="btnExportAuditCSV" type="button" title="Export audit events as CSV">📥 Export CSV</button>
+            <button class="btn btn-secondary btn-sm" id="btnExportAuditJSON" type="button" title="Export audit events as JSON">📥 Export JSON</button>
+            <button class="btn btn-secondary btn-sm" id="btnRefreshAudit" type="button" title="Reload recent audit events">↻ Refresh</button>
+            <button class="btn btn-danger btn-sm" id="btnClearAudit" type="button" title="Purge audit logs">🗑️ Clear</button>
+          </div>
+        </div>
+        <div id="auditLogListContainer" style="max-height: 280px; overflow-y: auto; background: #13161f; border: 1px solid #232733; border-radius: 4px; padding: 6px;">
+          <div style="color: #94a3b8; padding: 12px; text-align: center;">Loading audit logs...</div>
+        </div>
+      </div>
     </div>
 
     <div class="modal-footer">
@@ -692,6 +712,110 @@ export async function showSettingsDialog() {
   const btnRefKh = box.querySelector("#btnRefreshKnownHosts");
   if (btnRefKh) btnRefKh.onclick = loadKnownHostsList;
 
+  async function loadAuditLogsList() {
+    const container = box.querySelector("#auditLogListContainer");
+    if (!container) return;
+    try {
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.GetAuditLogs) {
+        const logs = await window.go.main.App.GetAuditLogs(100);
+        if (!logs || logs.length === 0) {
+          container.innerHTML = `<div style="color: #94a3b8; padding: 16px; text-align: center; font-size: 12px;">No audit events recorded yet. Session connections, file transfers, and policy denials will be logged here.</div>`;
+          return;
+        }
+        let html = `
+          <table class="knownhosts-table" style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
+            <thead>
+              <tr style="border-bottom: 1px solid #232733; color: #94a3b8; text-align: left;">
+                <th style="padding: 6px 8px;">Time</th>
+                <th style="padding: 6px 8px;">Action</th>
+                <th style="padding: 6px 8px;">Proto</th>
+                <th style="padding: 6px 8px;">Target</th>
+                <th style="padding: 6px 8px;">User</th>
+                <th style="padding: 6px 8px;">Result</th>
+                <th style="padding: 6px 8px;">Details</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+        logs.forEach((log) => {
+          let resultBadgeColor = "#10b981"; // success
+          if (log.result === "DENIED") resultBadgeColor = "#f59e0b"; // denied
+          else if (log.result === "FAILURE") resultBadgeColor = "#ef4444"; // failure
+
+          const ts = log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : "";
+
+          html += `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+              <td style="padding: 5px 8px; color: #94a3b8; white-space: nowrap;">${escapeHtml(ts)}</td>
+              <td style="padding: 5px 8px; font-weight: 600; color: #e2e8f0;">${escapeHtml(log.action || '')}</td>
+              <td style="padding: 5px 8px;"><span class="hostkey-badge" style="text-transform: uppercase;">${escapeHtml(log.protocol || '-')}</span></td>
+              <td style="padding: 5px 8px; color: #38bdf8; font-family: monospace;">${escapeHtml(log.host || '-')}</td>
+              <td style="padding: 5px 8px; color: #cbd5e1;">${escapeHtml(log.username || '-')}</td>
+              <td style="padding: 5px 8px;"><span style="display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 700; background: ${resultBadgeColor}20; color: ${resultBadgeColor}; border: 1px solid ${resultBadgeColor}40;">${escapeHtml(log.result || 'OK')}</span></td>
+              <td style="padding: 5px 8px; color: #94a3b8; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(log.details || '')}">${escapeHtml(log.details || '')}</td>
+            </tr>
+          `;
+        });
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+      }
+    } catch (err) {
+      container.innerHTML = `<div style="color: #ef4444; padding: 12px;">Failed to load audit logs: ${escapeHtml(err)}</div>`;
+    }
+  }
+
+  const btnExpCsv = box.querySelector("#btnExportAuditCSV");
+  if (btnExpCsv) {
+    btnExpCsv.onclick = async () => {
+      try {
+        if (window.go && window.go.main && window.go.main.App && window.go.main.App.ExportAuditLogsCSV) {
+          const path = await window.go.main.App.ExportAuditLogsCSV();
+          if (path) {
+            showToast(`Audit log exported to: ${path}`, "success");
+          }
+        }
+      } catch (err) {
+        showToast("Export failed: " + err, "error");
+      }
+    };
+  }
+
+  const btnExpJson = box.querySelector("#btnExportAuditJSON");
+  if (btnExpJson) {
+    btnExpJson.onclick = async () => {
+      try {
+        if (window.go && window.go.main && window.go.main.App && window.go.main.App.ExportAuditLogsJSON) {
+          const path = await window.go.main.App.ExportAuditLogsJSON();
+          if (path) {
+            showToast(`Audit log exported to: ${path}`, "success");
+          }
+        }
+      } catch (err) {
+        showToast("Export failed: " + err, "error");
+      }
+    };
+  }
+
+  const btnRefAudit = box.querySelector("#btnRefreshAudit");
+  if (btnRefAudit) btnRefAudit.onclick = loadAuditLogsList;
+
+  const btnClrAudit = box.querySelector("#btnClearAudit");
+  if (btnClrAudit) {
+    btnClrAudit.onclick = async () => {
+      if (confirm("Are you sure you want to clear the audit log? This cannot be undone.")) {
+        try {
+          if (window.go && window.go.main && window.go.main.App && window.go.main.App.ClearAuditLogs) {
+            await window.go.main.App.ClearAuditLogs();
+            showToast("Audit logs cleared", "info");
+            loadAuditLogsList();
+          }
+        } catch (err) {
+          showToast("Failed to clear audit logs: " + err, "error");
+        }
+      }
+    };
+  }
+
   // Tab switching inside modal
   box.querySelectorAll(".modal-tab-btn").forEach(btn => {
     btn.onclick = () => {
@@ -702,6 +826,8 @@ export async function showSettingsDialog() {
       if (target) target.classList.remove("hidden");
       if (btn.dataset.tab === "tab-settings-knownhosts") {
         loadKnownHostsList();
+      } else if (btn.dataset.tab === "tab-settings-audit") {
+        loadAuditLogsList();
       }
     };
   });

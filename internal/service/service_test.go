@@ -5,6 +5,7 @@ import (
 	"nexterm/internal/model"
 	"nexterm/internal/protocol"
 	"nexterm/internal/security"
+	"strings"
 	"testing"
 )
 
@@ -184,3 +185,124 @@ func TestConnectionManagerExecuteMulti(t *testing.T) {
 		t.Fatalf("expected s4 not to receive command, got %q", string(s4.written))
 	}
 }
+
+func TestAuditLoggingAndExport(t *testing.T) {
+	emitter := &testEmitter{}
+	logger := NewLoggingService(emitter)
+
+	// Clean any previous audit records for isolation
+	_ = logger.ClearAuditLogs()
+
+	logger.LogAudit("SSH_CONNECT", "ssh", "10.0.0.1", "root", "tab-1", "SUCCESS", "Connected successfully")
+	logger.LogAudit("POLICY_DENIED", "telnet", "10.0.0.2", "admin", "tab-2", "DENIED", "Protocol disabled by policy")
+
+	logs := logger.GetAuditLogs(10)
+	if len(logs) < 2 {
+		t.Fatalf("expected at least 2 audit log records, got %d", len(logs))
+	}
+
+	foundConnect := false
+	foundDenied := false
+	for _, l := range logs {
+		if l.Action == "SSH_CONNECT" && l.Result == "SUCCESS" {
+			foundConnect = true
+		}
+		if l.Action == "POLICY_DENIED" && l.Result == "DENIED" {
+			foundDenied = true
+		}
+	}
+	if !foundConnect || !foundDenied {
+		t.Fatalf("expected both SSH_CONNECT and POLICY_DENIED in logs, foundConnect=%v, foundDenied=%v", foundConnect, foundDenied)
+	}
+
+	// Test CSV Export
+	csvData, err := logger.ExportAuditCSV()
+	if err != nil {
+		t.Fatalf("ExportAuditCSV failed: %v", err)
+	}
+	if !strings.Contains(csvData, "Action,Protocol,Host,Username") {
+		t.Fatalf("expected CSV header, got: %s", csvData)
+	}
+	if !strings.Contains(csvData, "SSH_CONNECT") || !strings.Contains(csvData, "POLICY_DENIED") {
+		t.Fatalf("expected CSV to contain actions, got: %s", csvData)
+	}
+
+	// Test JSON Export
+	jsonData, err := logger.ExportAuditJSON()
+	if err != nil {
+		t.Fatalf("ExportAuditJSON failed: %v", err)
+	}
+	if !strings.Contains(jsonData, "10.0.0.1") || !strings.Contains(jsonData, "10.0.0.2") {
+		t.Fatalf("expected JSON to contain hosts, got: %s", jsonData)
+	}
+
+	// Test Clear
+	if err := logger.ClearAuditLogs(); err != nil {
+		t.Fatalf("ClearAuditLogs failed: %v", err)
+	}
+	if len(logger.GetAuditLogs(10)) != 0 {
+		t.Fatalf("expected 0 audit records after ClearAuditLogs")
+	}
+}
+
+func TestValidateAndNormalizeTree(t *testing.T) {
+	svc := NewSessionService(nil)
+
+	// 1. Valid tree with missing ID and invalid port/protocol -> normalized
+	imported := &model.TreeNode{
+		Name: "Imported Root",
+		Children: []*model.TreeNode{
+			{
+				Name: "Out-of-range port session",
+				Session: &model.SessionProfile{
+					Name:     "Invalid Port",
+					Host:     "192.168.1.100",
+					Port:     999999,          // invalid port -> should normalize to 22
+					Protocol: "CUSTOM_UNKNOWN", // invalid proto -> should normalize to "ssh"
+				},
+			},
+		},
+	}
+
+	normalized, err := svc.ValidateAndNormalizeTree(imported)
+	if err != nil {
+		t.Fatalf("ValidateAndNormalizeTree failed on valid tree: %v", err)
+	}
+	if normalized.ID == "" {
+		t.Fatalf("expected normalized node to have an ID")
+	}
+	if len(normalized.Children) != 1 {
+		t.Fatalf("expected 1 child")
+	}
+	child := normalized.Children[0]
+	if child.ID == "" {
+		t.Fatalf("expected child to have an auto-generated UUID")
+	}
+	if child.Session.Port != 22 {
+		t.Fatalf("expected port to be normalized to 22, got %d", child.Session.Port)
+	}
+	if child.Session.Protocol != "ssh" {
+		t.Fatalf("expected protocol to be normalized to ssh, got %s", child.Session.Protocol)
+	}
+
+	// 2. Cyclic tree detection
+	cyclicRoot := &model.TreeNode{
+		ID:   "cycle-root",
+		Name: "Cycle Root",
+	}
+	cyclicChild := &model.TreeNode{
+		ID:       "cycle-child",
+		Name:     "Cycle Child",
+		Children: []*model.TreeNode{cyclicRoot}, // circular reference
+	}
+	cyclicRoot.Children = []*model.TreeNode{cyclicChild}
+
+	_, err = svc.ValidateAndNormalizeTree(cyclicRoot)
+	if err == nil {
+		t.Fatalf("expected cyclic tree to be rejected, but got no error")
+	}
+	if !strings.Contains(err.Error(), "exceeds maximum supported hierarchy depth") && !strings.Contains(err.Error(), "cyclic reference") {
+		t.Fatalf("expected cycle error, got: %v", err)
+	}
+}
+

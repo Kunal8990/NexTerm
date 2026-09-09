@@ -2,8 +2,10 @@ package security
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -135,4 +137,76 @@ func (sm *SecurityManager) SaveCustomizer(c CustomizerConfig) error {
 	defer sm.mu.Unlock()
 	sm.custom = c
 	return sm.save()
+}
+
+// CheckProtocol validates if connecting via the specified protocol is permitted by administrator policy.
+func (sm *SecurityManager) CheckProtocol(proto string) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+
+	p := sm.policy
+	switch strings.ToLower(proto) {
+	case "ssh", "":
+		if !p.AllowSSH {
+			return fmt.Errorf("security policy denied: SSH protocol is disabled by administrator policy")
+		}
+	case "sftp":
+		if !p.AllowSFTP {
+			return fmt.Errorf("security policy denied: SFTP protocol is disabled by administrator policy")
+		}
+	case "rdp":
+		if !p.AllowRDP {
+			return fmt.Errorf("security policy denied: RDP protocol is disabled by administrator policy")
+		}
+	case "vnc":
+		if !p.AllowVNC {
+			return fmt.Errorf("security policy denied: VNC protocol is disabled by administrator policy")
+		}
+	case "telnet":
+		if !p.AllowTelnet {
+			return fmt.Errorf("security policy denied: Telnet protocol is disabled by administrator policy (unencrypted traffic prohibited)")
+		}
+	case "serial":
+		if !p.AllowSerial {
+			return fmt.Errorf("security policy denied: Serial COM protocol is disabled by administrator policy")
+		}
+	}
+	return nil
+}
+
+// CheckPasswordSaving validates if saving passwords in the credential vault is allowed.
+func (sm *SecurityManager) CheckPasswordSaving() error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if !sm.policy.AllowPasswordSaving {
+		return fmt.Errorf("security policy denied: password saving is disabled by administrator policy")
+	}
+	return nil
+}
+
+// CheckFileTransfers validates if uploading or downloading files via SFTP is allowed.
+func (sm *SecurityManager) CheckFileTransfers() error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if !sm.policy.AllowFileTransfers {
+		return fmt.Errorf("security policy denied: file transfers are disabled by administrator policy")
+	}
+	return nil
+}
+
+// CheckClipboard validates if clipboard sharing is allowed.
+func (sm *SecurityManager) CheckClipboard() error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	if !sm.policy.AllowClipboardSharing {
+		return fmt.Errorf("security policy denied: clipboard sharing is disabled by administrator policy")
+	}
+	return nil
+}
+
+// IsAuditRequired returns whether audit logging is mandatory by policy.
+func (sm *SecurityManager) IsAuditRequired() bool {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	return sm.policy.RequireAuditLog
 }

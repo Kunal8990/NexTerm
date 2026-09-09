@@ -6,6 +6,7 @@ import (
 	"nexterm/internal/model"
 	"nexterm/internal/sshsession"
 	"nexterm/internal/store"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -508,7 +509,111 @@ func (s *SessionService) ExportSessions() (string, error) {
 	return string(data), nil
 }
 
-// ImportSessions restores session tree from a JSON string.
+// ValidateAndNormalizeTree validates and sanitizes an imported session tree before committing (GAP-15).
+func (s *SessionService) ValidateAndNormalizeTree(imported *model.TreeNode) (*model.TreeNode, error) {
+	return ValidateAndNormalizeTree(imported)
+}
+
+// ValidateAndNormalizeTree validates and sanitizes an imported session tree before committing (GAP-15).
+func ValidateAndNormalizeTree(imported *model.TreeNode) (*model.TreeNode, error) {
+	if imported == nil {
+		return nil, fmt.Errorf("import rejected: root node is null")
+	}
+
+	seenIDs := make(map[string]bool)
+	visitedNodes := make(map[*model.TreeNode]bool)
+
+	var walk func(node *model.TreeNode, depth int) error
+	walk = func(node *model.TreeNode, depth int) error {
+		if node == nil {
+			return nil
+		}
+		if depth > 50 {
+			return fmt.Errorf("import rejected: tree exceeds maximum supported hierarchy depth (possible cycle)")
+		}
+		if visitedNodes[node] {
+			return fmt.Errorf("import rejected: cyclic reference detected in session tree")
+		}
+		visitedNodes[node] = true
+
+		// Ensure node has a valid, non-empty ID
+		if node.ID == "" || seenIDs[node.ID] {
+			node.ID = uuid.NewString()
+		}
+		seenIDs[node.ID] = true
+
+		if node.Name == "" {
+			if node.Session != nil {
+				node.Name = "Imported Session"
+			} else {
+				node.Name = "Imported Folder"
+			}
+		}
+
+		if node.Session != nil {
+			sess := node.Session
+			if sess.ID == "" || seenIDs[sess.ID] {
+				sess.ID = uuid.NewString()
+			}
+			seenIDs[sess.ID] = true
+
+			if sess.Name == "" {
+				sess.Name = node.Name
+			}
+
+			// Validate and normalize protocol
+			proto := strings.ToLower(strings.TrimSpace(sess.Protocol))
+			validProtos := map[string]bool{
+				"ssh": true, "sftp": true, "rdp": true, "vnc": true,
+				"telnet": true, "serial": true, "local": true,
+			}
+			if proto == "" || !validProtos[proto] {
+				proto = "ssh"
+			}
+			sess.Protocol = proto
+
+			// Validate and normalize port
+			if sess.Port <= 0 || sess.Port > 65535 {
+				switch proto {
+				case "rdp":
+					sess.Port = 3389
+				case "vnc":
+					sess.Port = 5900
+				case "telnet":
+					sess.Port = 23
+				default:
+					sess.Port = 22
+				}
+			}
+
+			// Ensure vault key exists
+			if sess.VaultKey == "" {
+				sess.VaultKey = sess.ID
+			}
+		}
+
+		for _, child := range node.Children {
+			if err := walk(child, depth+1); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	if imported.ID == "" {
+		imported.ID = "root"
+	}
+	if imported.Name == "" {
+		imported.Name = "Sessions"
+	}
+
+	if err := walk(imported, 0); err != nil {
+		return nil, err
+	}
+	return imported, nil
+}
+
+// ImportSessions validates, normalizes and restores session tree from a JSON string (GAP-15).
 func (s *SessionService) ImportSessions(jsonContent string) (*model.TreeNode, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -517,7 +622,13 @@ func (s *SessionService) ImportSessions(jsonContent string) (*model.TreeNode, er
 	if err := json.Unmarshal([]byte(jsonContent), &imported); err != nil {
 		return s.root, fmt.Errorf("invalid session JSON: %w", err)
 	}
-	s.root = &imported
+
+	validated, err := ValidateAndNormalizeTree(&imported)
+	if err != nil {
+		return s.root, fmt.Errorf("session validation failed: %w", err)
+	}
+
+	s.root = validated
 	return s.root, s.saveTree()
 }
 

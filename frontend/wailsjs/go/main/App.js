@@ -42,6 +42,10 @@ export function ClassifyConnectionError(arg1) {
   return window['go']['main']['App']['ClassifyConnectionError'](arg1);
 }
 
+export function ClearAuditLogs() {
+  return window['go']['main']['App']['ClearAuditLogs']();
+}
+
 export function CloseTab(arg1) {
   return window['go']['main']['App']['CloseTab'](arg1);
 }
@@ -94,12 +98,24 @@ export function ExpandAllFolders(arg1) {
   return window['go']['main']['App']['ExpandAllFolders'](arg1);
 }
 
+export function ExportAuditLogsCSV() {
+  return window['go']['main']['App']['ExportAuditLogsCSV']();
+}
+
+export function ExportAuditLogsJSON() {
+  return window['go']['main']['App']['ExportAuditLogsJSON']();
+}
+
 export function ExportSessions() {
   return window['go']['main']['App']['ExportSessions']();
 }
 
 export function FocusWorkspacePane(arg1) {
   return window['go']['main']['App']['FocusWorkspacePane'](arg1);
+}
+
+export function GetAuditLogs(arg1) {
+  return window['go']['main']['App']['GetAuditLogs'](arg1);
 }
 
 export function GetAvailableSerialPorts() {
@@ -328,6 +344,10 @@ export function SaveSecurityPolicy(arg1) {
 
 export function SaveSessionPassword(arg1, arg2) {
   return window['go']['main']['App']['SaveSessionPassword'](arg1, arg2);
+}
+
+export function SaveTerminalOutput(arg1, arg2) {
+  return window['go']['main']['App']['SaveTerminalOutput'](arg1, arg2);
 }
 
 export function SaveTunnel(arg1) {

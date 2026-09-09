@@ -30,6 +30,8 @@ export function CheckSSHAgent():Promise<{[key: string]: any}>;
 
 export function ClassifyConnectionError(arg1:string):Promise<sshsession.ClassifiedError>;
 
+export function ClearAuditLogs():Promise<void>;
+
 export function CloseTab(arg1:string):Promise<void>;
 
 export function CloseWorkspacePane(arg1:string):Promise<model.Workspace>;
@@ -56,9 +58,15 @@ export function ExecuteMulti(arg1:Array<string>,arg2:string):Promise<void>;
 
 export function ExpandAllFolders(arg1:boolean):Promise<model.TreeNode>;
 
+export function ExportAuditLogsCSV():Promise<string>;
+
+export function ExportAuditLogsJSON():Promise<string>;
+
 export function ExportSessions():Promise<string>;
 
 export function FocusWorkspacePane(arg1:string):Promise<void>;
+
+export function GetAuditLogs(arg1:number):Promise<Array<service.AuditEvent>>;
 
 export function GetAvailableSerialPorts():Promise<Array<string>>;
 
@@ -173,6 +181,8 @@ export function SavePassword(arg1:string,arg2:string):Promise<void>;
 export function SaveSecurityPolicy(arg1:security.SecurityPolicy):Promise<void>;
 
 export function SaveSessionPassword(arg1:string,arg2:string):Promise<void>;
+
+export function SaveTerminalOutput(arg1:string,arg2:string):Promise<string>;
 
 export function SaveTunnel(arg1:tunnel.TunnelConfig):Promise<void>;
 

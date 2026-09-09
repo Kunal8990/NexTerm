@@ -108,3 +108,23 @@ func (s *SettingsService) SaveCustomizerConfig(c security.CustomizerConfig) erro
 	defer s.mu.Unlock()
 	return s.secMgr.SaveCustomizer(c)
 }
+
+func (s *SettingsService) CheckProtocol(proto string) error {
+	return s.secMgr.CheckProtocol(proto)
+}
+
+func (s *SettingsService) CheckPasswordSaving() error {
+	return s.secMgr.CheckPasswordSaving()
+}
+
+func (s *SettingsService) CheckFileTransfers() error {
+	return s.secMgr.CheckFileTransfers()
+}
+
+func (s *SettingsService) CheckClipboard() error {
+	return s.secMgr.CheckClipboard()
+}
+
+func (s *SettingsService) IsAuditRequired() bool {
+	return s.secMgr.IsAuditRequired()
+}
