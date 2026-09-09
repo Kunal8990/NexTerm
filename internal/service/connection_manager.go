@@ -199,10 +199,17 @@ func (cm *ConnectionManager) buildSSHConnectOptions(tabID string, profile model.
 	}
 	if password != "" {
 		opts.Password = password
-	} else if vKey != "" && cm.credService != nil {
-		saved, err := cm.credService.GetSessionPassword(vKey)
-		if err == nil && saved != "" {
-			opts.Password = saved
+	} else if cm.credService != nil {
+		if vKey != "" {
+			saved, err := cm.credService.GetSessionPassword(vKey)
+			if err == nil && saved != "" {
+				opts.Password = saved
+			}
+		}
+		if opts.Password == "" && profile.Host != "" && profile.Username != "" {
+			if fallback, err := cm.credService.FindSessionPassword(vKey, profile.Host, profile.Port, profile.Username); err == nil && fallback != "" {
+				opts.Password = fallback
+			}
 		}
 	}
 

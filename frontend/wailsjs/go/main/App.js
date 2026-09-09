@@ -154,6 +154,10 @@ export function GetSessionPassphrase(arg1) {
   return window['go']['main']['App']['GetSessionPassphrase'](arg1);
 }
 
+export function FindSessionPassword(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['FindSessionPassword'](arg1, arg2, arg3, arg4);
+}
+
 export function GetSessionPassword(arg1) {
   return window['go']['main']['App']['GetSessionPassword'](arg1);
 }

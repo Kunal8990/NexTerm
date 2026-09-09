@@ -38,7 +38,7 @@ export function hideModal() {
 
 export function promptPasswordDialog(profile) {
   return new Promise((resolve) => {
-    const showUserField = !profile.username;
+    const showUserField = true;
     const box = showModal(`
       <div class="modal-header">
         <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
@@ -48,14 +48,12 @@ export function promptPasswordDialog(profile) {
       </div>
       <div class="modal-body" style="padding: 16px 20px;">
         <div style="margin-bottom: 12px; font-size: 13px; color: var(--text-color);">
-          ${showUserField ? `Please enter connection credentials for <b>${escapeHtml(profile.host)}</b>:` : `Please enter password for <b>${escapeHtml(profile.username)}@${escapeHtml(profile.host)}</b>:`}
+          Please enter credentials for <b>${escapeHtml(profile.host)}</b>:
         </div>
-        ${showUserField ? `
         <div style="margin-bottom: 10px;">
-          <label style="display: block; font-size: 11px; margin-bottom: 4px; color: var(--text-dim);">Username</label>
+          <label style="display: block; font-size: 11px; margin-bottom: 4px; color: var(--text-dim);">Login Username</label>
           <input type="text" id="promptUserVal" class="auth-modal-input" placeholder="e.g. root, ubuntu" value="${escapeHtml(profile.username || '')}" style="width: 100%; height: 34px; padding: 0 10px; background: #0c0f17; border: 1px solid #283046; border-radius: 4px; color: #fff; font-size: 13px; box-sizing: border-box;" />
         </div>
-        ` : ''}
         <div class="sess-password-wrap">
           <input type="password" id="promptPwInput" class="auth-modal-input" placeholder="Enter password" autofocus autocomplete="current-password" style="width: 100%; height: 34px; padding: 0 36px 0 10px; background: #0c0f17; border: 1px solid #283046; border-radius: 4px; color: #fff; font-size: 13px; box-sizing: border-box;" />
           <button type="button" class="sess-password-toggle" id="promptPwToggle" title="Toggle visibility">👁️</button>
@@ -63,7 +61,7 @@ export function promptPasswordDialog(profile) {
         <div style="margin-top: 14px;">
           <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
             <input type="checkbox" id="promptPwSaveVault" checked />
-            <span>Save encrypted password in platform credential vault</span>
+            <span>Save credentials securely in platform vault</span>
           </label>
         </div>
       </div>
@@ -79,13 +77,20 @@ export function promptPasswordDialog(profile) {
     }
 
     const input = box.querySelector("#promptPwInput");
+    const userInput = box.querySelector("#promptUserVal");
     const toggleBtn = box.querySelector("#promptPwToggle");
     const saveCheck = box.querySelector("#promptPwSaveVault");
     const submitBtn = box.querySelector("#promptPwSubmit");
     const cancelBtn = box.querySelector("#promptPwCancel");
     const closeBtn = box.querySelector("#promptPwClose");
 
-    setTimeout(() => { if (input) input.focus(); }, 50);
+    setTimeout(() => {
+      if (!profile.username && userInput) {
+        userInput.focus();
+      } else if (input) {
+        input.focus();
+      }
+    }, 50);
 
     if (toggleBtn && input) {
       toggleBtn.onclick = () => {
@@ -97,20 +102,56 @@ export function promptPasswordDialog(profile) {
 
     const doSubmit = async () => {
       const val = input ? input.value : "";
-      const userInput = box.querySelector("#promptUserVal");
       if (userInput && userInput.value.trim()) {
         profile.username = userInput.value.trim();
       }
-      const vKey = profile.vaultKey || profile.id;
-      if (saveCheck && saveCheck.checked && val && vKey && window.go?.main?.App) {
+
+      const safeHost = (profile.host || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const safeUser = (profile.username || "user").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const port = profile.port || 22;
+      const detKey = `session_${safeUser}_${safeHost}_${port}`;
+      const vKey = profile.vaultKey || profile.id || detKey;
+      profile.vaultKey = vKey;
+
+      if (saveCheck && saveCheck.checked && val && window.go?.main?.App) {
         try {
           if (typeof window.go.main.App.SaveSessionPassword === "function") {
             await window.go.main.App.SaveSessionPassword(vKey, val);
+            if (detKey !== vKey) {
+              await window.go.main.App.SaveSessionPassword(detKey, val);
+            }
           } else if (typeof window.go.main.App.SavePassword === "function") {
             await window.go.main.App.SavePassword(vKey, val);
           }
-        } catch (_) {}
+        } catch (err) {
+          console.warn("Save password to vault failed:", err);
+        }
       }
+
+      // Persist login ID & server configuration to sessions.json
+      if (window.go?.main?.App) {
+        try {
+          if (profile.id && !profile.id.startsWith("quick-")) {
+            if (typeof window.go.main.App.UpdateSession === "function") {
+              await window.go.main.App.UpdateSession(profile);
+            }
+          } else {
+            // Auto-persist Quick Connect session so login ID and server info are preserved
+            if (typeof window.go.main.App.AddSession === "function") {
+              const res = await window.go.main.App.AddSession("", {
+                ...profile,
+                name: profile.name || (profile.username ? `${profile.username}@${profile.host}` : profile.host)
+              });
+              if (res && res.session) {
+                profile.id = res.session.id;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn("Persist session profile failed:", err);
+        }
+      }
+
       hideModal();
       resolve(val);
     };
@@ -127,6 +168,14 @@ export function promptPasswordDialog(profile) {
       input.onkeydown = (e) => {
         if (e.key === "Enter") doSubmit();
         else if (e.key === "Escape") doCancel();
+      };
+    }
+    if (userInput) {
+      userInput.onkeydown = (e) => {
+        if (e.key === "Enter") {
+          if (input) input.focus();
+          else doSubmit();
+        } else if (e.key === "Escape") doCancel();
       };
     }
   });
@@ -190,12 +239,18 @@ export function promptPassphraseDialog(profile) {
     const doSubmit = async () => {
       const val = input ? input.value : "";
       const pvKey = profile.passphraseVaultKey || (profile.vaultKey ? profile.vaultKey + "_passphrase" : (profile.id ? profile.id + "_passphrase" : ""));
+      if (pvKey) {
+        profile.passphraseVaultKey = pvKey;
+      }
       if (saveCheck && saveCheck.checked && val && pvKey && window.go?.main?.App) {
         try {
           if (typeof window.go.main.App.SaveSessionPassword === "function") {
             await window.go.main.App.SaveSessionPassword(pvKey, val);
           } else if (typeof window.go.main.App.SavePassword === "function") {
             await window.go.main.App.SavePassword(pvKey, val);
+          }
+          if (profile.id && !profile.id.startsWith("quick-") && typeof window.go.main.App.UpdateSession === "function") {
+            await window.go.main.App.UpdateSession(profile);
           }
         } catch (_) {}
       }

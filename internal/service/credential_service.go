@@ -6,6 +6,7 @@ import (
 	"nexterm/internal/model"
 	"nexterm/internal/sshsession"
 	"nexterm/internal/vault"
+	"strings"
 	"sync"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -24,8 +25,9 @@ type SavedCredential struct {
 
 // CredentialService encapsulates DPAPI / OS Keychain credentials, key inspection, and agent checks.
 type CredentialService struct {
-	mu    sync.RWMutex
-	vault *vault.Vault
+	mu           sync.RWMutex
+	vault        *vault.Vault
+	treeProvider func() *model.TreeNode
 }
 
 // NewCredentialService constructs a new CredentialService.
@@ -46,6 +48,13 @@ func (c *CredentialService) Vault() *vault.Vault {
 func (c *CredentialService) SetVault(v *vault.Vault) {
 	c.mu.Lock()
 	c.vault = v
+	c.mu.Unlock()
+}
+
+// SetTreeProvider configures a callback to fetch the live session tree for cross-referencing credentials.
+func (c *CredentialService) SetTreeProvider(fn func() *model.TreeNode) {
+	c.mu.Lock()
+	c.treeProvider = fn
 	c.mu.Unlock()
 }
 
@@ -143,11 +152,109 @@ func (c *CredentialService) GetSessionPassphrase(vaultKey string) (string, error
 	if c.vault == nil || vaultKey == "" {
 		return "", nil
 	}
-	pass, ok, err := c.vault.Load(vaultKey + "_passphrase")
-	if err != nil || !ok {
-		return "", nil
+	key := vaultKey
+	if !strings.HasSuffix(key, "_passphrase") {
+		key = key + "_passphrase"
+	}
+	pass, ok, err := c.vault.Load(key)
+	if err != nil || !ok || pass == "" {
+		pass, ok, err = c.vault.Load(vaultKey)
+		if err != nil || !ok {
+			return "", nil
+		}
 	}
 	return pass, nil
+}
+
+// FindSessionPassword searches for a stored password by vaultKey, or falls back to
+// host, port, and username matching across saved sessions and deterministic vault keys.
+func (c *CredentialService) FindSessionPassword(vaultKey, host string, port int, username string) (string, error) {
+	c.mu.RLock()
+	treeFn := c.treeProvider
+	c.mu.RUnlock()
+
+	// 1. Direct VaultKey lookup
+	if vaultKey != "" {
+		if pwd, err := c.GetSessionPassword(vaultKey); err == nil && pwd != "" {
+			return pwd, nil
+		}
+	}
+
+	// 2. Deterministic key lookup based on server coordinates
+	if host != "" && username != "" {
+		p := port
+		if p <= 0 {
+			p = 22
+		}
+		detKey := fmt.Sprintf("session_%s_%s_%d", sanitizeVaultKey(username), sanitizeVaultKey(host), p)
+		if pwd, err := c.GetSessionPassword(detKey); err == nil && pwd != "" {
+			if vaultKey != "" && vaultKey != detKey {
+				_ = c.SaveSessionPassword(vaultKey, pwd)
+			}
+			return pwd, nil
+		}
+		// Also without port
+		detKeyNoPort := fmt.Sprintf("session_%s_%s", sanitizeVaultKey(username), sanitizeVaultKey(host))
+		if pwd, err := c.GetSessionPassword(detKeyNoPort); err == nil && pwd != "" {
+			if vaultKey != "" && vaultKey != detKeyNoPort {
+				_ = c.SaveSessionPassword(vaultKey, pwd)
+			}
+			return pwd, nil
+		}
+	}
+
+	// 3. Search across all saved sessions in tree
+	if treeFn != nil && host != "" && username != "" {
+		root := treeFn()
+		if root != nil {
+			var foundPwd string
+			var search func(n *model.TreeNode)
+			search = func(n *model.TreeNode) {
+				if n == nil || foundPwd != "" {
+					return
+				}
+				if n.Session != nil {
+					s := n.Session
+					if strings.EqualFold(s.Host, host) && strings.EqualFold(s.Username, username) {
+						if s.VaultKey != "" && s.VaultKey != vaultKey {
+							if p, err := c.GetSessionPassword(s.VaultKey); err == nil && p != "" {
+								foundPwd = p
+								return
+							}
+						}
+					}
+				}
+				for _, ch := range n.Children {
+					search(ch)
+					if foundPwd != "" {
+						return
+					}
+				}
+			}
+			search(root)
+
+			if foundPwd != "" {
+				if vaultKey != "" {
+					_ = c.SaveSessionPassword(vaultKey, foundPwd)
+				}
+				return foundPwd, nil
+			}
+		}
+	}
+
+	return "", nil
+}
+
+func sanitizeVaultKey(s string) string {
+	var sb strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			sb.WriteRune(r)
+		} else {
+			sb.WriteRune('_')
+		}
+	}
+	return sb.String()
 }
 
 // SelectPrivateKeyFile opens a native OS file dialog to select a private key file.

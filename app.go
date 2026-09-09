@@ -123,6 +123,9 @@ func (a *App) startup(ctx context.Context) {
 		a.logRuntimeError("vault init failed: %v", err)
 	} else {
 		a.credentialService.SetVault(v)
+		a.credentialService.SetTreeProvider(func() *model.TreeNode {
+			return a.sessionService.GetSessionTree()
+		})
 	}
 
 	// Wire vault hooks into session service
@@ -261,6 +264,10 @@ func (a *App) GetSavedPassword(vaultKey string) (string, error) {
 
 func (a *App) GetSessionPassphrase(vaultKey string) (string, error) {
 	return a.credentialService.GetSessionPassphrase(vaultKey)
+}
+
+func (a *App) FindSessionPassword(vaultKey, host string, port int, username string) (string, error) {
+	return a.credentialService.FindSessionPassword(vaultKey, host, port, username)
 }
 
 func (a *App) SelectPrivateKeyFile() (string, error) {

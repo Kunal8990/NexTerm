@@ -86,6 +86,8 @@ export function GetSecurityPolicy():Promise<security.SecurityPolicy>;
 
 export function GetSessionPassphrase(arg1:string):Promise<string>;
 
+export function FindSessionPassword(arg1:string,arg2:string,arg3:number,arg4:string):Promise<string>;
+
 export function GetSessionPassword(arg1:string):Promise<string>;
 
 export function GetSessionTree():Promise<model.TreeNode>;

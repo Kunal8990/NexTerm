@@ -334,12 +334,15 @@ export async function executeReconnectAttempt(tabId, attempt) {
 
   let password = "";
   const vKey = profile.vaultKey || profile.id;
-  if (!profile.privateKeyPath && window.go && window.go.main && window.go.main.App && vKey) {
+  if (!profile.privateKeyPath && window.go && window.go.main && window.go.main.App) {
     try {
-      if (typeof window.go.main.App.GetSessionPassword === "function") {
+      if (vKey && typeof window.go.main.App.GetSessionPassword === "function") {
         password = await window.go.main.App.GetSessionPassword(vKey);
-      } else if (typeof window.go.main.App.GetSavedPassword === "function") {
+      } else if (vKey && typeof window.go.main.App.GetSavedPassword === "function") {
         password = await window.go.main.App.GetSavedPassword(vKey);
+      }
+      if (!password && window.go.main.App.FindSessionPassword && profile.host && profile.username) {
+        password = await window.go.main.App.FindSessionPassword(vKey || "", profile.host, profile.port || 22, profile.username);
       }
     } catch (_) {}
   }
@@ -1114,14 +1117,24 @@ export async function connectToSession(profile, forceNewTab = false) {
   if (authType === "password") {
     if (!password) {
       let hasSaved = false;
-      if (window.go && window.go.main && window.go.main.App && vKey) {
+      if (window.go && window.go.main && window.go.main.App) {
         try {
-          hasSaved = await window.go.main.App.HasSavedPassword(vKey);
-          if (hasSaved) {
-            if (typeof window.go.main.App.GetSessionPassword === "function") {
-              password = await window.go.main.App.GetSessionPassword(vKey);
-            } else if (typeof window.go.main.App.GetSavedPassword === "function") {
-              password = await window.go.main.App.GetSavedPassword(vKey);
+          if (vKey) {
+            hasSaved = await window.go.main.App.HasSavedPassword(vKey);
+            if (hasSaved) {
+              if (typeof window.go.main.App.GetSessionPassword === "function") {
+                password = await window.go.main.App.GetSessionPassword(vKey);
+              } else if (typeof window.go.main.App.GetSavedPassword === "function") {
+                password = await window.go.main.App.GetSavedPassword(vKey);
+              }
+            }
+          }
+          // Cross-session fallback: check if existing credentials match this host/username
+          if (!password && window.go.main.App.FindSessionPassword && profile.host && profile.username) {
+            const found = await window.go.main.App.FindSessionPassword(vKey || "", profile.host, profile.port || 22, profile.username);
+            if (found) {
+              password = found;
+              hasSaved = true;
             }
           }
         } catch (err) {}

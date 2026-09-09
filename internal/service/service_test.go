@@ -5,6 +5,7 @@ import (
 	"nexterm/internal/model"
 	"nexterm/internal/protocol"
 	"nexterm/internal/security"
+	"nexterm/internal/vault"
 	"strings"
 	"testing"
 )
@@ -303,6 +304,75 @@ func TestValidateAndNormalizeTree(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "exceeds maximum supported hierarchy depth") && !strings.Contains(err.Error(), "cyclic reference") {
 		t.Fatalf("expected cycle error, got: %v", err)
+	}
+}
+
+func TestFindSessionPassword(t *testing.T) {
+	vDir := t.TempDir()
+	v, err := vault.NewVaultAt(vDir)
+	if err != nil {
+		t.Fatalf("failed to init test vault: %v", err)
+	}
+	credSvc := NewCredentialService(v)
+
+	// Save credential under key "orig-key"
+	_ = credSvc.SaveSessionPassword("orig-key", "secret123")
+
+	// 1. Direct lookup
+	pwd, err := credSvc.FindSessionPassword("orig-key", "", 0, "")
+	if err != nil || pwd != "secret123" {
+		t.Fatalf("expected secret123 from direct lookup, got %s (err: %v)", pwd, err)
+	}
+
+	// 2. Deterministic lookup
+	_ = credSvc.SaveSessionPassword("session_pin_192.168.1.7_22", "det-secret")
+	pwd, err = credSvc.FindSessionPassword("", "192.168.1.7", 22, "pin")
+	if err != nil || pwd != "det-secret" {
+		t.Fatalf("expected det-secret from deterministic lookup, got %s (err: %v)", pwd, err)
+	}
+
+	// 3. Cross-session tree lookup
+	credSvc.SetTreeProvider(func() *model.TreeNode {
+		return &model.TreeNode{
+			ID:   "root",
+			Name: "Root",
+			Children: []*model.TreeNode{
+				{
+					ID:   "node-1",
+					Name: "Old Server",
+					Session: &model.SessionProfile{
+						ID:       "sess-1",
+						Host:     "10.0.0.50",
+						Port:     22,
+						Username: "admin",
+						VaultKey: "orig-key",
+					},
+				},
+			},
+		}
+	})
+
+	// Lookup for new session pointing to same host/user with different or empty vaultKey
+	pwd, err = credSvc.FindSessionPassword("new-key", "10.0.0.50", 22, "admin")
+	if err != nil || pwd != "secret123" {
+		t.Fatalf("expected secret123 from tree cross-session lookup, got %s (err: %v)", pwd, err)
+	}
+
+	// Verify it auto-cached under "new-key"
+	cachedPwd, err := credSvc.GetSessionPassword("new-key")
+	if err != nil || cachedPwd != "secret123" {
+		t.Fatalf("expected secret123 auto-cached under new-key, got %s (err: %v)", cachedPwd, err)
+	}
+
+	// 4. Test Passphrase lookup with and without _passphrase suffix
+	_ = credSvc.SaveSessionPassword("key1_passphrase", "passphrase-secret")
+	pp1, err := credSvc.GetSessionPassphrase("key1")
+	if err != nil || pp1 != "passphrase-secret" {
+		t.Fatalf("expected passphrase-secret from key1, got %s (err: %v)", pp1, err)
+	}
+	pp2, err := credSvc.GetSessionPassphrase("key1_passphrase")
+	if err != nil || pp2 != "passphrase-secret" {
+		t.Fatalf("expected passphrase-secret from key1_passphrase, got %s (err: %v)", pp2, err)
 	}
 }
 

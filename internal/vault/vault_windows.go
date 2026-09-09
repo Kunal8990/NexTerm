@@ -35,7 +35,28 @@ func NewVault() (*Vault, error) {
 		return nil, err
 	}
 	dir := filepath.Join(appData, "Nexterm", "vault")
-	return NewVaultAt(dir)
+	v, err := NewVaultAt(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	// Check if legacy MobaCloneGo vault exists and copy missing credential files
+	oldDir := filepath.Join(appData, "MobaCloneGo", "vault")
+	if entries, err := os.ReadDir(oldDir); err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				src := filepath.Join(oldDir, e.Name())
+				dst := filepath.Join(dir, e.Name())
+				if _, err := os.Stat(dst); os.IsNotExist(err) {
+					if data, err := os.ReadFile(src); err == nil {
+						_ = os.WriteFile(dst, data, 0o600)
+					}
+				}
+			}
+		}
+	}
+
+	return v, nil
 }
 
 func (v *Vault) path(key string) string {

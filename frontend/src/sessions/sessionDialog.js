@@ -40,6 +40,11 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
         savedPassword = await window.go.main.App.GetSavedPassword(vKey);
       } catch (_) {}
     }
+    if (!savedPassword && window.go.main.App.FindSessionPassword && editProfile.host && editProfile.username) {
+      try {
+        savedPassword = await window.go.main.App.FindSessionPassword(vKey, editProfile.host, editProfile.port || 22, editProfile.username);
+      } catch (_) {}
+    }
     if (window.go.main.App.GetSessionPassphrase) {
       try {
         savedPassphrase = await window.go.main.App.GetSessionPassphrase(vKey);
@@ -932,6 +937,33 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
     quickBrowse.onclick = () => fullBrowse.click();
   }
 
+  // Auto-detect existing saved credentials on Host / Username entry
+  const hostInput = box.querySelector("#sHost");
+  const userInput = box.querySelector("#sUser");
+  const portInput = box.querySelector("#sPort");
+
+  const tryLookupSavedCredential = async () => {
+    const h = hostInput ? hostInput.value.trim() : "";
+    const u = userInput ? userInput.value.trim() : "";
+    const p = (portInput ? parseInt(portInput.value, 10) : 22) || 22;
+    if (h && u && window.go?.main?.App?.FindSessionPassword) {
+      if (pwGenInput && !pwGenInput.value) {
+        try {
+          const found = await window.go.main.App.FindSessionPassword("", h, p, u);
+          if (found && !pwGenInput.value) {
+            pwGenInput.value = found;
+            if (pwAuthInput) pwAuthInput.value = found;
+            const saveCheck = box.querySelector("#sSavePasswordCheck");
+            if (saveCheck) saveCheck.checked = true;
+          }
+        } catch (_) {}
+      }
+    }
+  };
+
+  if (hostInput) hostInput.addEventListener("blur", tryLookupSavedCredential);
+  if (userInput) userInput.addEventListener("blur", tryLookupSavedCredential);
+
   // Link to Auth Tab
   const linkToAuth = box.querySelector("#linkToAuthTab");
   if (linkToAuth) {
@@ -1441,6 +1473,15 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
       }
       if (enteredPw && profile.vaultKey && shouldSavePw) {
         await window.go.main.App.SaveSessionPassword(profile.vaultKey, enteredPw);
+        if (profile.host && profile.username) {
+          const safeHost = profile.host.replace(/[^a-zA-Z0-9_-]/g, "_");
+          const safeUser = profile.username.replace(/[^a-zA-Z0-9_-]/g, "_");
+          const port = profile.port || 22;
+          const detKey = `session_${safeUser}_${safeHost}_${port}`;
+          if (detKey !== profile.vaultKey && typeof window.go.main.App.SaveSessionPassword === "function") {
+            await window.go.main.App.SaveSessionPassword(detKey, enteredPw);
+          }
+        }
       }
       const enteredPass = box.querySelector("#sKeyPassphrase") ? box.querySelector("#sKeyPassphrase").value : "";
       if (enteredPass && profile.vaultKey) {

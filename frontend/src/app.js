@@ -24,6 +24,7 @@ import {
 } from './ui/modal.js';
 import { showToast, updateStatus } from './ui/notifications.js';
 import { tabs, activeTabId } from './state/tabState.js';
+import { rootNode } from './state/sessionState.js';
 import {
   workspaceState,
   initWorkspace,
@@ -530,7 +531,7 @@ export function setupEventListeners() {
   //   user@host:2222
   //   ssh -p 2222 user@host
   // ------------------------------------------------------------------------
-  const executeQuickConnect = (inputEl) => {
+  const executeQuickConnect = async (inputEl) => {
     if (!inputEl) return;
     const raw = inputEl.value.trim();
     if (!raw) {
@@ -547,23 +548,78 @@ export function setupEventListeners() {
     inputEl.value = "";
 
     const proto = parsed.protocol || "ssh";
-    const portStr = (parsed.port && parsed.port !== 22) ? `:${parsed.port}` : "";
-    const title = parsed.username
-      ? `${parsed.username}@${parsed.host}${portStr}`
+    const port = parsed.port || 22;
+    const portStr = (port !== 22) ? `:${port}` : "";
+    const username = parsed.username || "";
+    const title = username
+      ? `${username}@${parsed.host}${portStr}`
       : `${parsed.host}${portStr}`;
 
     showToast(`Quick connecting to ${title}...`, "info");
 
-    connectToSession({
+    // 1. Check if an existing saved session matches this host and username in the tree
+    let matchedProfile = null;
+    const findMatchingNode = (node) => {
+      if (!node || matchedProfile) return;
+      if (node.session) {
+        const s = node.session;
+        if (s.host === parsed.host && (s.port || 22) === port) {
+          if (!username || !s.username || s.username === username) {
+            matchedProfile = s;
+            return;
+          }
+        }
+      }
+      if (node.children) {
+        for (const ch of node.children) {
+          findMatchingNode(ch);
+          if (matchedProfile) return;
+        }
+      }
+    };
+    findMatchingNode(rootNode);
+
+    if (matchedProfile) {
+      const connProfile = { ...matchedProfile };
+      if (username && !connProfile.username) {
+        connProfile.username = username;
+      }
+      connectToSession(connProfile);
+      return;
+    }
+
+    // 2. New connection: deterministic vault key
+    const safeHost = parsed.host.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const safeUser = (username || "user").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const detKey = `session_${safeUser}_${safeHost}_${port}`;
+
+    const newProfile = {
       id: "quick-" + Date.now(),
+      vaultKey: detKey,
       name: title,
       protocol: proto,
       host: parsed.host,
-      port: parsed.port || 22,
-      username: parsed.username || "",
+      port: port,
+      username: username,
       initialDir: parsed.initialDir || "",
       authType: "password"
-    });
+    };
+
+    // Auto-save to session tree so login info and host are preserved in sidebar
+    if (window.go?.main?.App?.AddSession) {
+      try {
+        const res = await window.go.main.App.AddSession("", newProfile);
+        if (res && res.session) {
+          newProfile.id = res.session.id;
+          newProfile.vaultKey = res.session.vaultKey || detKey;
+        }
+        await refreshTree();
+      } catch (err) {
+        console.warn("Auto-saving quick connect session failed:", err);
+      }
+    }
+
+    connectToSession(newProfile);
   };
 
   const quickConnectInput = document.getElementById("quickConnectInput");
