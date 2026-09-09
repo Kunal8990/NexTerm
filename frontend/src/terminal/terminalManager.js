@@ -1016,6 +1016,9 @@ export function createTab(tabId, profile, isLocal = false, initialState = "Conne
   targetPane.activeTabId = tabId;
 
   tabs[tabId] = {
+    id: tabId,
+    title: profile?.name || (isLocal ? "Local Terminal" : "SSH Session"),
+    host: profile?.host || (isLocal ? "Local Shell" : "127.0.0.1"),
     term,
     fitAddon,
     searchAddon,

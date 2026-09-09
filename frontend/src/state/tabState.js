@@ -48,14 +48,20 @@ export function getTabs() {
 }
 
 export function getAllTabs() {
-  return Object.values(tabs);
+  return Object.entries(tabs).map(([id, t]) => {
+    if (t && !t.id) t.id = id;
+    return t;
+  });
 }
 
 export function getTab(tabId) {
-  return tabs[tabId] || null;
+  const t = tabs[tabId] || null;
+  if (t && !t.id) t.id = tabId;
+  return t;
 }
 
 export function setTab(tabId, tabObj) {
+  if (tabObj && !tabObj.id) tabObj.id = tabId;
   tabs[tabId] = tabObj;
   return tabObj;
 }
@@ -87,7 +93,10 @@ export function getActiveTabId() {
 }
 
 export function getActiveTab() {
-  return activeTabId ? (tabs[activeTabId] || null) : null;
+  if (!activeTabId || !tabs[activeTabId]) return null;
+  const t = tabs[activeTabId];
+  if (!t.id) t.id = activeTabId;
+  return t;
 }
 
 export function setActiveTabId(id) {

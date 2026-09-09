@@ -54,17 +54,20 @@ let eventListenersRegistered = false;
 // --------------------------------------------------------------------------
 
 export function getConnectedSessions() {
-  const all = getAllTabs ? getAllTabs() : Object.values(tabs || {});
-  return all.filter(t => {
-    if (!t || !t.id || t.id === 'home') return false;
+  const tabEntries = Object.entries(tabs || {});
+  return tabEntries.filter(([id, t]) => {
+    if (!t || !id || id === 'home') return false;
     return true;
-  }).map(t => {
+  }).map(([id, t]) => {
+    const tabId = t.id || id;
+    const title = t.customTitle || t.title || t.profile?.name || (t.isLocal ? 'Local Terminal' : ('Terminal ' + String(tabId).slice(0, 6)));
+    const host = t.host || t.profile?.host || (t.isLocal ? 'Local Shell' : '127.0.0.1');
     return {
-      id: t.id,
-      title: t.title || t.name || 'Terminal ' + t.id.slice(0, 6),
-      host: t.host || (t.isLocal ? 'Local Shell' : '127.0.0.1'),
+      id: tabId,
+      title,
+      host,
       isLocal: !!t.isLocal,
-      env: inferEnvironment(t.title || '', t.host || '')
+      env: inferEnvironment(title, host)
     };
   });
 }
