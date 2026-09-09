@@ -35,6 +35,28 @@ export function formatAnsiToHtml(raw) {
   return text;
 }
 
+// Configurable dangerous command patterns per Section 5 & GAP-26
+export const DANGEROUS_COMMAND_PATTERNS = [
+  /\brm\s+-[rf]{1,3}\b/i,
+  /\bshutdown\b/i,
+  /\breboot\b/i,
+  /\bpoweroff\b/i,
+  /\bmkfs\b/i,
+  /\bdd\s+if=/i,
+  /\bdrop\s+database\b/i,
+  /\bdrop\s+table\b/i,
+  /\btruncate\s+table\b/i,
+  /\bformat\s+[a-z]:/i,
+  /\bkill\s+-9\s+-1\b/i,
+  /\binit\s+[06]\b/i
+];
+
+export function isDangerousCommand(cmd) {
+  if (!cmd || typeof cmd !== 'string') return false;
+  const trimmed = cmd.trim();
+  return DANGEROUS_COMMAND_PATTERNS.some(rx => rx.test(trimmed));
+}
+
 // Generate realistic simulated output for demo/browser execution
 function getSimulatedCommandOutput(cmd, serverName, serverHost) {
   const trimmed = cmd.trim();
@@ -402,6 +424,15 @@ export function showMultiExecutionModal() {
     if (selected.length === 0) {
       showToast('Please select at least one server to execute', 'warning');
       return;
+    }
+
+    // GAP-26: Dangerous command confirmation
+    if (isDangerousCommand(cmd)) {
+      const confirmed = confirm(`⚠️ WARNING: Potentially Destructive Command Detected!\n\nYou are about to execute:\n"${cmd}"\n\nacross ${selected.length} server(s) simultaneously.\nAre you sure you want to proceed?`);
+      if (!confirmed) {
+        showToast('Execution cancelled by user', 'info');
+        return;
+      }
     }
 
     executeBtn.disabled = true;
