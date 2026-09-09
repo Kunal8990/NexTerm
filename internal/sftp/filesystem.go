@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -247,8 +248,10 @@ func ListLocal(localPath string) ([]SFTPItem, string, error) {
 		home, err := os.UserHomeDir()
 		if err == nil && home != "" {
 			localPath = home
-		} else {
+		} else if runtime.GOOS == "windows" {
 			localPath = "C:\\"
+		} else {
+			localPath = "/"
 		}
 	}
 
@@ -289,8 +292,27 @@ func ListLocal(localPath string) ([]SFTPItem, string, error) {
 	return items, cleanPath, nil
 }
 
-// GetLocalDrives scans logical drives on Windows (e.g. C:\, D:\).
+// GetLocalDrives scans logical roots on Windows (e.g. C:\, D:\) or Unix root paths (/, ~).
 func GetLocalDrives() ([]string, error) {
+	if runtime.GOOS != "windows" {
+		var roots []string
+		home, err := os.UserHomeDir()
+		if err == nil && home != "" {
+			roots = append(roots, home)
+		}
+		roots = append(roots, "/")
+		if runtime.GOOS == "darwin" {
+			if _, err := os.Stat("/Volumes"); err == nil {
+				roots = append(roots, "/Volumes")
+			}
+		} else if runtime.GOOS == "linux" {
+			if _, err := os.Stat("/media"); err == nil {
+				roots = append(roots, "/media")
+			}
+		}
+		return roots, nil
+	}
+
 	var drives []string
 	for _, drive := range "ABCDEFGHIJKLMNOPQRSTUVWXYZ" {
 		root := string(drive) + ":\\"

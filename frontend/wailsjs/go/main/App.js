@@ -6,6 +6,10 @@ export function AddFolder(arg1, arg2) {
   return window['go']['main']['App']['AddFolder'](arg1, arg2);
 }
 
+export function AddFolderWithOptions(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['AddFolderWithOptions'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function AddSession(arg1, arg2) {
   return window['go']['main']['App']['AddSession'](arg1, arg2);
 }
@@ -14,12 +18,20 @@ export function AddWorkspacePane(arg1) {
   return window['go']['main']['App']['AddWorkspacePane'](arg1);
 }
 
-export function BroadcastCommand(arg1) {
-  return window['go']['main']['App']['BroadcastCommand'](arg1);
+export function BroadcastCommand(arg1, arg2, arg3) {
+  return window['go']['main']['App']['BroadcastCommand'](arg1, arg2, arg3);
+}
+
+export function BroadcastRaw(arg1) {
+  return window['go']['main']['App']['BroadcastRaw'](arg1);
 }
 
 export function CancelAuthChallenge(arg1) {
   return window['go']['main']['App']['CancelAuthChallenge'](arg1);
+}
+
+export function CancelBroadcast(arg1) {
+  return window['go']['main']['App']['CancelBroadcast'](arg1);
 }
 
 export function CheckSSHAgent() {
@@ -36,6 +48,10 @@ export function CloseTab(arg1) {
 
 export function CloseWorkspacePane(arg1) {
   return window['go']['main']['App']['CloseWorkspacePane'](arg1);
+}
+
+export function ConfigureFolder(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['ConfigureFolder'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function DeleteKnownHost(arg1, arg2) {
@@ -70,6 +86,10 @@ export function ExecuteMacro(arg1, arg2) {
   return window['go']['main']['App']['ExecuteMacro'](arg1, arg2);
 }
 
+export function ExecuteMulti(arg1, arg2) {
+  return window['go']['main']['App']['ExecuteMulti'](arg1, arg2);
+}
+
 export function ExpandAllFolders(arg1) {
   return window['go']['main']['App']['ExpandAllFolders'](arg1);
 }
@@ -96,6 +116,14 @@ export function GetKnownHosts() {
 
 export function GetMacros() {
   return window['go']['main']['App']['GetMacros']();
+}
+
+export function GetRecentLogs(arg1) {
+  return window['go']['main']['App']['GetRecentLogs'](arg1);
+}
+
+export function GetSavedPassword(arg1) {
+  return window['go']['main']['App']['GetSavedPassword'](arg1);
 }
 
 export function GetSavedPasswords() {
@@ -288,6 +316,10 @@ export function SaveCustomizerConfig(arg1) {
 
 export function SaveMacro(arg1) {
   return window['go']['main']['App']['SaveMacro'](arg1);
+}
+
+export function SavePassword(arg1, arg2) {
+  return window['go']['main']['App']['SavePassword'](arg1, arg2);
 }
 
 export function SaveSecurityPolicy(arg1) {

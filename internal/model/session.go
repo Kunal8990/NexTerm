@@ -21,6 +21,8 @@ type SessionProfile struct {
 	Theme             string `json:"theme,omitempty"`             // e.g. "dark-modern", "monokai", "dracula", "nord"
 	FontSize          int    `json:"fontSize,omitempty"`          // e.g. 14
 	KeepAliveInterval int    `json:"keepAliveInterval,omitempty"` // in seconds, default 15
+	Environment       string `json:"environment,omitempty"`       // "prod", "uat", "testing", "dev", "staging", "dr"
+	Color             string `json:"color,omitempty"`             // Hex color, e.g. "#f59e0b" for UAT, "#ef4444" for Prod
 
 	// Protocol: "ssh", "sftp", "rdp", "vnc", "telnet", "serial", "local"
 	Protocol string `json:"protocol,omitempty"`
@@ -83,11 +85,15 @@ type SessionProfile struct {
 // TreeNode is either a folder (Children populated, Session nil) or a leaf
 // (Session populated). Mirrors the tree the frontend renders in the sidebar.
 type TreeNode struct {
-	ID       string          `json:"id"`
-	Name     string          `json:"name"`
-	Session  *SessionProfile `json:"session,omitempty"`
-	Children []*TreeNode     `json:"children,omitempty"`
-	Expanded bool            `json:"expanded,omitempty"`
+	ID              string          `json:"id"`
+	Name            string          `json:"name"`
+	Session         *SessionProfile `json:"session,omitempty"`
+	Children        []*TreeNode     `json:"children,omitempty"`
+	Expanded        bool            `json:"expanded,omitempty"`
+	DefaultUsername string          `json:"defaultUsername,omitempty"`
+	DefaultPort     int             `json:"defaultPort,omitempty"`
+	Environment     string          `json:"environment,omitempty"`
+	Color           string          `json:"color,omitempty"`
 }
 
 func (n *TreeNode) IsFolder() bool {

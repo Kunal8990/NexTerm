@@ -8,5 +8,12 @@
   "frontend:dev:serverUrl": "auto",
   "author": {
     "name": "Kunal"
+  },
+  "info": {
+    "companyName": "Nexterm",
+    "productName": "Nexterm Professional",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright 2026 Nexterm",
+    "comments": "Modern Cross-Platform SSH Client and Connection Manager"
   }
 }

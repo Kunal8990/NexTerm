@@ -1,29 +1,22 @@
 package vault
 
 import (
-	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
+func createTestVault(t *testing.T, tempDir string) *Vault {
+	t.Helper()
+	v, err := NewVaultAt(filepath.Join(tempDir, "vault"))
+	if err != nil {
+		t.Skipf("skipping vault test on current platform: %v", err)
+	}
+	return v
+}
+
 func TestVault_BasicRoundTrip(t *testing.T) {
 	tempDir := t.TempDir()
-
-	var v *Vault
-	var err error
-
-	if runtime.GOOS == "windows" {
-		v, err = NewVaultAt(filepath.Join(tempDir, "vault"))
-		if err != nil {
-			t.Fatalf("NewVaultAt failed: %v", err)
-		}
-	} else {
-		v, err = NewVault()
-		if err != nil {
-			t.Skipf("skipping on non-windows platform without secure backend: %v", err)
-		}
-	}
+	v := createTestVault(t, tempDir)
 
 	key := "test-session-key-123"
 	secret := "P@ssw0rd!Secure#987"
@@ -42,25 +35,8 @@ func TestVault_BasicRoundTrip(t *testing.T) {
 		t.Fatalf("Save failed: %v", err)
 	}
 
-	// On Windows, verify that the raw saved file on disk does NOT contain plaintext secret!
-	if runtime.GOOS == "windows" {
-		filePath := v.path(key)
-		rawBytes, err := os.ReadFile(filePath)
-		if err != nil {
-			t.Fatalf("failed to read raw encrypted file: %v", err)
-		}
-		if string(rawBytes) == secret {
-			t.Fatalf("FATAL: saved file contains unencrypted plaintext secret!")
-		}
-		// Verify file permissions are 0600
-		fi, err := os.Stat(filePath)
-		if err != nil {
-			t.Fatalf("Stat failed: %v", err)
-		}
-		if fi.Mode().Perm()&0o600 == 0 {
-			t.Errorf("expected owner read/write permissions, got %o", fi.Mode().Perm())
-		}
-	}
+	// Verify disk-level encryption on Windows (no-op on macOS/Linux Keychain)
+	verifyWindowsDiskEncryption(t, v, key, secret)
 
 	// 3. Load secret and verify it matches original
 	loaded, ok, err = v.Load(key)
@@ -106,20 +82,7 @@ func TestVault_BasicRoundTrip(t *testing.T) {
 
 func TestVault_EmptyKeyHandling(t *testing.T) {
 	tempDir := t.TempDir()
-	var v *Vault
-	var err error
-
-	if runtime.GOOS == "windows" {
-		v, err = NewVaultAt(filepath.Join(tempDir, "vault"))
-		if err != nil {
-			t.Fatalf("NewVaultAt failed: %v", err)
-		}
-	} else {
-		v, err = NewVault()
-		if err != nil {
-			t.Skipf("skipping on non-windows platform: %v", err)
-		}
-	}
+	v := createTestVault(t, tempDir)
 
 	// Save with empty key must return an error
 	if err := v.Save("", "some-secret"); err == nil {

@@ -30,6 +30,11 @@ func NewVault() (*Vault, error) {
 	return &Vault{service: linuxServiceName}, nil
 }
 
+// NewVaultAt returns a Vault instance (directory path is ignored on Linux as credentials reside in Secret Service).
+func NewVaultAt(dir string) (*Vault, error) {
+	return NewVault()
+}
+
 func (v *Vault) Save(key, secret string) error {
 	if key == "" {
 		return errors.New("vault: key cannot be empty")

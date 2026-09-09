@@ -43,8 +43,48 @@ func NewMacroManager() *MacroManager {
 	return mm
 }
 
-func (mm *MacroManager) seedDefaults() {
-	defaults := []Macro{
+func (mm *MacroManager) defaultSnippets() []Macro {
+	return []Macro{
+		{
+			ID:          "m-restart-svc",
+			Name:        "Restart service",
+			Description: "Restart system service (e.g. nginx, apache2, systemd)",
+			Commands:    []string{"sudo systemctl restart nginx || sudo service nginx restart"},
+			DelayMs:     500,
+			Category:    "Commands",
+		},
+		{
+			ID:          "m-check-logs",
+			Name:        "Check logs",
+			Description: "Follow recent service and syslog messages in real-time",
+			Commands:    []string{"sudo journalctl -n 50 -f || tail -n 50 -f /var/log/syslog"},
+			DelayMs:     500,
+			Category:    "Commands",
+		},
+		{
+			ID:          "m-disk-usage",
+			Name:        "Disk usage",
+			Description: "Inspect partition capacity and top storage-consuming directories",
+			Commands:    []string{"df -h && du -sh * 2>/dev/null | sort -hr | head -n 10"},
+			DelayMs:     500,
+			Category:    "Commands",
+		},
+		{
+			ID:          "m-restart-app",
+			Name:        "Restart application",
+			Description: "Restart Docker compose containers or PM2 process clusters",
+			Commands:    []string{"docker compose restart || pm2 restart all"},
+			DelayMs:     500,
+			Category:    "Commands",
+		},
+		{
+			ID:          "m-git-pull",
+			Name:        "Git pull",
+			Description: "Fetch and fast-forward latest upstream git commits",
+			Commands:    []string{"git pull && git status"},
+			DelayMs:     500,
+			Category:    "Commands",
+		},
 		{
 			ID:          "m-sys-check",
 			Name:        "System Health & Resources",
@@ -77,17 +117,11 @@ func (mm *MacroManager) seedDefaults() {
 			DelayMs:     500,
 			Category:    "DevOps",
 		},
-		{
-			ID:          "m-brm-check",
-			Name:        "Oracle BRM / App Status",
-			Description: "Check status of billing, database, and background services",
-			Commands:    []string{"if [ -d /opt/brm ]; then cd /opt/brm && ./pin_ctl status; else echo 'Checking service status:'; systemctl status oracle || systemctl status mariadb; fi"},
-			DelayMs:     800,
-			Category:    "Enterprise",
-		},
 	}
+}
 
-	for _, d := range defaults {
+func (mm *MacroManager) seedDefaults() {
+	for _, d := range mm.defaultSnippets() {
 		mm.macros[d.ID] = d
 	}
 	_ = mm.save()
@@ -105,6 +139,17 @@ func (mm *MacroManager) load() error {
 	}
 	for _, m := range list {
 		mm.macros[m.ID] = m
+	}
+	// Ensure standard snippets are present
+	hasNew := false
+	for _, d := range mm.defaultSnippets() {
+		if _, exists := mm.macros[d.ID]; !exists {
+			mm.macros[d.ID] = d
+			hasNew = true
+		}
+	}
+	if hasNew {
+		_ = mm.save()
 	}
 	return nil
 }

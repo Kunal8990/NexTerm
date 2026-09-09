@@ -66,7 +66,8 @@ type ConnectOptions struct {
 	ProxyPassword     string
 
 	// HostKeyCallback for verifying server identities against known_hosts.
-	HostKeyCallback ssh.HostKeyCallback
+	HostKeyCallback   ssh.HostKeyCallback
+	HostKeyAlgorithms []string
 
 	// Jump Host / Bastion Proxy Configuration
 	UseJumpHost        bool
@@ -133,6 +134,33 @@ func Connect(opts ConnectOptions) (*Session, error) {
 		Timeout:         timeout,
 	}
 
+	if len(opts.HostKeyAlgorithms) > 0 {
+		var keyAlgos []string
+		seen := make(map[string]bool)
+		for _, algo := range opts.HostKeyAlgorithms {
+			if !seen[algo] && algo != "" {
+				keyAlgos = append(keyAlgos, algo)
+				seen[algo] = true
+			}
+		}
+		defaultAlgos := []string{
+			ssh.KeyAlgoED25519,
+			ssh.KeyAlgoECDSA256,
+			ssh.KeyAlgoECDSA384,
+			ssh.KeyAlgoECDSA521,
+			ssh.KeyAlgoRSASHA256,
+			ssh.KeyAlgoRSASHA512,
+			ssh.KeyAlgoRSA,
+		}
+		for _, algo := range defaultAlgos {
+			if !seen[algo] {
+				keyAlgos = append(keyAlgos, algo)
+				seen[algo] = true
+			}
+		}
+		config.HostKeyAlgorithms = keyAlgos
+	}
+
 	addr := net.JoinHostPort(opts.Host, strconv.Itoa(opts.Port))
 	var conn net.Conn
 
@@ -162,7 +190,7 @@ func Connect(opts ConnectOptions) (*Session, error) {
 			Timeout:         15 * time.Second,
 		}
 		jumpAddr := net.JoinHostPort(opts.JumpHost, strconv.Itoa(opts.JumpPort))
-		bastionDirectConn, bErr := net.DialTimeout("tcp", jumpAddr, 15*time.Second)
+		bastionDirectConn, bErr := net.DialTimeout("tcp", jumpAddr, timeout)
 		if bErr != nil {
 			return nil, fmt.Errorf("bastion connection failed to %s: %w", jumpAddr, bErr)
 		}
@@ -181,7 +209,7 @@ func Connect(opts ConnectOptions) (*Session, error) {
 		}
 		conn = proxiedConn
 	} else {
-		directConn, dErr := net.DialTimeout("tcp", addr, 15*time.Second)
+		directConn, dErr := net.DialTimeout("tcp", addr, timeout)
 		if dErr != nil {
 			return nil, fmt.Errorf("connection failed to %s: %w", addr, dErr)
 		}

@@ -1,3 +1,5 @@
+//go:build windows
+
 package pty
 
 import (
@@ -205,6 +207,11 @@ func (t *Terminal) Read(p []byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	}
 	return t.Out.Read(p)
+}
+
+// Pid returns the process ID of the child process.
+func (t *Terminal) Pid() int {
+	return t.pid
 }
 
 // Resize resizes the ConPTY window dimensions.

@@ -378,3 +378,30 @@ func TestStore_TightenedFilePermissions(t *testing.T) {
 	}
 }
 
+func TestStore_SeedDefaultEnvironmentFolders(t *testing.T) {
+	root := seedDefaultTree()
+	if root == nil {
+		t.Fatalf("expected seedDefaultTree to return non-nil root")
+	}
+
+	expected := []string{"Production", "UAT", "Testing", "Local", "Client", "User"}
+	if len(root.Children) != len(expected) {
+		t.Fatalf("expected %d default folders, got %d", len(expected), len(root.Children))
+	}
+
+	seenIDs := make(map[string]bool)
+	for i, exp := range expected {
+		child := root.Children[i]
+		if child.Name != exp {
+			t.Errorf("folder index %d mismatch: expected %q, got %q", i, exp, child.Name)
+		}
+		if child.Session != nil {
+			t.Errorf("default folder %q should not be a session node", child.Name)
+		}
+		if seenIDs[child.ID] {
+			t.Errorf("duplicate folder ID detected: %s", child.ID)
+		}
+		seenIDs[child.ID] = true
+	}
+}
+

@@ -198,13 +198,30 @@ func (m *Manager) Check(hostname string, remote net.Addr, key ssh.PublicKey) (*C
 			return res, nil
 		}
 
-		// Host key mismatch - potential MITM attack!
-		res.Status = StatusMismatch
-		oldKey := keyErr.Want[0].Key
-		res.OldKeyType = oldKey.Type()
-		res.OldFingerprintSHA = ssh.FingerprintSHA256(oldKey)
-		res.OldFingerprintMD5 = ssh.FingerprintLegacyMD5(oldKey)
-		res.Message = fmt.Sprintf("WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED for '%s'!", hostname)
+		// A true mismatch only occurs if a stored key of the SAME key type has changed
+		var matchingOldKey ssh.PublicKey
+		hasMatchingType := false
+		for _, want := range keyErr.Want {
+			if want.Key.Type() == key.Type() {
+				hasMatchingType = true
+				matchingOldKey = want.Key
+				break
+			}
+		}
+
+		if hasMatchingType && matchingOldKey != nil {
+			// Host key mismatch for same key type - potential MITM attack!
+			res.Status = StatusMismatch
+			res.OldKeyType = matchingOldKey.Type()
+			res.OldFingerprintSHA = ssh.FingerprintSHA256(matchingOldKey)
+			res.OldFingerprintMD5 = ssh.FingerprintLegacyMD5(matchingOldKey)
+			res.Message = fmt.Sprintf("WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED for '%s'!", hostname)
+			return res, nil
+		}
+
+		// Different host key algorithm for an existing host
+		res.Status = StatusUnknown
+		res.Message = fmt.Sprintf("The authenticity of host '%s' (%s) can't be established.", hostname, key.Type())
 		return res, nil
 	}
 
@@ -219,6 +236,40 @@ func (m *Manager) Check(hostname string, remote net.Addr, key ssh.PublicKey) (*C
 	res.Status = StatusUnknown
 	res.Message = chkErr.Error()
 	return res, nil
+}
+
+// GetAlgorithmsForHost returns known public key algorithm types for the given host and port.
+func (m *Manager) GetAlgorithmsForHost(hostname string, port int) []string {
+	if port <= 0 {
+		port = 22
+	}
+	addr := fmt.Sprintf("%s:%d", hostname, port)
+	normAddr := knownhosts.Normalize(addr)
+	normHost := knownhosts.Normalize(hostname)
+
+	entries, err := m.List()
+	if err != nil {
+		return nil
+	}
+
+	var algos []string
+	seen := make(map[string]bool)
+	for _, entry := range entries {
+		hosts := strings.Split(entry.Host, ",")
+		matched := false
+		for _, h := range hosts {
+			hTrim := strings.TrimSpace(h)
+			if hTrim == normAddr || hTrim == normHost || hTrim == hostname || hTrim == addr {
+				matched = true
+				break
+			}
+		}
+		if matched && entry.KeyType != "" && !seen[entry.KeyType] {
+			algos = append(algos, entry.KeyType)
+			seen[entry.KeyType] = true
+		}
+	}
+	return algos
 }
 
 // Add persists the host and public key to the application-specific known_hosts file.

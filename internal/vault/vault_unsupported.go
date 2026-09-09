@@ -15,6 +15,10 @@ func NewVault() (*Vault, error) {
 	return nil, ErrUnsupportedPlatform
 }
 
+func NewVaultAt(dir string) (*Vault, error) {
+	return nil, ErrUnsupportedPlatform
+}
+
 func (v *Vault) Save(key, secret string) error {
 	return ErrUnsupportedPlatform
 }

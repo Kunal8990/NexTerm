@@ -42,6 +42,7 @@
         <div class="dropdown-menu hidden" id="menu-view">
           <div class="menu-option" id="mToggleSidebar">Toggle Sidebar (Ctrl+B)</div>
           <div class="menu-option" id="mToggleMultiExec">Toggle MultiExec Bar (Alt+M)</div>
+          <div class="menu-option" id="mOpenCommandPalette">Command Palette... (Ctrl+K)</div>
           <div class="menu-separator"></div>
           <div class="menu-option" id="mSwitchTheme">🎨 Choose UI Theme...</div>
         </div>
@@ -117,6 +118,13 @@
           <span class="tb-label">MultiExec</span>
         </button>
 
+        <button id="tbBroadcastBtn" class="tb-btn" title="Broadcast Command Across Connected Terminals (Ctrl+Alt+B)">
+          <div class="tb-icon tb-broadcast-icon" style="background: linear-gradient(135deg, #0284c7, #38bdf8);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
+          </div>
+          <span class="tb-label">Broadcast</span>
+        </button>
+
         <button id="tbMacrosBtn" class="tb-btn" title="Terminal Macros (Record & Replay)">
           <div class="tb-icon tb-macros-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -158,6 +166,22 @@
           </div>
           <span class="tb-label">Help</span>
         </button>
+
+        <button id="tbCommandPaletteBtn" class="tb-btn" title="Command Palette & Quick Search (Ctrl+K)">
+          <div class="tb-icon tb-cmd-icon" style="background: linear-gradient(135deg, #4f46e5, #06b6d4);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          </div>
+          <span class="tb-label">⌘K</span>
+        </button>
+      </div>
+
+      <!-- MobaXterm Fast Connection Bar -->
+      <div class="toolbar-quick-connect" id="toolbarQuickConnect">
+        <div class="quick-connect-box">
+          <span class="quick-connect-icon" title="Quick Connect">⚡</span>
+          <input type="text" id="quickConnectInput" class="quick-connect-input" placeholder="ssh user@192.168.1.20" autocomplete="off" spellcheck="false" />
+        </div>
+        <button id="quickConnectBtn" class="quick-connect-btn" title="Quick Connect (Enter)">Connect</button>
       </div>
 
       <div class="toolbar-right">
@@ -175,6 +199,7 @@
       <div class="multiexec-badge">⚡ MULTIEXEC BROADCAST</div>
       <input type="text" id="multiExecInput" placeholder="Type command to send simultaneously to ALL active terminal tabs..." autocomplete="off" />
       <button id="multiExecSendBtn" class="btn-action primary">Broadcast (Enter)</button>
+      <button id="multiExecMatrixBtn" class="btn-action" title="Open Multi-Execution Matrix View">⊞ Matrix View</button>
       <button id="multiExecCloseBtn" class="btn-action">&times;</button>
     </div>
 
@@ -220,7 +245,12 @@
                     <span class="live-dot-pulse">●</span>
                     <span class="section-title-text">CONNECTED</span>
                   </div>
-                  <span class="connected-badge" id="connectedCountBadge">0</span>
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <button id="connectedBroadcastBtn" class="connected-header-bcast-btn" title="Broadcast Command to All Connected (Alt+B)" type="button">
+                      <span>📡</span> Broadcast
+                    </button>
+                    <span class="connected-badge" id="connectedCountBadge">0</span>
+                  </div>
                 </div>
                 <div id="connectedServersList" class="connected-servers-list">
                   <div class="connected-empty-msg">No active connections</div>
@@ -488,10 +518,50 @@
                 <input type="text" id="welcomeSearchInput" placeholder="Find existing session or server name..." autocomplete="off" />
               </div>
 
-              <!-- Saved / Recent Sessions Section (Only visible when user creates sessions) -->
-              <div class="recent-sessions-section" id="recentSessionsSection" style="display: none;">
-                <div class="recent-sessions-title">Saved Sessions</div>
+              <!-- Saved & Active Sessions Section (Always displayed prominently in center) -->
+              <div class="recent-sessions-section" id="recentSessionsSection">
+                <div class="recent-sessions-header">
+                  <span class="recent-sessions-title">⚡ Saved & Active Server Connections</span>
+                  <button class="btn btn-sm btn-outline" id="homeAddServerBtn" type="button">＋ New Server</button>
+                </div>
                 <div class="recent-sessions-grid" id="recentSessionsGrid"></div>
+              </div>
+
+              <!-- Quick Launch Options in Home Tab -->
+              <div class="home-options-panel">
+                <div class="home-panel-title">🧰 All Tools & Protocols</div>
+                <div class="home-quick-tools-grid">
+                  <button class="home-tool-card" id="homeToolSSH" type="button">
+                    <span class="tool-card-icon">🖥️</span>
+                    <span class="tool-card-title">SSH Session</span>
+                    <span class="tool-card-desc">Remote terminal shell</span>
+                  </button>
+                  <button class="home-tool-card" id="homeToolSFTP" type="button">
+                    <span class="tool-card-icon">📁</span>
+                    <span class="tool-card-title">SFTP Dual Browser</span>
+                    <span class="tool-card-desc">Transfer & edit files</span>
+                  </button>
+                  <button class="home-tool-card" id="homeToolTunnel" type="button">
+                    <span class="tool-card-icon">🔑</span>
+                    <span class="tool-card-title">SSH Tunneling</span>
+                    <span class="tool-card-desc">Port forwarding manager</span>
+                  </button>
+                  <button class="home-tool-card" id="homeToolMacros" type="button">
+                    <span class="tool-card-icon">📜</span>
+                    <span class="tool-card-title">Terminal Macros</span>
+                    <span class="tool-card-desc">Record & replay scripts</span>
+                  </button>
+                  <button class="home-tool-card" id="homeToolTaskMgr" type="button">
+                    <span class="tool-card-icon">🏃</span>
+                    <span class="tool-card-title">Task Manager</span>
+                    <span class="tool-card-desc">Windows process monitor</span>
+                  </button>
+                  <button class="home-tool-card" id="homeToolScanner" type="button">
+                    <span class="tool-card-icon">📶</span>
+                    <span class="tool-card-title">Port Scanner</span>
+                    <span class="tool-card-desc">Scan open remote ports</span>
+                  </button>
+                </div>
               </div>
 
               <div class="welcome-footer-notice">
@@ -502,17 +572,6 @@
 
           <!-- B. Live Terminal Panes -->
           <div id="panes" class="panes"></div>
-
-          <!-- Floating Terminal In-Session Controls -->
-          <div id="terminalFloatingControls" class="floating-controls hidden">
-            <button id="searchTermBtn" class="float-btn" title="Search terminal (Ctrl+Shift+F)">🔍 Search</button>
-            <button id="reconnectBtn" class="float-btn" title="Reconnect Session">↻</button>
-            <button id="clearTermBtn" class="float-btn" title="Clear Buffer">⌫</button>
-            <button id="zoomOutBtn" class="float-btn" title="Zoom Out">A-</button>
-            <button id="zoomInBtn" class="float-btn" title="Zoom In">A+</button>
-            <button id="copyAllBtn" class="float-btn" title="Copy Selected Text">📋 Copy</button>
-            <button id="pasteBtn" class="float-btn" title="Paste Clipboard (or Right-Click)">📥 Paste</button>
-          </div>
         </div>
       </main>
     </div>
@@ -548,6 +607,6 @@
   <script src="vendor/xterm.js"></script>
   <script src="vendor/addon-fit.js"></script>
   <script src="vendor/addon-search.js"></script>
-  <script src="src/main.js"></script>
+  <script type="module" src="src/app.js"></script>
 </body>
 </html>

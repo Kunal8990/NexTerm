@@ -50,67 +50,6 @@ export namespace macro {
 
 }
 
-export namespace main {
-	
-	export class SFTPListResult {
-	    path: string;
-	    items: sftpmanager.SFTPItem[];
-	
-	    static createFrom(source: any = {}) {
-	        return new SFTPListResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.path = source["path"];
-	        this.items = this.convertValues(source["items"], sftpmanager.SFTPItem);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class SavedCredential {
-	    sessionId: string;
-	    sessionName: string;
-	    host: string;
-	    port: number;
-	    username: string;
-	    vaultKey: string;
-	    password: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SavedCredential(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.sessionId = source["sessionId"];
-	        this.sessionName = source["sessionName"];
-	        this.host = source["host"];
-	        this.port = source["port"];
-	        this.username = source["username"];
-	        this.vaultKey = source["vaultKey"];
-	        this.password = source["password"];
-	    }
-	}
-
-}
-
 export namespace model {
 	
 	export class SessionProfile {
@@ -132,6 +71,8 @@ export namespace model {
 	    theme?: string;
 	    fontSize?: number;
 	    keepAliveInterval?: number;
+	    environment?: string;
+	    color?: string;
 	    protocol?: string;
 	    fontFamily?: string;
 	    rows?: number;
@@ -198,6 +139,8 @@ export namespace model {
 	        this.theme = source["theme"];
 	        this.fontSize = source["fontSize"];
 	        this.keepAliveInterval = source["keepAliveInterval"];
+	        this.environment = source["environment"];
+	        this.color = source["color"];
 	        this.protocol = source["protocol"];
 	        this.fontFamily = source["fontFamily"];
 	        this.rows = source["rows"];
@@ -334,6 +277,10 @@ export namespace model {
 	    session?: SessionProfile;
 	    children?: TreeNode[];
 	    expanded?: boolean;
+	    defaultUsername?: string;
+	    defaultPort?: number;
+	    environment?: string;
+	    color?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new TreeNode(source);
@@ -346,6 +293,10 @@ export namespace model {
 	        this.session = this.convertValues(source["session"], SessionProfile);
 	        this.children = this.convertValues(source["children"], TreeNode);
 	        this.expanded = source["expanded"];
+	        this.defaultUsername = source["defaultUsername"];
+	        this.defaultPort = source["defaultPort"];
+	        this.environment = source["environment"];
+	        this.color = source["color"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -505,6 +456,157 @@ export namespace security {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace service {
+	
+	export class BroadcastTargetResult {
+	    tabId: string;
+	    name: string;
+	    status: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BroadcastTargetResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tabId = source["tabId"];
+	        this.name = source["name"];
+	        this.status = source["status"];
+	        this.error = source["error"];
+	    }
+	}
+	export class BroadcastResult {
+	    requestId: string;
+	    targets: BroadcastTargetResult[];
+	
+	    static createFrom(source: any = {}) {
+	        return new BroadcastResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.requestId = source["requestId"];
+	        this.targets = this.convertValues(source["targets"], BroadcastTargetResult);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class LogEntry {
+	    // Go type: time
+	    timestamp: any;
+	    level: string;
+	    category: string;
+	    message: string;
+	    details?: {[key: string]: any};
+	
+	    static createFrom(source: any = {}) {
+	        return new LogEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.timestamp = this.convertValues(source["timestamp"], null);
+	        this.level = source["level"];
+	        this.category = source["category"];
+	        this.message = source["message"];
+	        this.details = source["details"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SFTPListResult {
+	    path: string;
+	    items: sftpmanager.SFTPItem[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SFTPListResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.items = this.convertValues(source["items"], sftpmanager.SFTPItem);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class SavedCredential {
+	    sessionId: string;
+	    sessionName: string;
+	    host: string;
+	    port: number;
+	    username: string;
+	    vaultKey: string;
+	    password: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SavedCredential(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sessionId = source["sessionId"];
+	        this.sessionName = source["sessionName"];
+	        this.host = source["host"];
+	        this.port = source["port"];
+	        this.username = source["username"];
+	        this.vaultKey = source["vaultKey"];
+	        this.password = source["password"];
+	    }
 	}
 
 }

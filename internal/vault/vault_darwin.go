@@ -25,6 +25,11 @@ func NewVault() (*Vault, error) {
 	return &Vault{service: keychainServiceName}, nil
 }
 
+// NewVaultAt returns a Vault instance (directory path is ignored on macOS as credentials reside in native Keychain).
+func NewVaultAt(dir string) (*Vault, error) {
+	return NewVault()
+}
+
 func (v *Vault) Save(key, secret string) error {
 	if key == "" {
 		return errors.New("vault: key cannot be empty")

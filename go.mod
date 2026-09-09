@@ -3,6 +3,7 @@ module nexterm
 go 1.25.0
 
 require (
+	github.com/creack/pty v1.1.24
 	github.com/google/uuid v1.6.0
 	github.com/pkg/sftp v1.13.11
 	github.com/wailsapp/wails/v2 v2.9.2
