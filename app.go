@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"runtime"
@@ -15,6 +16,7 @@ import (
 	"nexterm/internal/macro"
 	"nexterm/internal/model"
 	"nexterm/internal/nettools"
+	"nexterm/internal/protocol"
 	"nexterm/internal/security"
 	"nexterm/internal/service"
 	sftpmanager "nexterm/internal/sftp"
@@ -214,6 +216,116 @@ func (a *App) ExportSessions() (string, error) {
 
 func (a *App) ImportSessions(jsonContent string) (*model.TreeNode, error) {
 	return a.sessionService.ImportSessions(jsonContent)
+}
+
+// IsXServerRunning reports whether a local X server (VcXsrv, Xming, GWSL, …) is
+// accepting connections on the default X11 port 6000 (display :0).
+func (a *App) IsXServerRunning() bool {
+	conn, err := net.DialTimeout("tcp", "127.0.0.1:6000", 400*time.Millisecond)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+// LaunchXServer starts a local Windows X server so that X11-forwarded remote GUI
+// apps can display. It first checks whether one is already running, then tries the
+// common installs (VcXsrv, Xming, GWSL). Returns a human-readable status string.
+func (a *App) LaunchXServer() (string, error) {
+	if a.IsXServerRunning() {
+		return "An X server is already running on display :0 (port 6000).", nil
+	}
+
+	type candidate struct {
+		path string
+		args []string
+	}
+	candidates := []candidate{
+		{`C:\Program Files\VcXsrv\vcxsrv.exe`, []string{":0", "-multiwindow", "-clipboard", "-wgl", "-ac"}},
+		{`C:\Program Files (x86)\VcXsrv\vcxsrv.exe`, []string{":0", "-multiwindow", "-clipboard", "-wgl", "-ac"}},
+		{`C:\Program Files\Xming\Xming.exe`, []string{":0", "-clipboard", "-multiwindow", "-ac"}},
+		{`C:\Program Files (x86)\Xming\Xming.exe`, []string{":0", "-clipboard", "-multiwindow", "-ac"}},
+	}
+
+	for _, c := range candidates {
+		if _, err := os.Stat(c.path); err == nil {
+			cmd := exec.Command(c.path, c.args...)
+			if err := cmd.Start(); err != nil {
+				return "", fmt.Errorf("found %s but failed to start it: %w", c.path, err)
+			}
+			a.loggingService.LogAudit("XSERVER_STARTED", "xserver", "", "", "", "SUCCESS", c.path)
+			return "Started X server: " + c.path + " (display :0). Enable 'X11 Forwarding' on a session, then run a GUI app like 'xclock'.", nil
+		}
+	}
+
+	return "", fmt.Errorf("no X server found. Install VcXsrv (recommended, free) from sourceforge.net/projects/vcxsrv and try again")
+}
+
+// RunSSHCommand runs a one-shot command on the SSH connection bound to tabID and
+// returns its combined stdout+stderr. Used by the Server Monitoring dashboard to
+// poll live metrics (load, memory, users, ports, network) without disturbing the
+// interactive shell. Returns an error if the tab has no active SSH session.
+func (a *App) RunSSHCommand(tabID, command string) (string, error) {
+	sess, ok := a.connectionManager.GetSession(tabID)
+	if !ok || sess == nil {
+		return "", fmt.Errorf("no active session for tab %s", tabID)
+	}
+	sshSess, ok := sess.(*protocol.SSHSession)
+	if !ok {
+		return "", fmt.Errorf("monitoring is only available for SSH sessions")
+	}
+	client := sshSess.Client()
+	if client == nil {
+		return "", fmt.Errorf("SSH client is not connected")
+	}
+	s, err := client.NewSession()
+	if err != nil {
+		return "", err
+	}
+	defer s.Close()
+	out, err := s.CombinedOutput(command)
+	// A non-zero exit still yields useful output; return what we captured.
+	return string(out), err
+}
+
+// ExportSessionsToFile serializes all saved sessions/folders and writes them to
+// a JSON file the user chooses via a native Save dialog. Returns the saved path.
+func (a *App) ExportSessionsToFile() (string, error) {
+	data, err := a.sessionService.ExportSessions()
+	if err != nil {
+		return "", err
+	}
+	suggested := fmt.Sprintf("nexterm_sessions_%s.json", time.Now().Format("20060102_150405"))
+	savePath, err := a.sftpService.SelectDownloadDest(a.ctx, suggested)
+	if err != nil || savePath == "" {
+		return "", err
+	}
+	if err := os.WriteFile(savePath, []byte(data), 0644); err != nil {
+		return "", fmt.Errorf("failed to save sessions export: %w", err)
+	}
+	a.loggingService.LogAudit("SESSIONS_EXPORTED", "sessions", "", "", "", "SUCCESS", savePath)
+	return savePath, nil
+}
+
+// ImportSessionsFromFile lets the user pick a JSON file via a native Open dialog
+// and merges its sessions/folders into the current tree. Returns the new tree.
+// If the user cancels the dialog, the existing tree is returned unchanged.
+func (a *App) ImportSessionsFromFile() (*model.TreeNode, error) {
+	path, err := a.sftpService.SelectUploadFile(a.ctx)
+	if err != nil || path == "" {
+		return a.sessionService.GetSessionTree(), err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read import file: %w", err)
+	}
+	tree, err := a.sessionService.ImportSessions(string(data))
+	if err != nil {
+		return nil, err
+	}
+	a.loggingService.LogAudit("SESSIONS_IMPORTED", "sessions", "", "", "", "SUCCESS", path)
+	return tree, nil
 }
 
 // =========================================================================

@@ -600,12 +600,29 @@ html, body, #app {
 /* Left Sidebar */
 .sidebar {
   width: 290px;
-  min-width: 240px;
-  max-width: 450px;
+  min-width: 180px;
+  max-width: 640px;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+  position: relative; /* anchor the collapse toggle to the sidebar's own edge */
+}
+
+/* Draggable divider between the left panel and the workspace */
+.sidebar-resizer {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 20;
+}
+.sidebar-resizer:hover,
+.sidebar-resizer.dragging {
+  background: var(--accent-blue, #38bdf8);
 }
 
 .sidebar-quick-connect {
@@ -7417,9 +7434,23 @@ html, body {
 }
 
 .bcast-large-modal {
-  width: 920px;
-  max-width: 95vw;
-  max-height: 88vh;
+  width: min(960px, 96vw);
+  max-width: 96vw;
+  max-height: 90vh;
+}
+
+/* When a modal hosts its own self-sized card (e.g. the Broadcast Orchestrator),
+   the generic #modalBox must not impose the default 480px width or clip the
+   card with overflow:hidden — otherwise the right half of the dialog (close
+   button, later steps, right column) gets cut off the screen. */
+.modal-card.modal-plain {
+  width: auto;
+  max-width: 96vw;
+  max-height: 92vh;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  overflow: visible;
 }
 
 .broadcast-header {
@@ -7566,6 +7597,7 @@ html, body {
   padding: 16px 20px;
   overflow-y: auto;
   max-height: calc(88vh - 160px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -9364,3 +9396,59 @@ html, body {
 }
 
 
+
+/* ==========================================================================
+   Server Monitoring Dashboard
+   ========================================================================== */
+.mon-modal { width: min(1040px, 96vw); max-height: 90vh; display: flex; flex-direction: column; }
+/* Let the monitor body take the remaining height and scroll internally so the
+   Disk Usage section and footer are always reachable. */
+.mon-body { flex: 1 1 auto; min-height: 0; max-height: none; overflow-y: auto; }
+.mon-host-name { font-size: 13px; color: #38bdf8; font-weight: 600; }
+.mon-header-tools { display: flex; align-items: center; gap: 10px; }
+.mon-select {
+  background: #0b1220; color: #e2e8f0; border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px; padding: 5px 8px; font-size: 12px; max-width: 260px;
+}
+.mon-body { gap: 12px; }
+.mon-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.mon-tile {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;
+}
+.mon-tile-label { font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; }
+.mon-tile-val { font-size: 17px; font-weight: 700; color: #f8fafc; }
+.mon-tile-val.mon-tile-sm { font-size: 13px; font-weight: 600; }
+.mon-tile-sub { font-size: 11px; color: #94a3b8; }
+.mon-spark { width: 100%; height: 46px; margin-top: 4px; }
+.mon-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 760px) { .mon-cols { grid-template-columns: 1fr; } }
+.mon-panel {
+  background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px; overflow: hidden; display: flex; flex-direction: column;
+}
+.mon-panel-head {
+  padding: 8px 12px; font-size: 12px; font-weight: 700; color: #e2e8f0;
+  background: rgba(0,0,0,0.25); border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.mon-table { max-height: 240px; overflow-y: auto; }
+.mon-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 7px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px;
+}
+.mon-row:last-child { border-bottom: none; }
+.mon-row-main { color: #e2e8f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mon-row-side { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.mon-dim { color: #94a3b8; font-size: 11px; }
+.mon-tag { background: rgba(56,189,248,0.16); color: #7dd3fc; border-radius: 4px; padding: 1px 6px; font-size: 10px; }
+.mon-act-btn {
+  background: rgba(255,255,255,0.06); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 5px; padding: 3px 9px; font-size: 11px; cursor: pointer; transition: all .15s;
+}
+.mon-act-btn:hover { background: rgba(255,255,255,0.12); }
+.mon-act-btn.danger { color: #fca5a5; border-color: rgba(239,68,68,0.4); }
+.mon-act-btn.danger:hover { background: rgba(239,68,68,0.18); color: #fecaca; }
+.mon-bar { flex: 1; height: 8px; background: rgba(255,255,255,0.08); border-radius: 5px; overflow: hidden; }
+.mon-bar-fill { height: 100%; border-radius: 5px; transition: width .3s; }
+.mon-empty { padding: 14px; text-align: center; color: #64748b; font-size: 12px; }
+.mon-localbar { font-size: 11px; color: #94a3b8; padding: 6px 2px 0; border-top: 1px solid rgba(255,255,255,0.06); }

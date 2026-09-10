@@ -183,6 +183,7 @@ func (cm *ConnectionManager) buildSSHConnectOptions(tabID string, profile model.
 		WorkingDirectory:  profile.WorkingDirectory,
 		ConnectionTimeout: profile.ConnectionTimeout,
 		Compression:       profile.Compression,
+		X11Forwarding:     profile.X11Forwarding,
 		ProxyType:         profile.ProxyType,
 		ProxyHost:         profile.ProxyHost,
 		ProxyPort:         profile.ProxyPort,

@@ -50,6 +50,7 @@ import {
 } from './terminal/terminalManager.js';
 import { showMultiExecutionModal } from './terminal/multiExecution.js';
 import { openBroadcastDialog } from './terminal/broadcast.js';
+import { openServerMonitor } from './monitor/serverMonitor.js';
 import { showNewSessionDialog, showFolderDialog } from './sessions/sessionDialog.js';
 import { showMultiServerConnectDialog } from './sessions/multiServerConnect.js';
 import { refreshTree, switchSidebarView, parseQuickConnect } from './sessions/sessionTree.js';
@@ -253,6 +254,20 @@ export function setupEventListeners() {
   safeClick("mOpenTunneling", showTunnelingDialog);
   safeClick("mOpenSettings", showSettingsDialog);
   safeClick("mRecordMacro", showRecordMacroDialog);
+  safeClick("mStartXServer", async () => {
+    if (!(window.go && window.go.main && window.go.main.App && window.go.main.App.LaunchXServer)) {
+      showToast("X Server support requires rebuilding the app (run.bat)", "error");
+      return;
+    }
+    try {
+      const msg = await window.go.main.App.LaunchXServer();
+      showToast(msg || "X server started", "success");
+    } catch (err) {
+      showToast("X Server: " + err, "warning");
+    }
+  });
+  safeClick("mImportSessions", () => { const b = document.getElementById("treeImportBtn"); if (b) b.click(); });
+  safeClick("mExportSessions", () => { const b = document.getElementById("treeExportBtn"); if (b) b.click(); });
   safeClick("mCloseTab", () => { if (activeTabId && activeTabId !== "home") closeTab(activeTabId); });
   safeClick("mClearTab", () => { if (activeTabId && tabs[activeTabId]) tabs[activeTabId].term.clear(); });
   safeClick("mFindInTerm", () => {
@@ -266,7 +281,13 @@ export function setupEventListeners() {
 
   // Toolbar buttons
   safeClick("tbSessionBtn", () => showNewSessionDialog());
-  safeClick("tbServersBtn", () => switchSidebarView("sessions"));
+  safeClick("tbServersBtn", async () => {
+    switchSidebarView("sessions");
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.ExpandAllFolders) {
+      try { await window.go.main.App.ExpandAllFolders(true); } catch (_) {}
+    }
+    await refreshTree();
+  });
   safeClick("tbToolsBtn", () => switchSidebarView("tools"));
   safeClick("tbSplitBtn", (e) => showSplitMenu(e.clientX, e.clientY + 10));
   safeClick("tbMultiExecBtn", showMultiExecutionModal);
@@ -278,7 +299,19 @@ export function setupEventListeners() {
   safeClick("tbThemeBtn", showThemePickerDialog);
   safeClick("tbSettingsBtn", showSettingsDialog);
   safeClick("tbCommandPaletteBtn", openCommandPalette);
-  safeClick("tbHelpBtn", () => showToast("Shortcuts: Ctrl+K (Commands), Ctrl+N (New Session), Ctrl+W (Close Tab), Alt+M (MultiExec)", "info"));
+  safeClick("tbMonitorBtn", () => openServerMonitor());
+  safeClick("tbXServerBtn", async () => {
+    if (!(window.go && window.go.main && window.go.main.App && window.go.main.App.LaunchXServer)) {
+      showToast("X Server support requires rebuilding the app (run.bat)", "error");
+      return;
+    }
+    try {
+      const msg = await window.go.main.App.LaunchXServer();
+      showToast(msg || "X server started", "success");
+    } catch (err) {
+      showToast("X Server: " + err, "warning");
+    }
+  });
   safeClick("tbExitBtn", () => { if (confirm("Exit Nexterm?")) window.close(); });
 
   // MultiExec
@@ -524,6 +557,31 @@ export function setupEventListeners() {
   });
   safeClick("treeRefreshBtn", () => refreshTree());
 
+  // Export all saved sessions/folders to a JSON file
+  safeClick("treeExportBtn", async () => {
+    if (!(window.go && window.go.main && window.go.main.App)) return;
+    try {
+      const savedPath = await window.go.main.App.ExportSessionsToFile();
+      if (savedPath) {
+        showToast(`Sessions exported to ${savedPath}`, "success");
+      }
+    } catch (err) {
+      showToast("Export failed: " + err, "error");
+    }
+  });
+
+  // Import saved sessions/folders from a JSON file
+  safeClick("treeImportBtn", async () => {
+    if (!(window.go && window.go.main && window.go.main.App)) return;
+    try {
+      await window.go.main.App.ImportSessionsFromFile();
+      await refreshTree();
+      showToast("Sessions imported successfully", "success");
+    } catch (err) {
+      showToast("Import failed: " + err, "error");
+    }
+  });
+
   // ------------------------------------------------------------------------
   // Quick Connect (Toolbar Fast Connection Bar & Sidebar)
   // Supports:
@@ -716,6 +774,53 @@ export function setupEventListeners() {
   window.addEventListener("resize", () => {
     refitAllTerminals();
   });
+
+  // Resizable Left Panel (sidebar) — drag the divider to adjust width,
+  // double-click to reset. Width is remembered across launches.
+  const sidebarEl = document.getElementById("sidebar");
+  const sidebarResizer = document.getElementById("sidebarResizer");
+  if (sidebarEl && sidebarResizer) {
+    const SIDEBAR_MIN = 180;
+    const SIDEBAR_MAX = 640;
+    const SIDEBAR_DEFAULT = 290;
+    try {
+      const savedW = parseInt(localStorage.getItem("nexterm_sidebar_width"), 10);
+      if (savedW && savedW >= SIDEBAR_MIN && savedW <= SIDEBAR_MAX) {
+        sidebarEl.style.width = savedW + "px";
+      }
+    } catch (_) {}
+
+    let sbDragging = false;
+    sidebarResizer.addEventListener("mousedown", (e) => {
+      sbDragging = true;
+      sidebarResizer.classList.add("dragging");
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      e.preventDefault();
+    });
+    window.addEventListener("mousemove", (e) => {
+      if (!sbDragging) return;
+      const left = sidebarEl.getBoundingClientRect().left;
+      let w = Math.max(SIDEBAR_MIN, Math.min(SIDEBAR_MAX, e.clientX - left));
+      sidebarEl.style.width = w + "px";
+    });
+    window.addEventListener("mouseup", () => {
+      if (!sbDragging) return;
+      sbDragging = false;
+      sidebarResizer.classList.remove("dragging");
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      try {
+        localStorage.setItem("nexterm_sidebar_width", String(parseInt(sidebarEl.style.width, 10) || SIDEBAR_DEFAULT));
+      } catch (_) {}
+      refitAllTerminals();
+    });
+    sidebarResizer.addEventListener("dblclick", () => {
+      sidebarEl.style.width = SIDEBAR_DEFAULT + "px";
+      try { localStorage.setItem("nexterm_sidebar_width", String(SIDEBAR_DEFAULT)); } catch (_) {}
+      refitAllTerminals();
+    });
+  }
 
   // Global Shortcuts
   window.addEventListener("keydown", (e) => {

@@ -56,6 +56,11 @@ type ConnectOptions struct {
 	// Terminal & Startup
 	WorkingDirectory string
 
+	// X11 forwarding: when true, request X11 on the session and forward remote
+	// GUI apps to the local X server on 127.0.0.1:(6000+X11Display).
+	X11Forwarding bool
+	X11Display    int
+
 	// SSH Advanced
 	ConnectionTimeout int // in seconds
 	Compression       bool
@@ -264,6 +269,13 @@ func Connect(opts ConnectOptions) (*Session, error) {
 		_ = sshSess.Close()
 		_ = client.Close()
 		return nil, fmt.Errorf("failed to request pty: %w", err)
+	}
+
+	// X11 forwarding (best-effort): request X11 before the shell starts and
+	// forward incoming x11 channels to the local X server. A failure here must
+	// not break the interactive session, so errors are non-fatal.
+	if opts.X11Forwarding {
+		_ = setupX11Forwarding(sshSess, client, opts.X11Display)
 	}
 
 	// Change working directory if requested

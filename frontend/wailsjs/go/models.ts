@@ -85,6 +85,7 @@ export namespace model {
 	    connectionTimeout?: number;
 	    compression?: boolean;
 	    useAgent?: boolean;
+	    x11Forwarding?: boolean;
 	    autoReconnect?: boolean;
 	    reconnectAttempts?: number;
 	    reconnectDelay?: number;
@@ -153,6 +154,7 @@ export namespace model {
 	        this.connectionTimeout = source["connectionTimeout"];
 	        this.compression = source["compression"];
 	        this.useAgent = source["useAgent"];
+	        this.x11Forwarding = source["x11Forwarding"];
 	        this.autoReconnect = source["autoReconnect"];
 	        this.reconnectAttempts = source["reconnectAttempts"];
 	        this.reconnectDelay = source["reconnectDelay"];

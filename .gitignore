@@ -7,6 +7,11 @@ build/bin/
 *.dylib
 bin/
 
+# Logs & diagnostic outputs
+*.log
+*_log.txt
+build_diag.bat
+
 # Go test / coverage
 *.out
 *.test

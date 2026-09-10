@@ -55,6 +55,8 @@
           <div class="menu-separator"></div>
           <div class="menu-option" id="mToolCmdAdmin">Command Prompt (Admin)</div>
           <div class="menu-option" id="mToolPSAdmin">PowerShell (Admin)</div>
+          <div class="menu-separator"></div>
+          <div class="menu-option" id="mStartXServer">🖥️ Start X Server (Linux GUI apps)</div>
         </div>
       </div>
       <div class="menu-item" data-menu="menu-tunneling">Tunneling
@@ -160,11 +162,18 @@
           <span class="tb-label">Settings</span>
         </button>
 
-        <button id="tbHelpBtn" class="tb-btn" title="Help & Shortcuts">
-          <div class="tb-icon tb-help-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        <button id="tbMonitorBtn" class="tb-btn" title="Server Monitoring — live load, memory, users, ports & network">
+          <div class="tb-icon tb-monitor-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><path d="M7 15l3-4 3 2 4-6"></path></svg>
           </div>
-          <span class="tb-label">Help</span>
+          <span class="tb-label">Monitor</span>
+        </button>
+
+        <button id="tbXServerBtn" class="tb-btn" title="X Server — start a local X server so remote Linux GUI apps display here (X11 forwarding)">
+          <div class="tb-icon tb-xserver-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M8 8l3 3-3 3"></path><path d="M13 14h4"></path></svg>
+          </div>
+          <span class="tb-label">X Server</span>
         </button>
 
         <button id="tbCommandPaletteBtn" class="tb-btn" title="Command Palette & Quick Search (Ctrl+K)">
@@ -270,6 +279,8 @@
                     <button id="treeAddFolderBtn" title="New Folder">📁</button>
                     <button id="treeExpandAllBtn" title="Expand All Folders">⊞</button>
                     <button id="treeCollapseAllBtn" title="Collapse All Folders">⊟</button>
+                    <button id="treeImportBtn" title="Import sessions from a JSON file">📥</button>
+                    <button id="treeExportBtn" title="Export all sessions to a JSON file">📤</button>
                     <button id="treeRefreshBtn" title="Refresh">↻</button>
                   </div>
                 </div>
@@ -465,6 +476,9 @@
           </div>
         </div>
       </aside>
+
+      <!-- Draggable divider to resize the left panel -->
+      <div id="sidebarResizer" class="sidebar-resizer" title="Drag to resize the panel (double-click to reset)"></div>
 
       <!-- 4. Main Workspace & Tabbed Terminals -->
       <main id="workspace" class="workspace">

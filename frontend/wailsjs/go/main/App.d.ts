@@ -64,6 +64,10 @@ export function ExportAuditLogsJSON():Promise<string>;
 
 export function ExportSessions():Promise<string>;
 
+export function ExportSessionsToFile():Promise<string>;
+
+export function FindSessionPassword(arg1:string,arg2:string,arg3:number,arg4:string):Promise<string>;
+
 export function FocusWorkspacePane(arg1:string):Promise<void>;
 
 export function GetAuditLogs(arg1:number):Promise<Array<service.AuditEvent>>;
@@ -86,8 +90,6 @@ export function GetSecurityPolicy():Promise<security.SecurityPolicy>;
 
 export function GetSessionPassphrase(arg1:string):Promise<string>;
 
-export function FindSessionPassword(arg1:string,arg2:string,arg3:number,arg4:string):Promise<string>;
-
 export function GetSessionPassword(arg1:string):Promise<string>;
 
 export function GetSessionTree():Promise<model.TreeNode>;
@@ -100,9 +102,15 @@ export function HasSavedPassword(arg1:string):Promise<boolean>;
 
 export function ImportSessions(arg1:string):Promise<model.TreeNode>;
 
+export function ImportSessionsFromFile():Promise<model.TreeNode>;
+
+export function IsXServerRunning():Promise<boolean>;
+
 export function LaunchRDPSession(arg1:model.SessionProfile,arg2:string):Promise<void>;
 
 export function LaunchSystemTool(arg1:string):Promise<void>;
+
+export function LaunchXServer():Promise<string>;
 
 export function MoveNode(arg1:string,arg2:string,arg3:number):Promise<model.TreeNode>;
 
@@ -135,6 +143,8 @@ export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void
 export function RespondAuthChallenge(arg1:string,arg2:Array<string>):Promise<void>;
 
 export function RespondHostKey(arg1:string,arg2:string):Promise<void>;
+
+export function RunSSHCommand(arg1:string,arg2:string):Promise<string>;
 
 export function SFTPChmodLocal(arg1:string,arg2:string):Promise<void>;
 

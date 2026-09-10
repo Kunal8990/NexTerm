@@ -882,7 +882,7 @@ function renderBroadcastModal() {
       contentHtml = renderTargetsStep();
   }
 
-  showModal(contentHtml);
+  showModal(contentHtml, 'modal-plain');
   attachModalHandlers();
 }
 

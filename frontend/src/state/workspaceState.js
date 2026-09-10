@@ -144,6 +144,16 @@ export function renderWorkspace() {
   const visiblePanes = workspaceState.panes.slice(0, visibleLimit);
   const tabs = getTabs();
 
+  // Single-layer header rule: when the workspace is split into multiple panes,
+  // each pane draws its own header (server name + split/maximize/close controls),
+  // so the global top tab bar would be a redundant second layer. Hide the global
+  // tab bar in multi-pane layouts and show it only in single-pane mode. This
+  // keeps exactly ONE header layer on screen at all times.
+  const tabbarContainer = document.getElementById("tabbarContainer");
+  if (tabbarContainer) {
+    tabbarContainer.style.display = visiblePanes.length > 1 ? "none" : "";
+  }
+
   // Remove stale pane DOM elements
   const existingDomPanes = Array.from(panesEl.querySelectorAll(".workspace-pane"));
   existingDomPanes.forEach(domP => {

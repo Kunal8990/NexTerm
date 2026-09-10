@@ -110,6 +110,14 @@ export function ExportSessions() {
   return window['go']['main']['App']['ExportSessions']();
 }
 
+export function ExportSessionsToFile() {
+  return window['go']['main']['App']['ExportSessionsToFile']();
+}
+
+export function FindSessionPassword(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['FindSessionPassword'](arg1, arg2, arg3, arg4);
+}
+
 export function FocusWorkspacePane(arg1) {
   return window['go']['main']['App']['FocusWorkspacePane'](arg1);
 }
@@ -154,10 +162,6 @@ export function GetSessionPassphrase(arg1) {
   return window['go']['main']['App']['GetSessionPassphrase'](arg1);
 }
 
-export function FindSessionPassword(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['FindSessionPassword'](arg1, arg2, arg3, arg4);
-}
-
 export function GetSessionPassword(arg1) {
   return window['go']['main']['App']['GetSessionPassword'](arg1);
 }
@@ -182,12 +186,24 @@ export function ImportSessions(arg1) {
   return window['go']['main']['App']['ImportSessions'](arg1);
 }
 
+export function ImportSessionsFromFile() {
+  return window['go']['main']['App']['ImportSessionsFromFile']();
+}
+
+export function IsXServerRunning() {
+  return window['go']['main']['App']['IsXServerRunning']();
+}
+
 export function LaunchRDPSession(arg1, arg2) {
   return window['go']['main']['App']['LaunchRDPSession'](arg1, arg2);
 }
 
 export function LaunchSystemTool(arg1) {
   return window['go']['main']['App']['LaunchSystemTool'](arg1);
+}
+
+export function LaunchXServer() {
+  return window['go']['main']['App']['LaunchXServer']();
 }
 
 export function MoveNode(arg1, arg2, arg3) {
@@ -252,6 +268,10 @@ export function RespondAuthChallenge(arg1, arg2) {
 
 export function RespondHostKey(arg1, arg2) {
   return window['go']['main']['App']['RespondHostKey'](arg1, arg2);
+}
+
+export function RunSSHCommand(arg1, arg2) {
+  return window['go']['main']['App']['RunSSHCommand'](arg1, arg2);
 }
 
 export function SFTPChmodLocal(arg1, arg2) {

@@ -43,6 +43,7 @@ type SessionProfile struct {
 	ConnectionTimeout int    `json:"connectionTimeout,omitempty"` // in seconds, default 10
 	Compression       bool   `json:"compression,omitempty"`
 	UseAgent          bool   `json:"useAgent,omitempty"`
+	X11Forwarding     bool   `json:"x11Forwarding,omitempty"` // forward remote GUI apps to a local X server (VcXsrv/Xming)
 	AutoReconnect     bool   `json:"autoReconnect,omitempty"`
 	ReconnectAttempts int    `json:"reconnectAttempts,omitempty"` // default 5
 	ReconnectDelay    int    `json:"reconnectDelay,omitempty"`    // in seconds, default 2

@@ -81,6 +81,7 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
     keepAliveInterval: 15,
     connectionTimeout: 10,
     compression: false,
+    x11Forwarding: false,
     proxyType: "none",
     proxyHost: "",
     proxyPort: 1080,
@@ -620,6 +621,13 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
             <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
               <input type="checkbox" id="sCompression" ${p.compression ? 'checked' : ''} />
               <span><b>Enable SSH payload compression (zlib)</b> — improves speed over slow links</span>
+            </label>
+          </div>
+
+          <div class="sess-form-group">
+            <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" id="sX11Forwarding" ${p.x11Forwarding ? 'checked' : ''} />
+              <span><b>Enable X11 Forwarding</b> — run remote Linux GUI apps on your desktop (needs a local X server; use Tools → Start X Server)</span>
             </label>
           </div>
 
@@ -1492,6 +1500,7 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
       keepAliveInterval: parseInt(box.querySelector("#sKeepAlive").value, 10) || 15,
       connectionTimeout: parseInt(box.querySelector("#sTimeout").value, 10) || 10,
       compression: box.querySelector("#sCompression") ? box.querySelector("#sCompression").checked : false,
+      x11Forwarding: box.querySelector("#sX11Forwarding") ? box.querySelector("#sX11Forwarding").checked : false,
       autoReconnect: box.querySelector("#sAutoReconnect") ? box.querySelector("#sAutoReconnect").checked : false,
       reconnectAttempts: parseInt(box.querySelector("#sReconnectAttempts")?.value, 10) || 5,
       reconnectDelay: parseInt(box.querySelector("#sReconnectDelay")?.value, 10) || 2,

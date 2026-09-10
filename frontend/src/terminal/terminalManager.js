@@ -692,11 +692,11 @@ export function createTab(tabId, profile, isLocal = false, initialState = "Conne
           <div class="pane-split-handle" id="splitHandle_${tabId}" title="Drag to resize / Click toggle button to collapse SFTP">
             <span class="split-drag-bar"></span>
             <button class="split-toggle-btn" id="sftpToggleBtn_${tabId}" type="button">
-              <span class="split-icon">📂</span> SFTP Dual File Manager
+              <span class="split-icon">📂</span> Show SFTP Dual File Manager
             </button>
           </div>
         </div>
-        <div class="pane-sftp-bottom" id="sftpBottom_${tabId}">
+        <div class="pane-sftp-bottom is-collapsed" id="sftpBottom_${tabId}">
           <div class="sftp-dual-container" id="sftpDual_${tabId}">
             <!-- Local Files Half -->
             <div class="sftp-half-pane sftp-pane-local" id="sftpLocalHalf_${tabId}">
