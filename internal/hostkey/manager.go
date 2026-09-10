@@ -427,6 +427,10 @@ func (m *Manager) List() ([]HostKeyEntry, error) {
 				LineNumber:  lineNum,
 			})
 		}
+		if err := scanner.Err(); err != nil {
+			// Scan encountered a read error; proceed with entries parsed so far
+			_ = err
+		}
 		_ = f.Close()
 	}
 
