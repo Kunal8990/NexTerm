@@ -12,6 +12,12 @@ bin/
 *_log.txt
 build_diag.bat
 
+# Local test cases & internal analysis notes
+*.xlsx
+*.xls
+BASTION.md
+NexTerm_MobaXterm_Gap_Analysis.md
+
 # Go test / coverage
 *.out
 *.test
