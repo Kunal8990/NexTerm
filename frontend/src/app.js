@@ -593,9 +593,10 @@ export function setupEventListeners() {
     const safeUser = (username || "user").replace(/[^a-zA-Z0-9_-]/g, "_");
     const detKey = `session_${safeUser}_${safeHost}_${port}`;
 
+    const profileId = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : ('sess-' + Date.now());
     const newProfile = {
-      id: "quick-" + Date.now(),
-      vaultKey: detKey,
+      id: profileId,
+      vaultKey: profileId,
       name: title,
       protocol: proto,
       host: parsed.host,
@@ -608,11 +609,7 @@ export function setupEventListeners() {
     // Auto-save to session tree so login info and host are preserved in sidebar
     if (window.go?.main?.App?.AddSession) {
       try {
-        const res = await window.go.main.App.AddSession("", newProfile);
-        if (res && res.session) {
-          newProfile.id = res.session.id;
-          newProfile.vaultKey = res.session.vaultKey || detKey;
-        }
+        await window.go.main.App.AddSession("", newProfile);
         await refreshTree();
       } catch (err) {
         console.warn("Auto-saving quick connect session failed:", err);

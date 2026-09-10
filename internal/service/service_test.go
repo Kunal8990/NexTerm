@@ -452,4 +452,67 @@ func TestBuildSSHConnectOptions_BastionCredentials(t *testing.T) {
 	}
 }
 
+func TestCredentialService_FindSessionPasswordFallback(t *testing.T) {
+	tempVaultDir := t.TempDir()
+	v, err := vault.NewVaultAt(tempVaultDir)
+	if err != nil {
+		t.Fatalf("failed to create temp vault: %v", err)
+	}
+	credSvc := NewCredentialService(v)
+
+	// Save password under a session UUID vault key
+	sessionVaultKey := "test-sess-uuid-1234"
+	if err := credSvc.SaveSessionPassword(sessionVaultKey, "secret123"); err != nil {
+		t.Fatalf("SaveSessionPassword failed: %v", err)
+	}
+
+	// Mock tree with that session
+	mockTree := &model.TreeNode{
+		ID:   "root",
+		Name: "Root",
+		Children: []*model.TreeNode{
+			{
+				ID:   "node-1",
+				Name: "Web Server",
+				Session: &model.SessionProfile{
+					ID:       "test-sess-uuid-1234",
+					Name:     "Web Server",
+					Host:     "192.168.1.100",
+					Port:     22,
+					Username: "ubuntu",
+					VaultKey: sessionVaultKey,
+				},
+			},
+		},
+	}
+	credSvc.SetTreeProvider(func() *model.TreeNode {
+		return mockTree
+	})
+
+	// 1. Direct lookup by vaultKey
+	p1, err := credSvc.FindSessionPassword(sessionVaultKey, "192.168.1.100", 22, "ubuntu")
+	if err != nil || p1 != "secret123" {
+		t.Errorf("expected 'secret123', got '%s', err: %v", p1, err)
+	}
+
+	// 2. Cross-session resolution without vaultKey (matching host & username)
+	p2, err := credSvc.FindSessionPassword("", "192.168.1.100", 22, "ubuntu")
+	if err != nil || p2 != "secret123" {
+		t.Errorf("expected fallback 'secret123', got '%s', err: %v", p2, err)
+	}
+
+	// 3. Resolution using a new deterministic key (e.g. from Quick Connect)
+	quickKey := "session_ubuntu_192_168_1_100_22"
+	p3, err := credSvc.FindSessionPassword(quickKey, "192.168.1.100", 22, "ubuntu")
+	if err != nil || p3 != "secret123" {
+		t.Errorf("expected resolved 'secret123' for quickKey, got '%s', err: %v", p3, err)
+	}
+
+	// Verify quickKey was populated in vault
+	p4, err := credSvc.GetSessionPassword(quickKey)
+	if err != nil || p4 != "secret123" {
+		t.Errorf("expected quickKey in vault 'secret123', got '%s', err: %v", p4, err)
+	}
+}
+
 

@@ -252,6 +252,29 @@ func (s *SessionService) AddSession(parentID string, profile model.SessionProfil
 		profile.KeyPassphrase = ""
 	}
 
+	// Deduplicate: if an existing session under this parent matches the exact host, port, and username,
+	// update it in place so multiple duplicate nodes are not created repeatedly.
+	for _, c := range parent.Children {
+		if c.Session != nil && strings.EqualFold(c.Session.Host, profile.Host) &&
+			c.Session.Port == profile.Port && strings.EqualFold(c.Session.Username, profile.Username) &&
+			strings.EqualFold(c.Session.Protocol, profile.Protocol) {
+			c.Name = profile.Name
+			c.Session.Name = profile.Name
+			c.Session.Environment = profile.Environment
+			c.Session.Color = profile.Color
+			c.Session.AuthType = profile.AuthType
+			if profile.VaultKey != "" {
+				c.Session.VaultKey = profile.VaultKey
+			}
+			if profile.PrivateKeyPath != "" {
+				c.Session.PrivateKeyPath = profile.PrivateKeyPath
+				c.Session.KeyType = profile.KeyType
+				c.Session.KeyFingerprint = profile.KeyFingerprint
+			}
+			return s.root, s.saveTree()
+		}
+	}
+
 	node := &model.TreeNode{
 		ID:      uuid.NewString(),
 		Name:    profile.Name,
@@ -667,7 +690,7 @@ func findNodeBySessionID(n *model.TreeNode, sessionID string) *model.TreeNode {
 	if n == nil {
 		return nil
 	}
-	if n.Session != nil && n.Session.ID == sessionID {
+	if (n.Session != nil && n.Session.ID == sessionID) || n.ID == sessionID {
 		return n
 	}
 	for _, c := range n.Children {

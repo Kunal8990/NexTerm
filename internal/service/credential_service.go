@@ -180,26 +180,29 @@ func (c *CredentialService) FindSessionPassword(vaultKey, host string, port int,
 		}
 	}
 
-	// 2. Deterministic key lookup based on server coordinates
+	// 2. Deterministic key lookup based on server coordinates (check both dot and underscore formats)
 	if host != "" && username != "" {
 		p := port
 		if p <= 0 {
 			p = 22
 		}
-		detKey := fmt.Sprintf("session_%s_%s_%d", sanitizeVaultKey(username), sanitizeVaultKey(host), p)
-		if pwd, err := c.GetSessionPassword(detKey); err == nil && pwd != "" {
-			if vaultKey != "" && vaultKey != detKey {
-				_ = c.SaveSessionPassword(vaultKey, pwd)
-			}
-			return pwd, nil
+		cleanUser := sanitizeVaultKey(username)
+		cleanHost := sanitizeVaultKey(host)
+		underHost := strings.ReplaceAll(cleanHost, ".", "_")
+
+		detKeys := []string{
+			fmt.Sprintf("session_%s_%s_%d", cleanUser, cleanHost, p),
+			fmt.Sprintf("session_%s_%s_%d", cleanUser, underHost, p),
+			fmt.Sprintf("session_%s_%s", cleanUser, cleanHost),
+			fmt.Sprintf("session_%s_%s", cleanUser, underHost),
 		}
-		// Also without port
-		detKeyNoPort := fmt.Sprintf("session_%s_%s", sanitizeVaultKey(username), sanitizeVaultKey(host))
-		if pwd, err := c.GetSessionPassword(detKeyNoPort); err == nil && pwd != "" {
-			if vaultKey != "" && vaultKey != detKeyNoPort {
-				_ = c.SaveSessionPassword(vaultKey, pwd)
+		for _, detKey := range detKeys {
+			if pwd, err := c.GetSessionPassword(detKey); err == nil && pwd != "" {
+				if vaultKey != "" && vaultKey != detKey {
+					_ = c.SaveSessionPassword(vaultKey, pwd)
+				}
+				return pwd, nil
 			}
-			return pwd, nil
 		}
 	}
 
@@ -216,7 +219,7 @@ func (c *CredentialService) FindSessionPassword(vaultKey, host string, port int,
 				if n.Session != nil {
 					s := n.Session
 					if strings.EqualFold(s.Host, host) && strings.EqualFold(s.Username, username) {
-						if s.VaultKey != "" && s.VaultKey != vaultKey {
+						if s.VaultKey != "" {
 							if p, err := c.GetSessionPassword(s.VaultKey); err == nil && p != "" {
 								foundPwd = p
 								return

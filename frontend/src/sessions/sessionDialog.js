@@ -24,6 +24,10 @@ async function triggerRefreshTree() {
 // Multi-Protocol New Session Dialog (SSH, SFTP, RDP, VNC, Telnet, Serial, Local)
 // --------------------------------------------------------------------------
 
+export function showEditSessionDialog(profile) {
+  return showNewSessionDialog("", profile);
+}
+
 export async function showNewSessionDialog(parentFolderId = "", editProfile = null) {
   const isEdit = !!editProfile;
   let savedPassword = "";
@@ -1250,6 +1254,37 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
       syncAuthQuickUI(authSelect.value);
     };
   }
+
+  // Live synchronize General Tab password and Auth Tab password
+  const pwGenInput = box.querySelector("#sPasswordGen");
+  const pwAuthInput = box.querySelector("#sPassword");
+  if (pwGenInput && pwAuthInput) {
+    pwGenInput.addEventListener("input", () => {
+      pwAuthInput.value = pwGenInput.value;
+    });
+    pwAuthInput.addEventListener("input", () => {
+      pwGenInput.value = pwAuthInput.value;
+    });
+  }
+
+  // Automatic credential detection: if password empty, check if vault already has credentials for this host/user
+  const checkSavedCreds = async () => {
+    const h = box.querySelector("#sHost")?.value?.trim();
+    const u = box.querySelector("#sUser")?.value?.trim();
+    const p = parseInt(box.querySelector("#sPort")?.value, 10) || 22;
+    if (h && u && (!pwGenInput || !pwGenInput.value) && window.go?.main?.App?.FindSessionPassword) {
+      try {
+        const found = await window.go.main.App.FindSessionPassword("", h, p, u);
+        if (found && pwGenInput && !pwGenInput.value) {
+          pwGenInput.value = found;
+          if (pwAuthInput) pwAuthInput.value = found;
+          showToast(`⚡ Auto-loaded saved credentials for ${u}@${h}`, "info");
+        }
+      } catch (_) {}
+    }
+  };
+  box.querySelector("#sHost")?.addEventListener("change", checkSavedCreds);
+  box.querySelector("#sUser")?.addEventListener("change", checkSavedCreds);
 
   // Key inputs live change
   const keyPathInput = box.querySelector("#sKeyPath");

@@ -138,13 +138,12 @@ export function promptPasswordDialog(profile) {
           } else {
             // Auto-persist Quick Connect session so login ID and server info are preserved
             if (typeof window.go.main.App.AddSession === "function") {
-              const res = await window.go.main.App.AddSession("", {
+              profile.id = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : ('sess-' + Date.now());
+              profile.vaultKey = profile.id;
+              await window.go.main.App.AddSession("", {
                 ...profile,
                 name: profile.name || (profile.username ? `${profile.username}@${profile.host}` : profile.host)
               });
-              if (res && res.session) {
-                profile.id = res.session.id;
-              }
             }
           }
         } catch (err) {

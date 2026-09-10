@@ -37,7 +37,7 @@ import { renderSidebarMacros, renderSidebarTunnels } from '../ui/modal.js';
 
 // Helper to get tree DOM element
 function getTreeEl() {
-  return document.getElementById("sessionTree");
+  return document.getElementById("sessionTree") || document.getElementById("tree");
 }
 
 // --------------------------------------------------------------------------
@@ -400,7 +400,7 @@ export function renderNode(node, filter = "", parentNode = null, level = 0) {
     row.addEventListener("click", (e) => {
       e.stopPropagation();
       node.expanded = !node.expanded;
-      const sidebarQuickConnectInput = document.getElementById("sidebarQuickConnect");
+      const sidebarQuickConnectInput = document.getElementById("sidebarQuickConnectInput") || document.getElementById("sidebarQuickConnect");
       renderTree(sidebarQuickConnectInput ? sidebarQuickConnectInput.value : "");
       if (window.go && window.go.main && window.go.main.App) {
         window.go.main.App.ToggleFolder(node.id, node.expanded);
