@@ -40,12 +40,8 @@ type SecurityManager struct {
 	filePath string
 }
 
-func NewSecurityManager() *SecurityManager {
-	appData, err := os.UserConfigDir()
-	if err != nil {
-		appData = "."
-	}
-	dir := filepath.Join(appData, "Nexterm")
+func NewSecurityManagerAt(filePath string) *SecurityManager {
+	dir := filepath.Dir(filePath)
 	_ = os.MkdirAll(dir, 0700)
 
 	sm := &SecurityManager{
@@ -70,10 +66,19 @@ func NewSecurityManager() *SecurityManager {
 			DefaultTheme:    "dark-modern",
 			DefaultFontSize: 13,
 		},
-		filePath: filepath.Join(dir, "security_policy.json"),
+		filePath: filePath,
 	}
 	_ = sm.load()
 	return sm
+}
+
+func NewSecurityManager() *SecurityManager {
+	appData, err := os.UserConfigDir()
+	if err != nil {
+		appData = "."
+	}
+	dir := filepath.Join(appData, "Nexterm")
+	return NewSecurityManagerAt(filepath.Join(dir, "security_policy.json"))
 }
 
 func (sm *SecurityManager) load() error {

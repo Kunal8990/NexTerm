@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"nexterm/internal/model"
+	"nexterm/internal/security"
 	"nexterm/internal/service"
 	"nexterm/internal/store"
 	"path/filepath"
@@ -23,6 +24,8 @@ func createTestApp(t *testing.T) *App {
 		t.Fatalf("NewSessionStoreAt failed: %v", err)
 	}
 	app.sessionService = service.NewSessionService(sessStore)
+	secMgr := security.NewSecurityManagerAt(filepath.Join(tempDir, "security_policy.json"))
+	app.settingsService = service.NewSettingsService(secMgr)
 	app.startup(context.Background())
 	return app
 }
