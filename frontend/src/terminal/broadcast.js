@@ -5,10 +5,11 @@
 // per-target status tracking, cancellation, and real-time event streaming.
 // ==========================================================================
 
-import { tabs, getAllTabs, getActiveTab } from '../state/tabState.js';
+import { tabs, getTabs, getAllTabs, getActiveTab } from '../state/tabState.js';
 import { rootNode } from '../state/sessionState.js';
 import { showModal, hideModal } from '../ui/modal.js';
 import { showToast, escapeHtml } from '../ui/notifications.js';
+import { showMultiServerConnectDialog } from '../sessions/multiServerConnect.js';
 
 // Configurable dangerous command patterns per Section 5
 export const DANGEROUS_PATTERNS = [
@@ -54,7 +55,8 @@ let eventListenersRegistered = false;
 // --------------------------------------------------------------------------
 
 export function getConnectedSessions() {
-  const tabEntries = Object.entries(tabs || {});
+  const allTabs = (typeof getTabs === 'function' ? getTabs() : tabs) || {};
+  const tabEntries = Object.entries(allTabs);
   return tabEntries.filter(([id, t]) => {
     if (!t || !id || id === 'home') return false;
     return true;
@@ -89,7 +91,10 @@ export function openBroadcastDialog(scope = 'all', preselectedTabIDs = null) {
 
   const sessions = getConnectedSessions();
   if (sessions.length === 0) {
-    showToast('No active connected terminal sessions to broadcast to.', 'warning');
+    showToast('No active connected terminal sessions. Select saved servers to connect & broadcast.', 'info');
+    if (typeof showMultiServerConnectDialog === 'function') {
+      showMultiServerConnectDialog();
+    }
     return;
   }
 
@@ -313,6 +318,8 @@ function renderInputStep() {
           <div class="broadcast-section-header">
             <label class="broadcast-label">1. Select Target Terminals (${selectedCount} of ${sessions.length} selected)</label>
             <div class="broadcast-actions-group">
+              <button id="bcastConnectMoreBtn" class="bcast-btn-text" style="color: #38bdf8; font-weight: 600;">➕ Multi-Connect Servers...</button>
+              <span class="bcast-sep">|</span>
               <button id="bcastSelectAllBtn" class="bcast-btn-text">Select All</button>
               <span class="bcast-sep">|</span>
               <button id="bcastClearAllBtn" class="bcast-btn-text">Clear</button>
@@ -585,6 +592,14 @@ function attachModalHandlers() {
 
   const newBtn = document.getElementById('bcastNewBtn');
   if (newBtn) newBtn.onclick = () => openBroadcastDialog('all');
+
+  const connectMoreBtn = document.getElementById('bcastConnectMoreBtn');
+  if (connectMoreBtn) {
+    connectMoreBtn.onclick = () => {
+      closeBroadcast();
+      showMultiServerConnectDialog();
+    };
+  }
 
   const selectAllBtn = document.getElementById('bcastSelectAllBtn');
   if (selectAllBtn) {

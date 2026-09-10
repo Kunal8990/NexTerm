@@ -1439,8 +1439,12 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
 
   // Save handler
   const handleSaveSession = async (andConnect = false) => {
-    const host = box.querySelector("#sHost").value.trim();
-    const username = box.querySelector("#sUser").value.trim();
+    const host = box.querySelector("#sHost") ? box.querySelector("#sHost").value.trim() : "";
+    const username = box.querySelector("#sUser") ? box.querySelector("#sUser").value.trim() : "";
+    const authQuick = box.querySelector("#sAuthTypeQuick");
+    const authSelect = box.querySelector("#sAuthType");
+    const folderSelect = box.querySelector("#sFolderSelect");
+
     if (currentProto !== "serial" && currentProto !== "local" && !host) {
       showToast("Remote Host / IP is required", "error");
       return;
@@ -1569,6 +1573,11 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
       } else {
         const targetFolder = selectedFolderId || parentFolderId || "";
         await window.go.main.App.AddSession(targetFolder, profile);
+        if (targetFolder && window.go.main.App.ToggleFolder) {
+          try {
+            await window.go.main.App.ToggleFolder(targetFolder, true);
+          } catch (_) {}
+        }
         showToast(`Saved session "${profile.name}"`, "success");
       }
       if (enteredPw && profile.vaultKey && shouldSavePw) {

@@ -51,6 +51,7 @@ import {
 import { showMultiExecutionModal } from './terminal/multiExecution.js';
 import { openBroadcastDialog } from './terminal/broadcast.js';
 import { showNewSessionDialog, showFolderDialog } from './sessions/sessionDialog.js';
+import { showMultiServerConnectDialog } from './sessions/multiServerConnect.js';
 import { refreshTree, switchSidebarView, parseQuickConnect } from './sessions/sessionTree.js';
 import {
   refreshSFTP,
@@ -506,6 +507,7 @@ export function setupEventListeners() {
   safeClick("sidebarNewTunnelBtn", showNewTunnelWizard);
 
   // Sidebar tree tools
+  safeClick("treeMultiConnectBtn", () => showMultiServerConnectDialog());
   safeClick("treeAddSessionBtn", () => showNewSessionDialog());
   safeClick("treeAddFolderBtn", () => showFolderDialog());
   safeClick("treeExpandAllBtn", async () => {
@@ -654,6 +656,8 @@ export function setupEventListeners() {
   // Dashboard Buttons
   safeClick("startLocalTerminalBtn", () => startLocalTerminal("powershell"));
   safeClick("newSSHSessionBigBtn", () => showNewSessionDialog());
+  safeClick("homeMultiConnectBtn", () => showMultiServerConnectDialog());
+  safeClick("homeBroadcastConnectBtn", () => showMultiServerConnectDialog());
   safeClick("homeAddServerBtn", () => showNewSessionDialog());
   safeClick("homeToolSSH", () => showNewSessionDialog());
   safeClick("homeToolSFTP", () => {

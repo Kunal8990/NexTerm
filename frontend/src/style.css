@@ -2218,20 +2218,42 @@ html, body, #app {
   pointer-events: none;
 }
 
-.toast {
-  background: #232733;
-  border: 1px solid var(--border-active);
-  border-radius: var(--radius-sm);
-  padding: 8px 12px;
-  font-size: 11.5px;
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+.toast,
+.toast-item {
+  background: rgba(22, 27, 39, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 9px 14px;
+  font-size: 12px;
+  color: #f1f5f9;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
   pointer-events: auto;
+  backdrop-filter: blur(8px);
+  animation: toastSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  max-width: 360px;
+  word-break: break-word;
 }
 
-.toast.success { border-left: 3px solid var(--accent-green); }
-.toast.error { border-left: 3px solid var(--accent-rose); }
-.toast.info { border-left: 3px solid var(--accent-cyan); }
+@keyframes toastSlideIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.toast.fade-out,
+.toast-item.fade-out {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.toast.success,
+.toast-item.toast-success { border-left: 4px solid #10b981; }
+.toast.error,
+.toast-item.toast-error { border-left: 4px solid #ef4444; }
+.toast.warning,
+.toast-item.toast-warning { border-left: 4px solid #f59e0b; }
+.toast.info,
+.toast-item.toast-info { border-left: 4px solid #38bdf8; }
 
 /* Password Management in Settings */
 .pwd-vault-list {
@@ -8185,4 +8207,352 @@ html, body {
   margin-right: 3px;
   user-select: none;
 }
+
+/* ==========================================================================
+   Multi-Server Connect & Broadcast Subsystem Styles
+   ========================================================================== */
+
+.tree-multiconnect-btn {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.22), rgba(14, 165, 233, 0.12)) !important;
+  border: 1px solid rgba(56, 189, 248, 0.45) !important;
+  color: #38bdf8 !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  padding: 2px 7px !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+  transition: all 0.15s ease !important;
+  white-space: nowrap !important;
+}
+
+.tree-multiconnect-btn:hover {
+  background: linear-gradient(135deg, #0284c7, #0ea5e9) !important;
+  color: #ffffff !important;
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.45) !important;
+}
+
+.multiconnect-modal-header {
+  padding: 16px 20px 12px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.multiconnect-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.multiconnect-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.multiconnect-icon {
+  font-size: 18px;
+}
+
+.multiconnect-subtitle {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.multiconnect-modal-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(85vh - 120px);
+  overflow-y: auto;
+}
+
+.multiconnect-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.multiconnect-search-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.multiconnect-search-wrap .search-lens-icon {
+  position: absolute;
+  left: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+
+.multiconnect-search-input {
+  width: 100%;
+  padding: 7px 10px 7px 30px;
+  background: rgba(15, 23, 42, 0.65);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: #f1f5f9;
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.multiconnect-search-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.multiconnect-quick-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-sm-action {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-sm-action:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.mconn-selected-counter {
+  font-size: 11px;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 3px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.multiconnect-folder-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.mconn-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s ease;
+}
+
+.mconn-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+
+.mconn-pill.active {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.3), rgba(14, 165, 233, 0.2));
+  border-color: #38bdf8;
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.multiconnect-server-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 270px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.mconn-server-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  user-select: none;
+}
+
+.mconn-server-card:hover {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.mconn-server-card.selected {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.mconn-card-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mconn-card-checkbox {
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  accent-color: #0284c7;
+}
+
+.mconn-card-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mconn-card-dot.dot-live {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.mconn-card-dot.dot-offline {
+  background: #64748b;
+}
+
+.mconn-card-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.mconn-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.mconn-card-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #f8fafc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mconn-env-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+}
+
+.mconn-proto-tag {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+
+.mconn-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.mconn-card-host {
+  font-family: var(--font-mono, monospace);
+}
+
+.mconn-card-folder {
+  color: var(--text-muted);
+}
+
+.mconn-live-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+
+.multiconnect-options-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mconn-option-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mconn-option-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.mconn-layout-selector {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #f1f5f9;
+}
+
+.mconn-radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.multiconnect-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 

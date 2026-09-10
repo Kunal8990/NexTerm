@@ -15,6 +15,7 @@ import {
   showRenameNodeDialog,
   showMoveNodeDialog
 } from './sessionDialog.js';
+import { connectFolderSessionsAndBroadcast } from './multiServerConnect.js';
 
 let refreshTreeCallback = null;
 export function registerContextMenuRefreshTree(fn) {
@@ -292,6 +293,8 @@ export function showFolderContextMenu(x, y, node) {
   const isRoot = node.id === (rootNode ? rootNode.id : "");
 
   contextMenuEl.innerHTML = `
+    <div class="context-menu-item" id="cConnectBcastFold" style="color: #38bdf8; font-weight: 600;">⚡ Connect All & Broadcast</div>
+    <div class="context-menu-separator"></div>
     <div class="context-menu-item" id="cAddSess">＋ New Session</div>
     <div class="context-menu-item" id="cAddFold">📁 New Folder</div>
     <div class="context-menu-separator"></div>
@@ -307,6 +310,15 @@ export function showFolderContextMenu(x, y, node) {
     ` : ''}
   `;
   posMenu(x, y);
+
+  // 0. Connect All & Broadcast
+  const bcastBtn = contextMenuEl.querySelector("#cConnectBcastFold");
+  if (bcastBtn) {
+    bcastBtn.onclick = () => {
+      hideContextMenu();
+      connectFolderSessionsAndBroadcast(node);
+    };
+  }
 
   // 1. New Session
   contextMenuEl.querySelector("#cAddSess").onclick = () => {

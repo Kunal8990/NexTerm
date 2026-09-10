@@ -265,6 +265,7 @@
                     SAVED SESSIONS
                   </span>
                   <div class="session-tree-tools">
+                    <button id="treeMultiConnectBtn" class="tree-multiconnect-btn" title="Multi-Server Connect & Broadcast" type="button">📡 Broadcast</button>
                     <button id="treeAddSessionBtn" title="New Session">＋</button>
                     <button id="treeAddFolderBtn" title="New Folder">📁</button>
                     <button id="treeExpandAllBtn" title="Expand All Folders">⊞</button>
@@ -511,6 +512,10 @@
                   <span class="action-icon">↻</span>
                   <span>New SSH session</span>
                 </button>
+                <button id="homeMultiConnectBtn" class="big-action-btn broadcast-btn" style="background: linear-gradient(135deg, #0369a1, #0284c7); border: 1px solid #38bdf8;">
+                  <span class="action-icon">📡</span>
+                  <span>Multi-Server Broadcast</span>
+                </button>
               </div>
 
               <!-- Center Search Field -->
@@ -522,7 +527,10 @@
               <div class="recent-sessions-section" id="recentSessionsSection">
                 <div class="recent-sessions-header">
                   <span class="recent-sessions-title">⚡ Saved & Active Server Connections</span>
-                  <button class="btn btn-sm btn-outline" id="homeAddServerBtn" type="button">＋ New Server</button>
+                  <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn btn-sm btn-primary" id="homeBroadcastConnectBtn" type="button" style="background: linear-gradient(135deg, #0284c7, #38bdf8); font-size: 11px; font-weight: 600;">📡 Multi-Connect & Broadcast</button>
+                    <button class="btn btn-sm btn-outline" id="homeAddServerBtn" type="button">＋ New Server</button>
+                  </div>
                 </div>
                 <div class="recent-sessions-grid" id="recentSessionsGrid"></div>
               </div>

@@ -239,10 +239,20 @@ export function renderConnectedServers() {
 // Tree Rendering & Session Management (Drag-and-Drop)
 // --------------------------------------------------------------------------
 
+function normalizeTreeNode(node) {
+  if (!node) return;
+  if (!node.session) {
+    if (!Array.isArray(node.children)) node.children = [];
+    if (node.expanded === undefined) node.expanded = true;
+    node.children.forEach(normalizeTreeNode);
+  }
+}
+
 export async function refreshTree(filter = "") {
   try {
     if (window.go && window.go.main && window.go.main.App) {
       const data = await window.go.main.App.GetSessionTree();
+      normalizeTreeNode(data);
       setRootNode(data);
     } else {
       setRootNode({
@@ -903,3 +913,5 @@ registerContextMenuOpenSFTP((targetPath) => {
     refreshSFTP(targetPath || "~");
   }
 });
+
+export { showMultiServerConnectDialog } from './multiServerConnect.js';
