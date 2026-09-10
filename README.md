@@ -5,10 +5,12 @@
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://golang.org)
 [![Wails v2](https://img.shields.io/badge/Wails-v2.9+-df1a5a?style=for-the-badge&logo=wails&logoColor=white)](https://wails.io)
 [![xterm.js](https://img.shields.io/badge/xterm.js-v5.3+-000000?style=for-the-badge&logo=gnometerminal&logoColor=white)](https://xtermjs.org)
-[![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://microsoft.com/windows)
+[![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://microsoft.com/windows)
+[![macOS](https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](https://apple.com/macos)
+[![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://kernel.org)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.badge?style=for-the-badge)](#license)
 
-**NexTerm** is an all-in-one desktop SSH client, terminal emulator, SFTP browser, and remote infrastructure workstation built with **Go**, **Wails v2**, and **xterm.js**. It features zero artificial limits, enterprise-grade security controls, visual SSH tunnel management, bastion jump hosts, multi-execution command broadcasting, macro automation, and multi-protocol remote desktop connectivity.
+**NexTerm** is an all-in-one, cross-platform desktop SSH client, terminal emulator, SFTP browser, and remote infrastructure workstation built with **Go**, **Wails v2**, and **xterm.js**. Engineered for native execution on **Windows**, **macOS** (Apple Silicon & Intel), and **Linux**, it features zero artificial limits, enterprise-grade security controls, visual SSH tunnel management, bastion jump hosts, live server performance monitoring, multi-execution command broadcasting, macro automation, and multi-protocol connectivity.
 
 </div>
 
@@ -92,8 +94,11 @@
 - **Security Policy Enforcement**: Administrator toggles to allow or forbid specific protocols (SSH, SFTP, Telnet, FTP, RDP, VNC, Serial), enforce password complexity, or disable dangerous commands.
 - **NexTerm Customizer**: Corporate white-label branding (Application Name, Logo Text, custom Startup/Splash messaging, and default company session catalogs).
 
-### 🔑 10. Windows DPAPI Hardware-Bound Credential Vault
-- Zero plain-text credentials on disk. All passwords and passphrases are encrypted using Windows DPAPI (`CryptProtectData`) tied to the local Windows user profile.
+### 🔑 10. Platform-Native Hardware-Bound Credential Vault
+- Zero plain-text credentials on disk. All passwords, passphrases, and private keys are encrypted using native OS security APIs:
+  - **Windows**: Windows DPAPI (`CryptProtectData`) tied to user profile.
+  - **macOS**: Native macOS Keychain Services.
+  - **Linux**: Freedesktop Secret Service API / system Keyring.
 
 ### 📈 11. Live Server Monitoring Dashboard
 - **Real-Time Visual Sparklines**: Live canvas-rendered graphs for CPU utilization, RAM usage, and network RX/TX bandwidth (refreshed every 2.5s).
@@ -171,29 +176,57 @@ graph TD
 
 ## 🚀 Getting Started
 
+### 🌐 Multi-Platform Support
+NexTerm is designed and tested for native execution across:
+- **Windows**: Windows 10 & Windows 11 (`x86_64`, `ARM64`)
+- **macOS**: macOS 11+ Big Sur through Sequoia (Native Apple Silicon `arm64` M1/M2/M3/M4 & Intel `x86_64`)
+- **Linux**: Ubuntu, Debian, Fedora, Arch Linux, RHEL, openSUSE (`x86_64`, `arm64`)
+
 ### Prerequisites
 - **Go 1.22+** ([golang.org](https://golang.org/dl/))
 - **Wails CLI v2.9+** ([wails.io](https://wails.io/docs/gettingstarted/installation))
-  ```powershell
+  ```bash
   go install github.com/wailsapp/wails/v2/cmd/wails@latest
   ```
 - **Node.js 18+** (Optional, for frontend asset modification)
-- **Windows 10 / 11**
+- **Linux Dependencies** (Linux only):
+  ```bash
+  # Ubuntu / Debian
+  sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev
 
-### Quick Launch
-Simply double-click `run.bat` or execute in PowerShell:
+  # Fedora / RHEL
+  sudo dnf install -y gtk3-devel webkit2gtk3-devel
+
+  # Arch Linux
+  sudo pacman -S gtk3 webkit2gtk
+  ```
+
+### Quick Launch (Windows)
+Double-click `run.bat` or execute in PowerShell:
 ```cmd
 run.bat
 ```
 
 ### Build from Source
-To compile a clean release executable:
+Compile optimized release binaries for your operating system:
+
+**Windows:**
 ```powershell
-wails build
+wails build -platform windows/amd64 -clean
+# Output: build\bin\nexterm.exe
 ```
-The compiled release executable will be available at:
-```text
-build\bin\nexterm.exe
+
+**macOS (Apple Silicon & Intel):**
+```bash
+wails build -platform darwin/arm64 -clean   # Apple Silicon (M1/M2/M3/M4)
+wails build -platform darwin/amd64 -clean   # Intel Mac
+# Output: build/bin/Nexterm.app
+```
+
+**Linux:**
+```bash
+wails build -platform linux/amd64 -clean
+# Output: build/bin/nexterm
 ```
 
 ---
