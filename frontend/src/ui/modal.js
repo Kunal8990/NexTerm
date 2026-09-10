@@ -275,6 +275,101 @@ export function promptPassphraseDialog(profile) {
   });
 }
 
+// Prompts for a bastion/jump-host secret (gateway password, or the
+// passphrase for the gateway's private key). Deliberately side-effect-free
+// beyond an optional vault save: unlike promptPasswordDialog/
+// promptPassphraseDialog above, this never calls UpdateSession/AddSession,
+// because the "profile" behind a bastion prompt is the *target* session,
+// and persisting gateway-shaped fields onto it would corrupt that session.
+export function promptBastionSecretDialog({ gatewayLabel, vaultKey, isKey, keyPath }) {
+  return new Promise((resolve) => {
+    const title = isKey ? "Bastion Private Key Passphrase Required" : "SSH Gateway Password Authentication";
+    const icon = isKey ? "🔑" : "🛡️";
+    const box = showModal(`
+      <div class="modal-header">
+        <div class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+          <span>${icon}</span> ${title}
+        </div>
+        <button class="modal-close-btn" id="promptBastionClose">&times;</button>
+      </div>
+      <div class="modal-body" style="padding: 16px 20px;">
+        <div style="margin-bottom: 10px; font-size: 13px; color: var(--text-color);">
+          ${isKey ? "The bastion gateway's private key is encrypted:" : "Enter the password for the bastion / jump host gateway:"}
+          <br/><b>${escapeHtml(gatewayLabel || '')}</b>
+        </div>
+        ${isKey ? `<div style="margin-bottom: 12px; font-size: 11px; color: var(--text-dim); word-break: break-all; background: #0c0f17; padding: 6px 10px; border-radius: 4px; border: 1px solid #1f2536;"><code>${escapeHtml(keyPath || '')}</code></div>` : ''}
+        <div class="sess-password-wrap">
+          <input type="password" id="promptBastionInput" class="auth-modal-input" placeholder="${isKey ? 'Enter key passphrase' : 'Enter gateway password'}" autofocus autocomplete="off" style="width: 100%; height: 34px; padding: 0 36px 0 10px; background: #0c0f17; border: 1px solid #283046; border-radius: 4px; color: #fff; font-size: 13px; box-sizing: border-box;" />
+          <button type="button" class="sess-password-toggle" id="promptBastionToggle" title="Toggle visibility">👁️</button>
+        </div>
+        <div style="margin-top: 14px;">
+          <label class="checkbox-label" style="display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer;">
+            <input type="checkbox" id="promptBastionSaveVault" checked />
+            <span>Save in encrypted credential vault</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button class="btn-secondary" id="promptBastionCancel" type="button">Cancel</button>
+        <button class="btn-primary" id="promptBastionSubmit" type="button">Continue</button>
+      </div>
+    `, "modal-auth-prompt");
+
+    if (!box) {
+      resolve(null);
+      return;
+    }
+
+    const input = box.querySelector("#promptBastionInput");
+    const toggleBtn = box.querySelector("#promptBastionToggle");
+    const saveCheck = box.querySelector("#promptBastionSaveVault");
+    const submitBtn = box.querySelector("#promptBastionSubmit");
+    const cancelBtn = box.querySelector("#promptBastionCancel");
+    const closeBtn = box.querySelector("#promptBastionClose");
+
+    setTimeout(() => { if (input) input.focus(); }, 50);
+
+    if (toggleBtn && input) {
+      toggleBtn.onclick = () => {
+        const isPw = input.type === "password";
+        input.type = isPw ? "text" : "password";
+        toggleBtn.textContent = isPw ? "🔒" : "👁️";
+      };
+    }
+
+    const doSubmit = async () => {
+      const val = input ? input.value : "";
+      if (saveCheck && saveCheck.checked && val && vaultKey && window.go?.main?.App) {
+        try {
+          const key = isKey ? vaultKey + "_passphrase" : vaultKey;
+          if (typeof window.go.main.App.SaveSessionPassword === "function") {
+            await window.go.main.App.SaveSessionPassword(key, val);
+          } else if (typeof window.go.main.App.SavePassword === "function") {
+            await window.go.main.App.SavePassword(key, val);
+          }
+        } catch (_) {}
+      }
+      hideModal();
+      resolve(val);
+    };
+
+    const doCancel = () => {
+      hideModal();
+      resolve(null);
+    };
+
+    if (submitBtn) submitBtn.onclick = doSubmit;
+    if (cancelBtn) cancelBtn.onclick = doCancel;
+    if (closeBtn) closeBtn.onclick = doCancel;
+    if (input) {
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") doSubmit();
+        else if (e.key === "Escape") doCancel();
+      };
+    }
+  });
+}
+
 export function showAuthChallengeModal(data) {
   if (!data || !data.requestId) return;
   const { requestId, user, instruction, questions, echoes } = data;

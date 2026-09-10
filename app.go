@@ -292,7 +292,19 @@ func (a *App) OpenSession(profile model.SessionProfile, password string) (string
 	return tabID, err
 }
 
+// OpenSessionWithTabID keeps its original signature for backward compatibility
+// with older frontend bundles; it simply forwards with no bastion secret.
 func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, password string) error {
+	return a.OpenSessionWithTabIDAndJumpSecret(tabID, profile, password, "")
+}
+
+// OpenSessionWithTabIDAndJumpSecret is the full entry point used by the
+// session dialog / terminal manager. jumpSecret carries whatever credential
+// the bastion hop needs for this connect attempt: a plaintext password when
+// profile.JumpAuthType is "password", or a private-key passphrase when it is
+// "key". It is never persisted here — the frontend is responsible for saving
+// it to the vault (via SaveSessionPassword) if the user opted in.
+func (a *App) OpenSessionWithTabIDAndJumpSecret(tabID string, profile model.SessionProfile, password string, jumpSecret string) error {
 	if tabID == "" {
 		tabID = uuid.NewString()
 	}
@@ -308,7 +320,7 @@ func (a *App) OpenSessionWithTabID(tabID string, profile model.SessionProfile, p
 		return err
 	}
 
-	if err := a.connectionManager.OpenSession(a.ctx, tabID, profile, password); err != nil {
+	if err := a.connectionManager.OpenSession(a.ctx, tabID, profile, password, jumpSecret); err != nil {
 		a.loggingService.LogAudit("AUTH_FAILED", proto, profile.Host, profile.Username, tabID, "FAILURE", err.Error())
 		return err
 	}

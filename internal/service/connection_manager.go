@@ -59,7 +59,7 @@ func (cm *ConnectionManager) SetOnSessionClosed(fn func(tabID string)) {
 }
 
 // OpenSession creates, configures, and connects a ProtocolSession based on the profile's protocol.
-func (cm *ConnectionManager) OpenSession(ctx context.Context, tabID string, profile model.SessionProfile, password string) error {
+func (cm *ConnectionManager) OpenSession(ctx context.Context, tabID string, profile model.SessionProfile, password string, jumpSecret string) error {
 	if tabID == "" {
 		tabID = uuid.NewString()
 	}
@@ -93,7 +93,7 @@ func (cm *ConnectionManager) OpenSession(ctx context.Context, tabID string, prof
 		session = protocol.NewVNCSession(tabID, profile)
 
 	default: // "ssh", "sftp", etc.
-		opts, err := cm.buildSSHConnectOptions(tabID, profile, password)
+		opts, err := cm.buildSSHConnectOptions(tabID, profile, password, jumpSecret)
 		if err != nil {
 			return err
 		}
@@ -169,7 +169,7 @@ func (cm *ConnectionManager) OpenSession(ctx context.Context, tabID string, prof
 	return nil
 }
 
-func (cm *ConnectionManager) buildSSHConnectOptions(tabID string, profile model.SessionProfile, password string) (sshsession.ConnectOptions, error) {
+func (cm *ConnectionManager) buildSSHConnectOptions(tabID string, profile model.SessionProfile, password string, jumpSecret string) (sshsession.ConnectOptions, error) {
 	opts := sshsession.ConnectOptions{
 		Host:              profile.Host,
 		Port:              profile.Port,
@@ -255,8 +255,22 @@ func (cm *ConnectionManager) buildSSHConnectOptions(tabID string, profile model.
 				opts.JumpPrivateKeyPEM = jKeyBytes
 			}
 		}
-		if profile.JumpVaultKey != "" && cm.credService != nil {
-			if jPw, err := cm.credService.GetSessionPassword(profile.JumpVaultKey); err == nil && jPw != "" {
+		// Resolve the bastion secret with the same precedence the target-host
+		// password already uses elsewhere in this function: an explicit,
+		// per-connect value (typed just now or resolved by the frontend) wins;
+		// otherwise fall back to whatever was persisted in the vault.
+		if jumpSecret != "" {
+			if opts.JumpAuthType == sshsession.AuthTypePrivateKey {
+				opts.JumpKeyPassphrase = jumpSecret
+			} else {
+				opts.JumpPassword = jumpSecret
+			}
+		} else if profile.JumpVaultKey != "" && cm.credService != nil {
+			if opts.JumpAuthType == sshsession.AuthTypePrivateKey {
+				if jPass, err := cm.credService.GetSessionPassphrase(profile.JumpVaultKey + "_passphrase"); err == nil && jPass != "" {
+					opts.JumpKeyPassphrase = jPass
+				}
+			} else if jPw, err := cm.credService.GetSessionPassword(profile.JumpVaultKey); err == nil && jPw != "" {
 				opts.JumpPassword = jPw
 			}
 		}

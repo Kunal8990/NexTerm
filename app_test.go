@@ -288,3 +288,33 @@ func TestBroadcastCommand_AppFacade(t *testing.T) {
 	}
 }
 
+func TestOpenSessionWithTabIDAndJumpSecret_PolicyGating(t *testing.T) {
+	app := createTestApp(t)
+
+	// Deny SSH in security policy
+	policy := app.GetSecurityPolicy()
+	policy.AllowSSH = false
+	_ = app.SaveSecurityPolicy(policy)
+
+	profile := model.SessionProfile{
+		Host:         "10.0.0.1",
+		Port:         22,
+		Username:     "testuser",
+		Protocol:     "ssh",
+		UseJumpHost:  true,
+		JumpHost:     "10.0.0.254",
+		JumpPort:     22,
+		JumpUsername: "bastion",
+		JumpAuthType: "password",
+	}
+
+	err := app.OpenSessionWithTabIDAndJumpSecret("test-tab-bastion", profile, "password", "bastion-secret")
+	if err == nil {
+		t.Fatalf("expected error when SSH is disabled by security policy")
+	}
+	if !strings.Contains(err.Error(), "security policy denied") {
+		t.Errorf("expected policy denial error, got: %v", err)
+	}
+}
+
+

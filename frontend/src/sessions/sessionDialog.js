@@ -82,11 +82,13 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
     proxyPort: 1080,
     proxyUsername: "",
     proxyPassword: "",
-    useJumpHost: false,
-    jumpHost: "",
-    jumpPort: 22,
-    jumpUsername: "bastion",
-    jumpAuthType: "password",
+    useJumpHost: editProfile?.useJumpHost || false,
+    jumpHost: editProfile?.jumpHost || "",
+    jumpPort: editProfile?.jumpPort || 22,
+    jumpUsername: editProfile?.jumpUsername || "bastion",
+    jumpAuthType: editProfile?.jumpAuthType || "password",
+    jumpPrivateKeyPath: editProfile?.jumpPrivateKeyPath || "",
+    jumpVaultKey: editProfile?.jumpVaultKey || "",
     theme: userSettings.theme || "dark-modern",
     foreground: "",
     background: "",
@@ -640,9 +642,34 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
                   <input type="text" id="sJumpUser" value="${escapeHtml(p.jumpUsername || 'bastion')}" />
                 </div>
                 <div class="sess-form-group">
-                  <label>Gateway Password / Passphrase</label>
-                  <input type="password" id="sJumpPassword" placeholder="Optional" />
+                  <label>Gateway Auth Method</label>
+                  <select id="sJumpAuthType">
+                    <option value="password" ${p.jumpAuthType !== 'key' ? 'selected' : ''}>Password</option>
+                    <option value="key" ${p.jumpAuthType === 'key' ? 'selected' : ''}>Private Key</option>
+                  </select>
                 </div>
+              </div>
+              <div id="jumpPassFields" class="${p.jumpAuthType === 'key' ? 'hidden' : ''}">
+                <div class="sess-form-group">
+                  <label>Gateway Password</label>
+                  <input type="password" id="sJumpPassword" placeholder="Stored encrypted in Vault; leave blank to prompt on connect" autocomplete="off" />
+                </div>
+              </div>
+              <div id="jumpKeyFields" class="${p.jumpAuthType === 'key' ? '' : 'hidden'}">
+                <div class="sess-form-group">
+                  <label>Gateway Private Key File</label>
+                  <div class="file-input-group" style="display: flex; gap: 8px;">
+                    <input type="text" id="sJumpKeyPath" value="${escapeHtml(p.jumpPrivateKeyPath || '')}" placeholder="C:\\Users\\...\\.ssh\\bastion_key" />
+                    <button class="btn-secondary" id="browseJumpKeyBtn" type="button">Browse...</button>
+                  </div>
+                </div>
+                <div class="sess-form-group">
+                  <label>Gateway Key Passphrase</label>
+                  <input type="password" id="sJumpKeyPassphrase" placeholder="Passphrase if key is encrypted (stored in Vault)" />
+                </div>
+              </div>
+              <div style="font-size: 10.5px; color: var(--text-dim); margin-top: 4px;">
+                🛡️ NexTerm opens the SSH connection to this gateway first, authenticates, then tunnels a second SSH handshake to the target host through it — the target never sees a direct connection from your machine.
               </div>
             </div>
           </div>
@@ -1291,6 +1318,34 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
     jumpCheck.onchange = () => jumpFields.classList.toggle("hidden", !jumpCheck.checked);
   }
 
+  // Jump Host auth-method toggle (password vs private key)
+  const jumpAuthSelect = box.querySelector("#sJumpAuthType");
+  const jumpPassFields = box.querySelector("#jumpPassFields");
+  const jumpKeyFields = box.querySelector("#jumpKeyFields");
+  if (jumpAuthSelect && jumpPassFields && jumpKeyFields) {
+    jumpAuthSelect.onchange = () => {
+      const isKey = jumpAuthSelect.value === "key";
+      jumpPassFields.classList.toggle("hidden", isKey);
+      jumpKeyFields.classList.toggle("hidden", !isKey);
+    };
+  }
+
+  // Jump Host private key file browser
+  const browseJumpKeyBtn = box.querySelector("#browseJumpKeyBtn");
+  if (browseJumpKeyBtn) {
+    browseJumpKeyBtn.onclick = async () => {
+      if (window.go && window.go.main && window.go.main.App && window.go.main.App.SelectPrivateKeyFile) {
+        try {
+          const path = await window.go.main.App.SelectPrivateKeyFile();
+          if (path) {
+            const jumpKeyInput = box.querySelector("#sJumpKeyPath");
+            if (jumpKeyInput) jumpKeyInput.value = path;
+          }
+        } catch (_) {}
+      }
+    };
+  }
+
   // Proxy type dropdown toggle
   const proxySelect = box.querySelector("#sProxyType");
   const proxyFields = box.querySelector("#proxyFields");
@@ -1416,6 +1471,15 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
       jumpHost: box.querySelector("#sJumpHost") ? box.querySelector("#sJumpHost").value.trim() : "",
       jumpPort: parseInt(box.querySelector("#sJumpPort")?.value, 10) || 22,
       jumpUsername: box.querySelector("#sJumpUser") ? box.querySelector("#sJumpUser").value.trim() : "bastion",
+      jumpAuthType: box.querySelector("#sJumpAuthType") ? box.querySelector("#sJumpAuthType").value : "password",
+      jumpPrivateKeyPath: (box.querySelector("#sJumpAuthType") && box.querySelector("#sJumpAuthType").value === "key" && box.querySelector("#sJumpKeyPath"))
+        ? box.querySelector("#sJumpKeyPath").value.trim()
+        : "",
+      // Deterministic per-session vault key so the bastion secret survives a
+      // reload the same way the main vaultKey does. Reusing vaultKey (rather
+      // than jumpHost/jumpUser) keeps two sessions that share one bastion but
+      // use different bastion accounts from colliding in the vault.
+      jumpVaultKey: (isEdit && editProfile?.jumpVaultKey) ? editProfile.jumpVaultKey : (vaultKey + "_jump"),
 
       // Appearance
       theme: themeSelect ? themeSelect.value : "dark-modern",
@@ -1440,6 +1504,7 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
     const enteredPw = (box.querySelector("#sPasswordGen")?.value || box.querySelector("#sPassword")?.value || "");
     const shouldSavePw = box.querySelector("#sSavePasswordCheck") ? box.querySelector("#sSavePasswordCheck").checked : true;
     const jumpPw = box.querySelector("#sJumpPassword") ? box.querySelector("#sJumpPassword").value : "";
+    const jumpKeyPass = box.querySelector("#sJumpKeyPassphrase") ? box.querySelector("#sJumpKeyPassphrase").value : "";
     if (enteredPw) {
       profile.password = enteredPw;
     }
@@ -1487,8 +1552,11 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
       if (enteredPass && profile.vaultKey) {
         await window.go.main.App.SaveSessionPassword(profile.vaultKey + "_passphrase", enteredPass);
       }
-      if (jumpPw && profile.jumpVaultKey) {
+      if (jumpPw && profile.jumpVaultKey && profile.jumpAuthType !== "key") {
         await window.go.main.App.SaveSessionPassword(profile.jumpVaultKey, jumpPw);
+      }
+      if (jumpKeyPass && profile.jumpVaultKey && profile.jumpAuthType === "key") {
+        await window.go.main.App.SaveSessionPassword(profile.jumpVaultKey + "_passphrase", jumpKeyPass);
       }
     }
     await triggerRefreshTree();

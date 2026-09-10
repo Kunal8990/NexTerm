@@ -124,6 +124,8 @@ export function OpenSession(arg1:model.SessionProfile,arg2:string):Promise<strin
 
 export function OpenSessionWithTabID(arg1:string,arg2:model.SessionProfile,arg3:string):Promise<void>;
 
+export function OpenSessionWithTabIDAndJumpSecret(arg1:string,arg2:model.SessionProfile,arg3:string,arg4:string):Promise<void>;
+
 export function QuickConnect(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string):Promise<string>;
 
 export function RenameNode(arg1:string,arg2:string):Promise<model.TreeNode>;

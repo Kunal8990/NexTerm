@@ -376,3 +376,80 @@ func TestFindSessionPassword(t *testing.T) {
 	}
 }
 
+func TestBuildSSHConnectOptions_BastionCredentials(t *testing.T) {
+	vDir := t.TempDir()
+	v, err := vault.NewVaultAt(vDir)
+	if err != nil {
+		t.Fatalf("failed to init test vault: %v", err)
+	}
+	credSvc := NewCredentialService(v)
+	_ = credSvc.SaveSessionPassword("vault_jump_key", "saved-jump-password")
+	_ = credSvc.SaveSessionPassword("vault_jump_key_passphrase", "saved-jump-passphrase")
+
+	cm := NewConnectionManager(credSvc, nil, nil, nil)
+
+	// Case 1: Password jump host with explicit runtime jumpSecret (should override vault)
+	profile1 := model.SessionProfile{
+		Host:         "10.0.0.1",
+		Port:         22,
+		Username:     "targetuser",
+		UseJumpHost:  true,
+		JumpHost:     "jump.corp.com",
+		JumpPort:     2222,
+		JumpUsername: "jumpuser",
+		JumpAuthType: "password",
+		JumpVaultKey: "vault_jump_key",
+	}
+
+	opts1, err := cm.buildSSHConnectOptions("tab-1", profile1, "targetpw", "explicit-runtime-jump-pw")
+	if err != nil {
+		t.Fatalf("buildSSHConnectOptions failed: %v", err)
+	}
+	if !opts1.UseJumpHost {
+		t.Errorf("expected UseJumpHost true")
+	}
+	if opts1.JumpPassword != "explicit-runtime-jump-pw" {
+		t.Errorf("expected JumpPassword 'explicit-runtime-jump-pw', got '%s'", opts1.JumpPassword)
+	}
+
+	// Case 2: Password jump host with empty jumpSecret (should fall back to vault)
+	opts2, err := cm.buildSSHConnectOptions("tab-2", profile1, "targetpw", "")
+	if err != nil {
+		t.Fatalf("buildSSHConnectOptions failed: %v", err)
+	}
+	if opts2.JumpPassword != "saved-jump-password" {
+		t.Errorf("expected JumpPassword fallback 'saved-jump-password', got '%s'", opts2.JumpPassword)
+	}
+
+	// Case 3: Private key jump host with explicit runtime jumpSecret (passphrase)
+	profileKey := model.SessionProfile{
+		Host:         "10.0.0.1",
+		Port:         22,
+		Username:     "targetuser",
+		UseJumpHost:  true,
+		JumpHost:     "jump.corp.com",
+		JumpPort:     22,
+		JumpUsername: "jumpuser",
+		JumpAuthType: "key",
+		JumpVaultKey: "vault_jump_key",
+	}
+
+	opts3, err := cm.buildSSHConnectOptions("tab-3", profileKey, "targetpw", "runtime-passphrase")
+	if err != nil {
+		t.Fatalf("buildSSHConnectOptions failed: %v", err)
+	}
+	if opts3.JumpKeyPassphrase != "runtime-passphrase" {
+		t.Errorf("expected JumpKeyPassphrase 'runtime-passphrase', got '%s'", opts3.JumpKeyPassphrase)
+	}
+
+	// Case 4: Private key jump host with empty jumpSecret (fallback to vault passphrase)
+	opts4, err := cm.buildSSHConnectOptions("tab-4", profileKey, "targetpw", "")
+	if err != nil {
+		t.Fatalf("buildSSHConnectOptions failed: %v", err)
+	}
+	if opts4.JumpKeyPassphrase != "saved-jump-passphrase" {
+		t.Errorf("expected JumpKeyPassphrase fallback 'saved-jump-passphrase', got '%s'", opts4.JumpKeyPassphrase)
+	}
+}
+
+

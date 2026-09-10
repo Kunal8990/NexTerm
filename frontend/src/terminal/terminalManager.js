@@ -39,7 +39,7 @@ import {
 } from "./terminal.js";
 import { userSettings, THEMES } from "../settings/settings.js";
 import { showToast, updateStatus, escapeHtml } from "../ui/notifications.js";
-import { promptPasswordDialog, promptPassphraseDialog, registerLocalTerminalLauncher } from "../ui/modal.js";
+import { promptPasswordDialog, promptPassphraseDialog, promptBastionSecretDialog, registerLocalTerminalLauncher } from "../ui/modal.js";
 import { getContextMenuEl, posMenu, hideContextMenu } from "../ui/contextMenu.js";
 import { openBroadcastDialog } from "./broadcast.js";
 
@@ -1177,6 +1177,58 @@ export async function connectToSession(profile, forceNewTab = false) {
     }
   }
 
+  // Bastion / Jump Host: resolve whatever secret the gateway hop needs
+  // *before* we ever hit the backend, mirroring the target-host password
+  // flow above. Without this, a jump host configured for password or
+  // encrypted-key auth has no way to actually authenticate — the tunnel
+  // dials out but the SSH handshake to the gateway itself fails.
+  let jumpSecret = "";
+  if (profile.useJumpHost && profile.jumpHost) {
+    const jumpAuthType = profile.jumpAuthType || "password";
+    const gatewayLabel = `${profile.jumpUsername || 'bastion'}@${profile.jumpHost}:${profile.jumpPort || 22}`;
+
+    if (jumpAuthType === "key") {
+      if (profile.jumpVaultKey && window.go?.main?.App?.GetSessionPassphrase) {
+        try {
+          jumpSecret = (await window.go.main.App.GetSessionPassphrase(profile.jumpVaultKey + "_passphrase")) || "";
+        } catch (_) {}
+      }
+      if (!jumpSecret && profile.jumpPrivateKeyPath && window.go?.main?.App?.ValidatePrivateKeyFile) {
+        try {
+          const info = await window.go.main.App.ValidatePrivateKeyFile(profile.jumpPrivateKeyPath, "");
+          if (info && info.encrypted) {
+            const entered = await promptBastionSecretDialog({
+              gatewayLabel,
+              vaultKey: profile.jumpVaultKey,
+              isKey: true,
+              keyPath: profile.jumpPrivateKeyPath
+            });
+            if (entered === null) return;
+            jumpSecret = entered;
+          }
+        } catch (_) {}
+      }
+    } else {
+      if (profile.jumpVaultKey && window.go?.main?.App?.HasSavedPassword) {
+        try {
+          const hasSaved = await window.go.main.App.HasSavedPassword(profile.jumpVaultKey);
+          if (hasSaved && window.go.main.App.GetSessionPassword) {
+            jumpSecret = (await window.go.main.App.GetSessionPassword(profile.jumpVaultKey)) || "";
+          }
+        } catch (_) {}
+      }
+      if (!jumpSecret) {
+        const entered = await promptBastionSecretDialog({
+          gatewayLabel,
+          vaultKey: profile.jumpVaultKey,
+          isKey: false
+        });
+        if (entered === null) return;
+        jumpSecret = entered;
+      }
+    }
+  }
+
   // Reuse existing tab if disconnected/failed, otherwise create exactly one tab
   let tabId = (!forceNewTab && profile.id && findTabBySessionId(profile.id)) || null;
   if (tabId && tabs[tabId]) {
@@ -1196,7 +1248,9 @@ export async function connectToSession(profile, forceNewTab = false) {
 
   try {
     if (window.go && window.go.main && window.go.main.App) {
-      if (typeof window.go.main.App.OpenSessionWithTabID === "function") {
+      if (typeof window.go.main.App.OpenSessionWithTabIDAndJumpSecret === "function") {
+        await window.go.main.App.OpenSessionWithTabIDAndJumpSecret(tabId, profile, password, jumpSecret);
+      } else if (typeof window.go.main.App.OpenSessionWithTabID === "function") {
         await window.go.main.App.OpenSessionWithTabID(tabId, profile, password);
       } else {
         const actualTabId = await window.go.main.App.OpenSession(profile, password);

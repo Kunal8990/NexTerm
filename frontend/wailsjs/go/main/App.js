@@ -230,6 +230,10 @@ export function OpenSessionWithTabID(arg1, arg2, arg3) {
   return window['go']['main']['App']['OpenSessionWithTabID'](arg1, arg2, arg3);
 }
 
+export function OpenSessionWithTabIDAndJumpSecret(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['OpenSessionWithTabIDAndJumpSecret'](arg1, arg2, arg3, arg4);
+}
+
 export function QuickConnect(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['QuickConnect'](arg1, arg2, arg3, arg4, arg5);
 }
