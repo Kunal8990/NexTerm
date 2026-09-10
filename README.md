@@ -6,7 +6,7 @@
 [![Wails v2](https://img.shields.io/badge/Wails-v2.9+-df1a5a?style=for-the-badge&logo=wails&logoColor=white)](https://wails.io)
 [![xterm.js](https://img.shields.io/badge/xterm.js-v5.3+-000000?style=for-the-badge&logo=gnometerminal&logoColor=white)](https://xtermjs.org)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](https://microsoft.com/windows)
-[![License](https://img.shields.io/badge/License-MIT-green.badge?style=for-the-badge)](#license)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.badge?style=for-the-badge)](#license)
 
 **NexTerm** is an all-in-one desktop SSH client, terminal emulator, SFTP browser, and remote infrastructure workstation built with **Go**, **Wails v2**, and **xterm.js**. It features zero artificial limits, enterprise-grade security controls, visual SSH tunnel management, bastion jump hosts, multi-execution command broadcasting, macro automation, and multi-protocol remote desktop connectivity.
 
@@ -95,6 +95,26 @@
 ### 🔑 10. Windows DPAPI Hardware-Bound Credential Vault
 - Zero plain-text credentials on disk. All passwords and passphrases are encrypted using Windows DPAPI (`CryptProtectData`) tied to the local Windows user profile.
 
+### 📈 11. Live Server Monitoring Dashboard
+- **Real-Time Visual Sparklines**: Live canvas-rendered graphs for CPU utilization, RAM usage, and network RX/TX bandwidth (refreshed every 2.5s).
+- **Out-of-Band SSH Probing**: Background diagnostic probes run on a dedicated SSH channel without interrupting or printing to your active interactive shell.
+- **Process & Port Management**: Inspect listening ports, associated daemons, and PIDs. Terminate runaway processes with a single click.
+- **Interactive User Management**: View active TTY logins and disconnect idle or unauthorized user sessions directly from the dashboard.
+- **Storage Metrics**: Visual disk usage bars across all mounted remote filesystems.
+
+### 🖥️ 12. X11 Forwarding & Local X Server Manager
+- **Remote GUI App Display**: Seamless SSH X11 tunneling (`x11-req`) forwarding remote Linux graphical applications (e.g. `xclock`, `gedit`, `firefox`, database installers) directly to your Windows desktop.
+- **Local X Server Detection & Launch**: Automatically detects and launches local Windows X servers (VcXsrv, Xming, GWSL) on display `:0` (port `6000`).
+
+### 💾 13. Portable Session Tree Backup, Export & Import
+- **Native File Dialogs**: Export your entire hierarchical session tree (folders, host configurations, environments, and jump host bindings) into a portable JSON backup file.
+- **1-Click Import & Merge**: Restore or transfer session catalogs from another machine seamlessly with native file picker integration.
+
+### 🎛️ 14. Adaptive Multi-Pane Workspace & Resizable Sidebar
+- **Resizable Sidebar**: Drag the custom splitter bar to adjust the navigation and session panel width, with persistent state saved across sessions.
+- **Intelligent Header Layering**: Eliminates redundant global tab bars when multiple split panes are open, providing a clean, single-layer header per pane.
+- **Collapsible SFTP Dual Manager**: Easily toggle or drag the SFTP panel to expand terminal real estate when focusing on command execution.
+
 ---
 
 ## 🏗️ Architecture
@@ -182,9 +202,11 @@ build\bin\nexterm.exe
 
 | Shortcut | Action |
 | :--- | :--- |
+| `Ctrl + K` | Open Universal Command Palette |
 | `Ctrl + N` | New SSH Session Dialog |
 | `Ctrl + T` | Open Local PowerShell Tab |
 | `Ctrl + W` | Close Active Tab |
+| `Ctrl + Shift + F` | Terminal In-Buffer Text Search |
 | `Ctrl + Shift + \` | 2-Way Vertical Split |
 | `Ctrl + Shift + -` | 2-Way Horizontal Split |
 | `Alt + M` | Toggle MultiExec Command Broadcast |
