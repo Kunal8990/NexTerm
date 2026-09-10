@@ -270,7 +270,7 @@ export async function refreshTree(filter = "") {
       });
     }
     renderTree(filter);
-    updateRecentSessionsGrid();
+    updateRecentSessionsGrid(null, filter);
   } catch (err) {
     console.error("Failed to load session tree:", err);
   }
@@ -615,7 +615,7 @@ export function renderNode(node, filter = "", parentNode = null, level = 0) {
   return wrap;
 }
 
-export function updateRecentSessionsGrid(targetNode = null) {
+export function updateRecentSessionsGrid(targetNode = null, filterText = "") {
   const section = document.getElementById("recentSessionsSection");
   const grid = document.getElementById("recentSessionsGrid");
   if (!grid) return;
@@ -687,7 +687,7 @@ export function updateRecentSessionsGrid(targetNode = null) {
     return;
   }
 
-  const q = (filter || "").trim().toLowerCase();
+  const q = (filterText || "").trim().toLowerCase();
   const filterFn = item => {
     if (!q) return true;
     const s = item.session;
@@ -776,7 +776,7 @@ export function updateRecentSessionsGrid(targetNode = null) {
     `;
   }
 
-  grid.innerHTML = html || `<div class="empty-saved-sessions-card"><div style="font-size:13px; color:var(--text-muted);">No sessions match "${escapeHtml(filter)}"</div></div>`;
+  grid.innerHTML = html || `<div class="empty-saved-sessions-card"><div style="font-size:13px; color:var(--text-muted);">No sessions match "${escapeHtml(filterText)}"</div></div>`;
 
   const sessions = allSessions;
 

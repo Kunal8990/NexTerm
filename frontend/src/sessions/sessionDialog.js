@@ -7,7 +7,7 @@ import { escapeHtml, showToast } from '../ui/notifications.js';
 import { userSettings, THEMES } from '../settings/settings.js';
 import { rootNode, isDescendantInTree } from '../state/sessionState.js';
 import { connectToSession } from '../terminal/terminalManager.js';
-import { getEnvironmentInfo, getEnvironmentFromFolderName } from '../state/tabState.js';
+import { ENVIRONMENTS, getEnvironmentInfo, getEnvironmentFromFolderName } from '../state/tabState.js';
 
 let refreshTreeCallback = null;
 export function registerDialogRefreshTree(fn) {
@@ -1255,17 +1255,11 @@ export async function showNewSessionDialog(parentFolderId = "", editProfile = nu
     };
   }
 
-  // Live synchronize General Tab password and Auth Tab password
-  const pwGenInput = box.querySelector("#sPasswordGen");
-  const pwAuthInput = box.querySelector("#sPassword");
-  if (pwGenInput && pwAuthInput) {
-    pwGenInput.addEventListener("input", () => {
-      pwAuthInput.value = pwGenInput.value;
-    });
-    pwAuthInput.addEventListener("input", () => {
-      pwGenInput.value = pwAuthInput.value;
-    });
-  }
+  // Live password synchronization between the General and Auth tabs is already
+  // wired earlier in this function (pwGenInput / pwAuthInput). Re-declaring them
+  // here previously caused a fatal "Identifier 'pwGenInput' has already been
+  // declared" SyntaxError, which prevented this entire module from loading and
+  // broke session creation plus every feature that imports it.
 
   // Automatic credential detection: if password empty, check if vault already has credentials for this host/user
   const checkSavedCreds = async () => {
