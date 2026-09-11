@@ -16,6 +16,14 @@
 
 ---
 
+<div align="center">
+
+<img src="assets/nexterm-main.png" alt="NexTerm Application Workspace" width="100%" />
+
+</div>
+
+---
+
 ## 🌟 Key Features
 
 ```text
