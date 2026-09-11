@@ -408,6 +408,49 @@ export function broadcastMultiExecData(tabId, data) {
   }
 }
 
+// --------------------------------------------------------------------------
+// Session Logging — auto-save terminal transcripts to timestamped files
+// --------------------------------------------------------------------------
+const ANSI_RE = new RegExp("[\\u001b\\u009b][[\\]()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]", "g");
+function stripAnsi(s) {
+  try { return String(s).replace(ANSI_RE, "").replace(/\r/g, ""); } catch (_) { return s; }
+}
+
+export function isAutoLogEnabled() {
+  try { return localStorage.getItem("nexterm_autolog") === "1"; } catch (_) { return false; }
+}
+export function setAutoLog(on) {
+  try { localStorage.setItem("nexterm_autolog", on ? "1" : "0"); } catch (_) {}
+}
+
+function tabLogName(t) {
+  return (t && (t.customTitle || t.remoteHostname || t.profile?.name || t.profile?.host)) || "session";
+}
+
+export function maybeLogSessionData(tabId, data) {
+  const t = tabs[tabId];
+  if (!t || !t.logging) return;
+  if (window.go && window.go.main && window.go.main.App && window.go.main.App.AppendSessionLog) {
+    try { window.go.main.App.AppendSessionLog(tabId, tabLogName(t), stripAnsi(data)); } catch (_) {}
+  }
+}
+
+export async function toggleSessionLogging(tabId) {
+  const t = tabs[tabId];
+  if (!t) { showToast("Open a terminal first", "warning"); return; }
+  if (t.logging) {
+    t.logging = false;
+    let path = "";
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.StopSessionLog) {
+      try { path = await window.go.main.App.StopSessionLog(tabId); } catch (_) {}
+    }
+    showToast(path ? `Logging stopped — saved to ${path}` : "Session logging stopped", "info");
+  } else {
+    t.logging = true;
+    showToast("Session logging started — auto-saving transcript to the Nexterm Logs folder", "success");
+  }
+}
+
 export function toggleMultiExec() {
   const multiExecBarEl = document.getElementById("multiExecBar");
   const multiExecInputEl = document.getElementById("multiExecInput");
@@ -436,10 +479,50 @@ export async function sendMultiExec() {
 }
 
 // --------------------------------------------------------------------------
+// Per-environment color enforcement — a colored border + badge around the
+// active terminal so it's obvious when you're working on Production/UAT/etc.
+// --------------------------------------------------------------------------
+function applyEnvGuard(tab) {
+  const ws = document.getElementById("workspace");
+  if (!ws) return;
+  const env = tab ? getEnvironmentInfo(tab.environment || tab.profile?.environment || tab.color || tab.profile?.color) : null;
+  const color = env ? env.color : "";
+  // Only guard Production — it's the high-risk environment. Other environments
+  // (test/uat/dev/…) don't get the border+badge so it stays out of the way.
+  if (env && env.key === "prod" && color) {
+    ws.style.borderTop = `3px solid ${color}`;
+    ws.style.boxShadow = `inset 0 0 0 1px ${color}44`;
+    let badge = document.getElementById("envGuardBadge");
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.id = "envGuardBadge";
+      badge.className = "env-guard-badge";
+      ws.appendChild(badge);
+    }
+    const host = tab.profile?.host || "";
+    badge.textContent = `${env.label}${host ? " · " + host : ""}`;
+    badge.style.background = env.bg || color;
+    badge.style.color = color;
+    badge.style.borderColor = color;
+    badge.hidden = false;
+  } else {
+    clearEnvGuard();
+  }
+}
+
+function clearEnvGuard() {
+  const ws = document.getElementById("workspace");
+  if (ws) { ws.style.borderTop = ""; ws.style.boxShadow = ""; }
+  const badge = document.getElementById("envGuardBadge");
+  if (badge) badge.hidden = true;
+}
+
+// --------------------------------------------------------------------------
 // Tab Lifecycle & Terminal Creation
 // --------------------------------------------------------------------------
 
 export function activateHomeTab() {
+  clearEnvGuard();
   setActiveTabId("home");
   const homeTabBtnEl = document.getElementById("homeTabBtn");
   const welcomeStateEl = document.getElementById("welcomeState");
@@ -494,6 +577,7 @@ export function activateTab(tabId) {
   renderWorkspace();
 
   const currentTab = tabs[tabId];
+  applyEnvGuard(currentTab);
   if (currentTab) {
     setTimeout(() => {
       try {
@@ -529,6 +613,12 @@ export function activateTab(tabId) {
 export function closeTab(tabId) {
   const t = tabs[tabId];
   if (!t) return;
+
+  // Flush and close any active session log for this tab.
+  if (t.logging && window.go && window.go.main && window.go.main.App && window.go.main.App.StopSessionLog) {
+    try { window.go.main.App.StopSessionLog(tabId); } catch (_) {}
+    t.logging = false;
+  }
 
   if (t.reconnectState) {
     if (t.reconnectState.timerId) clearTimeout(t.reconnectState.timerId);
@@ -852,6 +942,7 @@ export function createTab(tabId, profile, isLocal = false, initialState = "Conne
     const unsubData = window.runtime.EventsOn("terminal:data:" + tabId, (data) => {
       term.write(data);
       broadcastMultiExecData(tabId, data);
+      maybeLogSessionData(tabId, data);
       if (!isLocal) {
         outputBuffer = (outputBuffer + data).slice(-500);
         handleTerminalOutputPrompt(tabId, outputBuffer);
@@ -1261,6 +1352,7 @@ export async function connectToSession(profile, forceNewTab = false) {
       }
     }
     setTabConnectionState(tabId, "Connected");
+    if (isAutoLogEnabled() && tabs[tabId]) tabs[tabId].logging = true;
     showToast(`Connected to ${profile.name}`, "success");
   } catch (err) {
     const classified = parseClassifiedError(err);

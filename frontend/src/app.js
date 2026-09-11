@@ -51,6 +51,10 @@ import {
 import { showMultiExecutionModal } from './terminal/multiExecution.js';
 import { openBroadcastDialog } from './terminal/broadcast.js';
 import { openServerMonitor } from './monitor/serverMonitor.js';
+import { promptSaveGroup, showGroupsDialog, maybeAutoStartGroups } from './sessions/sessionGroups.js';
+import { showSnippetsDialog } from './terminal/snippets.js';
+import { showShortcutsOverlay } from './ui/shortcutsHelp.js';
+import { toggleSessionLogging, isAutoLogEnabled, setAutoLog } from './terminal/terminalManager.js';
 import { showNewSessionDialog, showFolderDialog } from './sessions/sessionDialog.js';
 import { showMultiServerConnectDialog } from './sessions/multiServerConnect.js';
 import { refreshTree, switchSidebarView, parseQuickConnect } from './sessions/sessionTree.js';
@@ -268,6 +272,8 @@ export function setupEventListeners() {
   });
   safeClick("mImportSessions", () => { const b = document.getElementById("treeImportBtn"); if (b) b.click(); });
   safeClick("mExportSessions", () => { const b = document.getElementById("treeExportBtn"); if (b) b.click(); });
+  safeClick("mSaveGroup", () => promptSaveGroup());
+  safeClick("mManageGroups", () => showGroupsDialog());
   safeClick("mCloseTab", () => { if (activeTabId && activeTabId !== "home") closeTab(activeTabId); });
   safeClick("mClearTab", () => { if (activeTabId && tabs[activeTabId]) tabs[activeTabId].term.clear(); });
   safeClick("mFindInTerm", () => {
@@ -276,6 +282,29 @@ export function setupEventListeners() {
   safeClick("mDuplicateTab", () => {
     if (activeTabId && tabs[activeTabId]) {
       duplicateTab(activeTabId);
+    }
+  });
+
+  // Session logging + snippets
+  safeClick("mSnippets", () => showSnippetsDialog());
+  safeClick("mShortcuts", () => showShortcutsOverlay());
+  safeClick("mToggleLogging", () => {
+    if (activeTabId && activeTabId !== "home") toggleSessionLogging(activeTabId);
+    else showToast("Open a terminal tab first", "warning");
+  });
+  const refreshAutoLogLabel = () => {
+    const el = document.getElementById("mAutoLogState");
+    if (el) el.textContent = isAutoLogEnabled() ? "On" : "Off";
+  };
+  refreshAutoLogLabel();
+  safeClick("mToggleAutoLog", () => {
+    setAutoLog(!isAutoLogEnabled());
+    refreshAutoLogLabel();
+    showToast(isAutoLogEnabled() ? "New sessions will be auto-logged" : "Auto-logging disabled", "info");
+  });
+  safeClick("mOpenLogsFolder", () => {
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.OpenSessionLogFolder) {
+      window.go.main.App.OpenSessionLogFolder();
     }
   });
 
@@ -829,6 +858,12 @@ export function setupEventListeners() {
         hideModal();
         closeCommandPalette();
       }
+      // F1 or Shift+? → keyboard cheat-sheet (ignore while typing in a field)
+      const typingInField = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target && e.target.tagName) || "");
+      if ((e.key === "F1" || (e.shiftKey && e.key === "?")) && !typingInField) {
+        e.preventDefault();
+        showShortcutsOverlay();
+      }
       if (e.altKey && (e.key === "m" || e.key === "M")) {
         e.preventDefault();
         showMultiExecutionModal();
@@ -936,6 +971,10 @@ export async function init() {
     onOpenTunneling: showTunnelingDialog,
     onOpenSettings: showSettingsDialog
   });
+
+  // Auto-open any session groups flagged "auto-start" (after the tree is loaded
+  // so saved profiles can be resolved). Small delay lets the workspace settle.
+  setTimeout(() => { try { maybeAutoStartGroups(); } catch (_) {} }, 1200);
 }
 
 // Auto-run on DOMContentLoaded

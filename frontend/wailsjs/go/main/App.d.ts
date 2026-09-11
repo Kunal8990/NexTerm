@@ -18,6 +18,8 @@ export function AddSession(arg1:string,arg2:model.SessionProfile):Promise<model.
 
 export function AddWorkspacePane(arg1:string):Promise<model.Pane>;
 
+export function AppendSessionLog(arg1:string,arg2:string,arg3:string):Promise<string>;
+
 export function BroadcastCommand(arg1:Array<string>,arg2:string,arg3:string):Promise<service.BroadcastResult>;
 
 export function BroadcastRaw(arg1:string):Promise<void>;
@@ -130,6 +132,8 @@ export function OpenLocalTerminal(arg1:string):Promise<string>;
 
 export function OpenSession(arg1:model.SessionProfile,arg2:string):Promise<string>;
 
+export function OpenSessionLogFolder():Promise<void>;
+
 export function OpenSessionWithTabID(arg1:string,arg2:model.SessionProfile,arg3:string):Promise<void>;
 
 export function OpenSessionWithTabIDAndJumpSecret(arg1:string,arg2:model.SessionProfile,arg3:string,arg4:string):Promise<void>;
@@ -211,6 +215,8 @@ export function SetWorkspaceActiveTab(arg1:string,arg2:string):Promise<void>;
 export function SetWorkspaceLayout(arg1:string):Promise<model.Workspace>;
 
 export function StartTunnel(arg1:string,arg2:string):Promise<void>;
+
+export function StopSessionLog(arg1:string):Promise<string>;
 
 export function StopTunnel(arg1:string):Promise<void>;
 

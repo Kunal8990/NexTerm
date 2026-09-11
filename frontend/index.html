@@ -27,6 +27,10 @@
           <div class="menu-option" id="mFindInTerm">🔍 Find in Terminal... (Ctrl+Shift+F)</div>
           <div class="menu-option" id="mClearTab">Clear Terminal Screen</div>
           <div class="menu-option" id="mCloseTab">Close Tab (Ctrl+W)</div>
+          <div class="menu-separator"></div>
+          <div class="menu-option" id="mToggleLogging">📝 Start/Stop Logging (active tab)</div>
+          <div class="menu-option" id="mToggleAutoLog">🔄 Auto-log new sessions: <span id="mAutoLogState">Off</span></div>
+          <div class="menu-option" id="mOpenLogsFolder">📂 Open Logs Folder</div>
         </div>
       </div>
       <div class="menu-item" data-menu="menu-sessions">Sessions
@@ -36,6 +40,9 @@
           <div class="menu-separator"></div>
           <div class="menu-option" id="mImportSessions">Import Sessions from JSON...</div>
           <div class="menu-option" id="mExportSessions">Export Sessions to JSON...</div>
+          <div class="menu-separator"></div>
+          <div class="menu-option" id="mSaveGroup">💾 Save Open Tabs as Group...</div>
+          <div class="menu-option" id="mManageGroups">🗂️ Session Groups...</div>
         </div>
       </div>
       <div class="menu-item" data-menu="menu-view">View
@@ -56,6 +63,7 @@
           <div class="menu-option" id="mToolCmdAdmin">Command Prompt (Admin)</div>
           <div class="menu-option" id="mToolPSAdmin">PowerShell (Admin)</div>
           <div class="menu-separator"></div>
+          <div class="menu-option" id="mSnippets">📋 Command Snippets...</div>
           <div class="menu-option" id="mStartXServer">🖥️ Start X Server (Linux GUI apps)</div>
         </div>
       </div>
@@ -502,18 +510,10 @@
           <!-- A. Home / Welcome Screen (Dashboard) -->
           <div id="welcomeState" class="welcome-dashboard active">
             <div class="welcome-content">
-              <!-- Nexterm Logo & Title -->
-              <div class="moba-logo-row">
-                <div class="moba-logo-box">
-                  <span class="logo-prompt">&gt;_</span>
-                  <div class="logo-cubes">
-                    <span class="cube red"></span>
-                    <span class="cube blue"></span>
-                    <span class="cube green"></span>
-                    <span class="cube yellow"></span>
-                  </div>
-                </div>
-                <h1 class="moba-brand-title">Nexterm</h1>
+              <!-- Compact brand header (logo + name) -->
+              <div class="nexterm-brand-row">
+                <img src="src/assets/nexterm-logo.png" alt="NexTerm" class="nexterm-brand-icon" />
+                <span class="nexterm-brand-text"><span class="nb-nex">Nex</span><span class="nb-term">Term</span></span>
               </div>
 
               <!-- Main Action Buttons -->
@@ -543,7 +543,7 @@
                   <span class="recent-sessions-title">⚡ Saved & Active Server Connections</span>
                   <div style="display: flex; gap: 8px; align-items: center;">
                     <button class="btn btn-sm btn-primary" id="homeBroadcastConnectBtn" type="button" style="background: linear-gradient(135deg, #0284c7, #38bdf8); font-size: 11px; font-weight: 600;">📡 Multi-Connect & Broadcast</button>
-                    <button class="btn btn-sm btn-outline" id="homeAddServerBtn" type="button">＋ New Server</button>
+                    <button class="btn btn-sm home-newserver-btn" id="homeAddServerBtn" type="button">＋ New Server</button>
                   </div>
                 </div>
                 <div class="recent-sessions-grid" id="recentSessionsGrid"></div>

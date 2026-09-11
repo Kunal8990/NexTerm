@@ -9452,3 +9452,116 @@ html, body {
 .mon-bar-fill { height: 100%; border-radius: 5px; transition: width .3s; }
 .mon-empty { padding: 14px; text-align: center; color: #64748b; font-size: 12px; }
 .mon-localbar { font-size: 11px; color: #94a3b8; padding: 6px 2px 0; border-top: 1px solid rgba(255,255,255,0.06); }
+
+/* Server Monitoring — tabs, tables, sub-views (Phase 1 expansion) */
+.mon-tabbar { display: flex; gap: 4px; padding: 8px 20px 0; background: rgba(15,23,42,0.95); border-bottom: 1px solid rgba(255,255,255,0.08); }
+.mon-tab {
+  background: transparent; color: #94a3b8; border: 1px solid transparent; border-bottom: none;
+  padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; border-radius: 8px 8px 0 0;
+}
+.mon-tab:hover { color: #e2e8f0; background: rgba(255,255,255,0.05); }
+.mon-tab.active { color: #f8fafc; background: rgba(56,189,248,0.14); border-color: rgba(56,189,248,0.35); }
+.mon-table-tall { max-height: calc(90vh - 210px); }
+.mon-row-hdr { background: rgba(0,0,0,0.25); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; }
+.mon-metric { font-variant-numeric: tabular-nums; color: #cbd5e1; font-size: 11.5px; }
+.mon-status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; vertical-align: middle; }
+.mon-sort-toggle { font-size: 11px; color: #94a3b8; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+.mon-mini-tab {
+  background: rgba(255,255,255,0.06); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 5px; padding: 2px 9px; font-size: 11px; cursor: pointer;
+}
+.mon-mini-tab.active { background: rgba(56,189,248,0.2); color: #7dd3fc; border-color: rgba(56,189,248,0.5); }
+.mon-logs {
+  background: #0b0f18; color: #cbd5e1; font-family: "Cascadia Mono", Consolas, monospace; font-size: 12px;
+  padding: 12px; border-radius: 8px; white-space: pre-wrap; word-break: break-word;
+  max-height: calc(90vh - 150px); overflow: auto; margin: 0;
+}
+
+/* Session Groups dialog (Phase 2) */
+.grp-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow-y: auto; }
+.grp-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; }
+.grp-info { flex: 1; min-width: 0; }
+.grp-name { font-weight: 700; color: var(--text-primary); font-size: 13px; }
+.grp-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.grp-auto { font-size: 11px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; white-space: nowrap; cursor: pointer; }
+.grp-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* Per-environment guard badge on the active terminal (Phase 4) */
+.workspace { position: relative; }
+.env-guard-badge {
+  position: absolute; top: 38px; right: 14px; z-index: 40;
+  font-size: 10.5px; font-weight: 800; letter-spacing: .5px; text-transform: uppercase;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid;
+  pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.35); opacity: 0.95;
+}
+
+/* Keyboard shortcuts cheat-sheet overlay (Phase 4) */
+.ks-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 620px) { .ks-grid { grid-template-columns: 1fr; } }
+.ks-group-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--accent-blue, #38bdf8); margin: 4px 0 8px; }
+.ks-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.ks-desc { color: var(--text-muted); font-size: 12px; text-align: right; }
+.ks-keys kbd {
+  display: inline-block; font-family: inherit; font-size: 11px; font-weight: 700;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18);
+  border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; margin: 0 1px; color: var(--text-primary);
+}
+
+/* New Nexterm logo mark (home dashboard) */
+.moba-logo-box.nexterm-logo-mark {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  display: flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px;
+}
+
+/* NexTerm brand logo image on the home dashboard */
+.nexterm-logo-row { display: flex; justify-content: center; align-items: center; margin-bottom: 6px; }
+.nexterm-logo-img { width: 150px; height: 150px; object-fit: contain; border-radius: 22px; }
+
+/* Improved "+ New Server" button on the home dashboard header */
+.home-newserver-btn {
+  font-size: 11px;
+  font-weight: 600;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.10);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 7px;
+  padding: 5px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+.home-newserver-btn:hover {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: #38bdf8;
+  color: #e0f2fe;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(56, 189, 248, 0.25);
+}
+
+/* Compact NexTerm brand header on the home dashboard (MobaXterm-style) */
+.nexterm-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 4px 0 18px;
+}
+.nexterm-brand-icon {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+.nexterm-brand-text {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.nexterm-brand-text .nb-nex { color: #f8fafc; }
+.nexterm-brand-text .nb-term { color: #38bdf8; }

@@ -8,8 +8,10 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"nexterm/internal/hostkey"
@@ -216,6 +218,93 @@ func (a *App) ExportSessions() (string, error) {
 
 func (a *App) ImportSessions(jsonContent string) (*model.TreeNode, error) {
 	return a.sessionService.ImportSessions(jsonContent)
+}
+
+// --------------------------------------------------------------------------
+// Session Logging — auto-save each terminal transcript to a timestamped file.
+// --------------------------------------------------------------------------
+var (
+	sessionLogMu    sync.Mutex
+	sessionLogFiles = map[string]*os.File{}
+)
+
+func sessionLogDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return filepath.Join(os.TempDir(), "Nexterm Logs")
+	}
+	return filepath.Join(home, "Documents", "Nexterm Logs")
+}
+
+func sanitizeLogName(s string) string {
+	if s == "" {
+		s = "session"
+	}
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('_')
+		}
+	}
+	return b.String()
+}
+
+// AppendSessionLog appends terminal output for tabID to its log file, creating
+// (and caching) the file on first write. Returns the log file path.
+func (a *App) AppendSessionLog(tabID, serverName, data string) (string, error) {
+	sessionLogMu.Lock()
+	defer sessionLogMu.Unlock()
+
+	f, ok := sessionLogFiles[tabID]
+	if !ok {
+		dir := sessionLogDir()
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return "", err
+		}
+		ts := time.Now().Format("20060102_150405")
+		path := filepath.Join(dir, fmt.Sprintf("%s_%s.log", sanitizeLogName(serverName), ts))
+		nf, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return "", err
+		}
+		_, _ = nf.WriteString(fmt.Sprintf("===== Nexterm session log: %s — started %s =====\n", serverName, time.Now().Format(time.RFC1123)))
+		sessionLogFiles[tabID] = nf
+		f = nf
+	}
+	if _, err := f.WriteString(data); err != nil {
+		return f.Name(), err
+	}
+	return f.Name(), nil
+}
+
+// StopSessionLog closes and forgets the log file for tabID, returning its path.
+func (a *App) StopSessionLog(tabID string) string {
+	sessionLogMu.Lock()
+	defer sessionLogMu.Unlock()
+	if f, ok := sessionLogFiles[tabID]; ok {
+		name := f.Name()
+		_, _ = f.WriteString(fmt.Sprintf("\n===== log closed %s =====\n", time.Now().Format(time.RFC1123)))
+		_ = f.Close()
+		delete(sessionLogFiles, tabID)
+		return name
+	}
+	return ""
+}
+
+// OpenSessionLogFolder opens the session-logs directory in the OS file manager.
+func (a *App) OpenSessionLogFolder() error {
+	dir := sessionLogDir()
+	_ = os.MkdirAll(dir, 0755)
+	switch runtime.GOOS {
+	case "windows":
+		return exec.Command("explorer", dir).Start()
+	case "darwin":
+		return exec.Command("open", dir).Start()
+	default:
+		return exec.Command("xdg-open", dir).Start()
+	}
 }
 
 // IsXServerRunning reports whether a local X server (VcXsrv, Xming, GWSL, …) is

@@ -14,6 +14,9 @@ let monitorState = {
   tabId: null,
   interval: null,
   intervalMs: 2500,
+  view: 'overview',    // overview | processes | services | docker
+  busy: false,
+  procSort: 'cpu',     // cpu | mem
   prevNet: null,       // { ts, rx, tx }
   prevCpu: null,       // { idle, total }
   history: {
@@ -21,11 +24,16 @@ let monitorState = {
     ram: [],           // % 0..100
     net: []            // total KB/s
   },
+  lastAlert: {},       // key -> timestamp (debounce threshold alerts)
   lastUsers: [],
   lastPorts: []
 };
 
-const HISTORY_LEN = 40;
+const HISTORY_LEN = 120; // ~5 minutes of history at 2.5s cadence
+
+// Threshold alerts: fire a toast (debounced) when a metric crosses a limit.
+const ALERT_THRESHOLDS = { cpu: 90, ram: 90, disk: 90 };
+const ALERT_DEBOUNCE_MS = 60000;
 
 // The single combined probe. Each section is delimited so we can parse robustly
 // even when a distro is missing a tool (ss vs netstat, etc.).
@@ -71,6 +79,8 @@ export function openServerMonitor() {
 
   monitorState.open = true;
   monitorState.tabId = tabId;
+  monitorState.view = 'overview';
+  monitorState.busy = false;
   monitorState.prevNet = null;
   monitorState.prevCpu = null;
   monitorState.history = { cpu: [], ram: [], net: [] };
@@ -116,7 +126,16 @@ function renderShell() {
         </div>
       </div>
 
+      <div class="mon-tabbar">
+        <button class="mon-tab active" data-view="overview">📊 Overview</button>
+        <button class="mon-tab" data-view="processes">⚙️ Processes</button>
+        <button class="mon-tab" data-view="services">🧩 Services</button>
+        <button class="mon-tab" data-view="docker">🐳 Docker</button>
+      </div>
+
       <div class="broadcast-body mon-body">
+        <!-- ===== OVERVIEW VIEW ===== -->
+        <div id="monViewOverview">
         <!-- Metric tiles -->
         <div class="mon-tiles">
           <div class="mon-tile"><div class="mon-tile-label">CPU Load</div><div class="mon-tile-val" id="monCpuVal">—</div><canvas class="mon-spark" id="monCpuGraph" width="240" height="46"></canvas></div>
@@ -146,6 +165,38 @@ function renderShell() {
         </div>
 
         <div class="mon-localbar" id="monLocalBar"></div>
+        </div><!-- /overview -->
+
+        <!-- ===== PROCESSES VIEW ===== -->
+        <div id="monViewProcesses" hidden>
+          <div class="mon-panel">
+            <div class="mon-panel-head" style="display:flex; justify-content:space-between; align-items:center;">
+              <span>⚙️ Top Processes (<span id="monProcCount">0</span>)</span>
+              <span class="mon-sort-toggle">
+                Sort:
+                <button class="mon-mini-tab" id="monSortCpu" data-sort="cpu">CPU</button>
+                <button class="mon-mini-tab" id="monSortMem" data-sort="mem">Memory</button>
+              </span>
+            </div>
+            <div class="mon-table mon-table-tall" id="monProcs"><div class="mon-empty">Loading…</div></div>
+          </div>
+        </div>
+
+        <!-- ===== SERVICES VIEW ===== -->
+        <div id="monViewServices" hidden>
+          <div class="mon-panel">
+            <div class="mon-panel-head"><span>🧩 systemd Services (<span id="monSvcCount">0</span>)</span></div>
+            <div class="mon-table mon-table-tall" id="monServices"><div class="mon-empty">Loading…</div></div>
+          </div>
+        </div>
+
+        <!-- ===== DOCKER VIEW ===== -->
+        <div id="monViewDocker" hidden>
+          <div class="mon-panel">
+            <div class="mon-panel-head"><span>🐳 Docker Containers (<span id="monDockerCount">0</span>)</span></div>
+            <div class="mon-table mon-table-tall" id="monDocker"><div class="mon-empty">Loading…</div></div>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -165,6 +216,33 @@ function attachHandlers() {
       poll();
     };
   }
+
+  document.querySelectorAll('.mon-tab').forEach(btn => {
+    btn.onclick = () => switchView(btn.getAttribute('data-view'));
+  });
+  const sc = document.getElementById('monSortCpu');
+  const sm = document.getElementById('monSortMem');
+  if (sc) sc.onclick = () => { monitorState.procSort = 'cpu'; markProcSort(); fetchProcesses(); };
+  if (sm) sm.onclick = () => { monitorState.procSort = 'mem'; markProcSort(); fetchProcesses(); };
+  markProcSort();
+}
+
+function switchView(view) {
+  monitorState.view = view;
+  document.querySelectorAll('.mon-tab').forEach(b => b.classList.toggle('active', b.getAttribute('data-view') === view));
+  const map = { overview: 'monViewOverview', processes: 'monViewProcesses', services: 'monViewServices', docker: 'monViewDocker' };
+  Object.entries(map).forEach(([v, id]) => { const el = document.getElementById(id); if (el) el.hidden = (v !== view); });
+  // Fetch the newly shown view's data immediately.
+  if (view === 'processes') fetchProcesses();
+  else if (view === 'services') fetchServices();
+  else if (view === 'docker') fetchDocker();
+}
+
+function markProcSort() {
+  const sc = document.getElementById('monSortCpu');
+  const sm = document.getElementById('monSortMem');
+  if (sc) sc.classList.toggle('active', monitorState.procSort === 'cpu');
+  if (sm) sm.classList.toggle('active', monitorState.procSort === 'mem');
 }
 
 async function poll() {
@@ -188,11 +266,189 @@ async function poll() {
   try {
     const s = parseProbe(raw);
     updateUI(s);
+    checkAlerts(s);
   } catch (e) {
     // Never let a parse hiccup kill the polling loop.
     console.warn('monitor parse error', e);
   }
   updateLocalBar();
+
+  // Refresh whichever sub-view is currently visible.
+  if (monitorState.view === 'processes') fetchProcesses();
+  else if (monitorState.view === 'services') fetchServices();
+  else if (monitorState.view === 'docker') fetchDocker();
+}
+
+// ---- Threshold alerts -----------------------------------------------------
+function checkAlerts(s) {
+  const now = Date.now();
+  const fire = (key, label) => {
+    if (now - (monitorState.lastAlert[key] || 0) > ALERT_DEBOUNCE_MS) {
+      monitorState.lastAlert[key] = now;
+      showToast('⚠️ ' + label, 'warning');
+    }
+  };
+  if (s.cpuPct >= ALERT_THRESHOLDS.cpu) fire('cpu', `High CPU on ${s.host || 'server'}: ${Math.round(s.cpuPct)}%`);
+  if (s.memPct >= ALERT_THRESHOLDS.ram) fire('ram', `High memory on ${s.host || 'server'}: ${Math.round(s.memPct)}%`);
+  (s.disks || []).forEach(d => {
+    const pct = parseInt(d.pct, 10) || 0;
+    if (pct >= ALERT_THRESHOLDS.disk) fire('disk:' + d.mount, `Disk ${d.mount} on ${s.host || 'server'} is ${pct}% full`);
+  });
+}
+
+// ---- Processes ------------------------------------------------------------
+async function fetchProcesses() {
+  const el = document.getElementById('monProcs');
+  if (!el) return;
+  const sortKey = monitorState.procSort === 'mem' ? '-pmem' : '-pcpu';
+  const cmd = `ps -eo pid,user,pcpu,pmem,comm --sort=${sortKey} 2>/dev/null | head -n 31`;
+  let out = '';
+  try { out = await window.go.main.App.RunSSHCommand(monitorState.tabId, cmd); } catch (e) { return; }
+  const rows = out.split('\n').map(l => l.trim()).filter(Boolean);
+  rows.shift(); // header
+  const procs = rows.map(l => {
+    const p = l.split(/\s+/);
+    return { pid: p[0], user: p[1], cpu: p[2], mem: p[3], cmd: p.slice(4).join(' ') };
+  }).filter(p => p.pid && /^\d+$/.test(p.pid));
+  setText('monProcCount', String(procs.length));
+  if (!procs.length) { el.innerHTML = '<div class="mon-empty">No process data</div>'; return; }
+  el.innerHTML = `<div class="mon-row mon-row-hdr"><div class="mon-row-main">PID · User · Command</div><div class="mon-row-side">CPU / MEM</div></div>` +
+    procs.map(p => `
+      <div class="mon-row">
+        <div class="mon-row-main"><strong>${escape(p.pid)}</strong> <span class="mon-dim">${escape(p.user)}</span> ${escape(p.cmd)}</div>
+        <div class="mon-row-side">
+          <span class="mon-metric">${escape(p.cpu)}% / ${escape(p.mem)}%</span>
+          <button class="mon-act-btn danger" data-killproc="${escape(p.pid)}" data-name="${escape(p.cmd)}" title="Kill this process">Kill</button>
+        </div>
+      </div>`).join('');
+  el.querySelectorAll('[data-killproc]').forEach(b => {
+    b.onclick = () => killProcess(b.getAttribute('data-killproc'), b.getAttribute('data-name'));
+  });
+}
+
+async function killProcess(pid, name) {
+  if (!pid) return;
+  if (!confirm(`Kill process ${pid} (${name}) on this server?`)) return;
+  try {
+    await window.go.main.App.RunSSHCommand(monitorState.tabId, `kill -TERM ${pid} 2>&1 || sudo kill -TERM ${pid} 2>&1`);
+    showToast(`Sent terminate to PID ${pid}`, 'info');
+    setTimeout(fetchProcesses, 500);
+  } catch (err) { showToast('Kill failed: ' + err, 'error'); }
+}
+
+// ---- Services (systemd) ---------------------------------------------------
+async function fetchServices() {
+  const el = document.getElementById('monServices');
+  if (!el) return;
+  const cmd = `systemctl list-units --type=service --all --no-legend --no-pager 2>/dev/null | head -n 60`;
+  let out = '';
+  try { out = await window.go.main.App.RunSSHCommand(monitorState.tabId, cmd); } catch (e) { return; }
+  const svcs = out.split('\n').map(l => l.replace(/^\s*[●*]\s*/, '').trim()).filter(Boolean).map(l => {
+    const p = l.split(/\s+/);
+    return { unit: p[0], load: p[1], active: p[2], sub: p[3], desc: p.slice(4).join(' ') };
+  }).filter(s => s.unit && s.unit.endsWith('.service'));
+  setText('monSvcCount', String(svcs.length));
+  if (!svcs.length) { el.innerHTML = '<div class="mon-empty">No services found (systemd may be unavailable)</div>'; return; }
+  el.innerHTML = svcs.map(s => {
+    const running = s.active === 'active';
+    const dot = running ? '#22c55e' : (s.active === 'failed' ? '#ef4444' : '#94a3b8');
+    return `<div class="mon-row">
+      <div class="mon-row-main"><span class="mon-status-dot" style="background:${dot};"></span><strong>${escape(s.unit.replace('.service', ''))}</strong> <span class="mon-dim">${escape(s.active)}/${escape(s.sub)}</span></div>
+      <div class="mon-row-side">
+        <button class="mon-act-btn" data-svc="${escape(s.unit)}" data-op="restart" title="Restart">Restart</button>
+        ${running
+          ? `<button class="mon-act-btn danger" data-svc="${escape(s.unit)}" data-op="stop" title="Stop">Stop</button>`
+          : `<button class="mon-act-btn" data-svc="${escape(s.unit)}" data-op="start" title="Start">Start</button>`}
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-svc]').forEach(b => {
+    b.onclick = () => serviceAction(b.getAttribute('data-svc'), b.getAttribute('data-op'));
+  });
+}
+
+async function serviceAction(unit, op) {
+  if (!unit || !op) return;
+  if (!confirm(`${op} service "${unit}" on this server?`)) return;
+  try {
+    await window.go.main.App.RunSSHCommand(monitorState.tabId, `systemctl ${op} ${unit} 2>&1 || sudo systemctl ${op} ${unit} 2>&1`);
+    showToast(`${op} sent to ${unit}`, 'info');
+    setTimeout(fetchServices, 700);
+  } catch (err) { showToast('Service action failed: ' + err, 'error'); }
+}
+
+// ---- Docker ---------------------------------------------------------------
+async function fetchDocker() {
+  const el = document.getElementById('monDocker');
+  if (!el) return;
+  const cmd = `docker ps -a --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}' 2>&1 | head -n 60`;
+  let out = '';
+  try { out = await window.go.main.App.RunSSHCommand(monitorState.tabId, cmd); } catch (e) { return; }
+  if (/command not found|permission denied|Cannot connect to the Docker daemon/i.test(out)) {
+    el.innerHTML = `<div class="mon-empty">Docker not available on this host (${escape(out.split('\n')[0] || '')})</div>`;
+    setText('monDockerCount', '0');
+    return;
+  }
+  const rows = out.split('\n').map(l => l.trim()).filter(l => l.includes('|')).map(l => {
+    const p = l.split('|');
+    return { id: p[0], name: p[1], image: p[2], state: p[3], status: p[4] };
+  });
+  setText('monDockerCount', String(rows.length));
+  if (!rows.length) { el.innerHTML = '<div class="mon-empty">No containers</div>'; return; }
+  el.innerHTML = rows.map(c => {
+    const running = /running|up/i.test(c.state) || /^Up/i.test(c.status);
+    const dot = running ? '#22c55e' : '#94a3b8';
+    return `<div class="mon-row">
+      <div class="mon-row-main"><span class="mon-status-dot" style="background:${dot};"></span><strong>${escape(c.name)}</strong> <span class="mon-dim">${escape(c.image)}</span> <span class="mon-dim">${escape(c.status)}</span></div>
+      <div class="mon-row-side">
+        <button class="mon-act-btn" data-dockerlogs="${escape(c.id)}" data-name="${escape(c.name)}" title="View recent logs">Logs</button>
+        <button class="mon-act-btn" data-dockerrestart="${escape(c.id)}" data-name="${escape(c.name)}" title="Restart container">Restart</button>
+        ${running ? `<button class="mon-act-btn danger" data-dockerstop="${escape(c.id)}" data-name="${escape(c.name)}" title="Stop container">Stop</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('[data-dockerrestart]').forEach(b => b.onclick = () => dockerAction(b.getAttribute('data-dockerrestart'), 'restart', b.getAttribute('data-name')));
+  el.querySelectorAll('[data-dockerstop]').forEach(b => b.onclick = () => dockerAction(b.getAttribute('data-dockerstop'), 'stop', b.getAttribute('data-name')));
+  el.querySelectorAll('[data-dockerlogs]').forEach(b => b.onclick = () => dockerLogs(b.getAttribute('data-dockerlogs'), b.getAttribute('data-name')));
+}
+
+async function dockerAction(id, op, name) {
+  if (!id) return;
+  if (op === 'stop' && !confirm(`Stop container ${name}?`)) return;
+  try {
+    await window.go.main.App.RunSSHCommand(monitorState.tabId, `docker ${op} ${id} 2>&1 || sudo docker ${op} ${id} 2>&1`);
+    showToast(`docker ${op} ${name}`, 'info');
+    setTimeout(fetchDocker, 900);
+  } catch (err) { showToast('Docker action failed: ' + err, 'error'); }
+}
+
+async function dockerLogs(id, name) {
+  try {
+    const out = await window.go.main.App.RunSSHCommand(monitorState.tabId, `docker logs --tail 200 ${id} 2>&1 || sudo docker logs --tail 200 ${id} 2>&1`);
+    // Pause polling so a background refresh doesn't close/overwrite the logs view.
+    if (monitorState.interval) { clearInterval(monitorState.interval); monitorState.interval = null; }
+    monitorState.open = false;
+    showModal(`
+      <div class="broadcast-modal-card bcast-large-modal mon-modal">
+        <div class="broadcast-header">
+          <div class="broadcast-title-row"><span class="broadcast-icon">🐳</span><div><h3>Logs: ${escape(name)}</h3><p class="broadcast-subtitle">Last 200 lines</p></div></div>
+          <button id="monLogsClose" class="broadcast-close-btn">✕</button>
+        </div>
+        <div class="broadcast-body"><pre class="mon-logs">${escape(out || '(empty)')}</pre></div>
+      </div>`, 'modal-plain');
+    const c = document.getElementById('monLogsClose');
+    if (c) c.onclick = () => reopenMonitor('docker');
+  } catch (err) { showToast('Could not fetch logs: ' + err, 'error'); }
+}
+
+// Rebuild the monitor shell and resume polling (used after the logs sub-modal).
+function reopenMonitor(view) {
+  monitorState.open = true;
+  showModal(renderShell(), 'modal-plain');
+  attachHandlers();
+  switchView(view || 'overview');
+  if (!monitorState.interval) monitorState.interval = setInterval(poll, monitorState.intervalMs);
+  poll();
 }
 
 function section(raw, name) {

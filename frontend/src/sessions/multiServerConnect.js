@@ -435,3 +435,18 @@ export async function connectFolderSessionsAndBroadcast(folderNode) {
 
   await executeMultiServerConnect(servers, "auto-split", true);
 }
+
+// Open every saved session in a folder as its own tab — no split layout and no
+// broadcast bar. This is the plain "connect all in this folder" action.
+export async function connectFolderSessionsTabbed(folderNode) {
+  if (!folderNode) return;
+  const servers = collectSavedServers(folderNode, folderNode.name, folderNode.id);
+
+  if (servers.length === 0) {
+    showToast(`No saved sessions found inside folder "${folderNode.name}".`, "warning");
+    return;
+  }
+
+  showToast(`Opening ${servers.length} session(s) from "${folderNode.name}"...`, "info");
+  await executeMultiServerConnect(servers, "tabbed", false);
+}

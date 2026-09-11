@@ -15,7 +15,7 @@ import {
   showRenameNodeDialog,
   showMoveNodeDialog
 } from './sessionDialog.js';
-import { connectFolderSessionsAndBroadcast } from './multiServerConnect.js';
+import { connectFolderSessionsAndBroadcast, connectFolderSessionsTabbed } from './multiServerConnect.js';
 
 let refreshTreeCallback = null;
 export function registerContextMenuRefreshTree(fn) {
@@ -293,6 +293,7 @@ export function showFolderContextMenu(x, y, node) {
   const isRoot = node.id === (rootNode ? rootNode.id : "");
 
   contextMenuEl.innerHTML = `
+    <div class="context-menu-item" id="cConnectAllFold" style="color: #22c55e; font-weight: 600;">▶ Open All in Tabs</div>
     <div class="context-menu-item" id="cConnectBcastFold" style="color: #38bdf8; font-weight: 600;">⚡ Connect All & Broadcast</div>
     <div class="context-menu-separator"></div>
     <div class="context-menu-item" id="cAddSess">＋ New Session</div>
@@ -311,7 +312,16 @@ export function showFolderContextMenu(x, y, node) {
   `;
   posMenu(x, y);
 
-  // 0. Connect All & Broadcast
+  // 0a. Open All in Tabs (no broadcast / no split)
+  const openAllBtn = contextMenuEl.querySelector("#cConnectAllFold");
+  if (openAllBtn) {
+    openAllBtn.onclick = () => {
+      hideContextMenu();
+      connectFolderSessionsTabbed(node);
+    };
+  }
+
+  // 0b. Connect All & Broadcast
   const bcastBtn = contextMenuEl.querySelector("#cConnectBcastFold");
   if (bcastBtn) {
     bcastBtn.onclick = () => {
@@ -422,8 +432,9 @@ export function showSessionContextMenu(x, y, profile, nodeId) {
 
   contextMenuEl.innerHTML = `
     <div class="context-menu-item" id="cConn">⚡ Connect</div>
+    <div class="context-menu-item" id="cConnNew">⧉ Open in New Tab (Duplicate)</div>
     <div class="context-menu-item" id="cEdit">✏️ Edit</div>
-    <div class="context-menu-item" id="cDup">📋 Duplicate</div>
+    <div class="context-menu-item" id="cDup">📋 Duplicate Saved Entry</div>
     <div class="context-menu-item" id="cRenSess">🏷️ Rename</div>
     <div class="context-menu-separator"></div>
     <div class="context-menu-item" id="cMoveSess">📦 Move To</div>
@@ -439,6 +450,13 @@ export function showSessionContextMenu(x, y, profile, nodeId) {
   contextMenuEl.querySelector("#cConn").onclick = () => {
     hideContextMenu();
     connectToSession(profile);
+  };
+
+  // 1b. Open in New Tab (duplicate live connection — forces a fresh tab even if
+  // one is already open for this server)
+  contextMenuEl.querySelector("#cConnNew").onclick = () => {
+    hideContextMenu();
+    connectToSession(profile, true);
   };
 
   // 2. Edit

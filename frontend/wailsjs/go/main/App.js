@@ -18,6 +18,10 @@ export function AddWorkspacePane(arg1) {
   return window['go']['main']['App']['AddWorkspacePane'](arg1);
 }
 
+export function AppendSessionLog(arg1, arg2, arg3) {
+  return window['go']['main']['App']['AppendSessionLog'](arg1, arg2, arg3);
+}
+
 export function BroadcastCommand(arg1, arg2, arg3) {
   return window['go']['main']['App']['BroadcastCommand'](arg1, arg2, arg3);
 }
@@ -242,6 +246,10 @@ export function OpenSession(arg1, arg2) {
   return window['go']['main']['App']['OpenSession'](arg1, arg2);
 }
 
+export function OpenSessionLogFolder() {
+  return window['go']['main']['App']['OpenSessionLogFolder']();
+}
+
 export function OpenSessionWithTabID(arg1, arg2, arg3) {
   return window['go']['main']['App']['OpenSessionWithTabID'](arg1, arg2, arg3);
 }
@@ -404,6 +412,10 @@ export function SetWorkspaceLayout(arg1) {
 
 export function StartTunnel(arg1, arg2) {
   return window['go']['main']['App']['StartTunnel'](arg1, arg2);
+}
+
+export function StopSessionLog(arg1) {
+  return window['go']['main']['App']['StopSessionLog'](arg1);
 }
 
 export function StopTunnel(arg1) {
