@@ -307,48 +307,78 @@ func (a *App) OpenSessionLogFolder() error {
 	}
 }
 
-// IsXServerRunning reports whether a local X server (VcXsrv, Xming, GWSL, …) is
-// accepting connections on the default X11 port 6000 (display :0).
+// IsXServerRunning reports whether a local X server is available: TCP :6000
+// (VcXsrv/Xming on Windows, or XQuartz/Linux configured for TCP), or — on
+// macOS/Linux — a local X11 unix socket or a set DISPLAY.
 func (a *App) IsXServerRunning() bool {
-	conn, err := net.DialTimeout("tcp", "127.0.0.1:6000", 400*time.Millisecond)
-	if err != nil {
-		return false
+	if conn, err := net.DialTimeout("tcp", "127.0.0.1:6000", 400*time.Millisecond); err == nil {
+		_ = conn.Close()
+		return true
 	}
-	_ = conn.Close()
-	return true
-}
-
-// LaunchXServer starts a local Windows X server so that X11-forwarded remote GUI
-// apps can display. It first checks whether one is already running, then tries the
-// common installs (VcXsrv, Xming, GWSL). Returns a human-readable status string.
-func (a *App) LaunchXServer() (string, error) {
-	if a.IsXServerRunning() {
-		return "An X server is already running on display :0 (port 6000).", nil
-	}
-
-	type candidate struct {
-		path string
-		args []string
-	}
-	candidates := []candidate{
-		{`C:\Program Files\VcXsrv\vcxsrv.exe`, []string{":0", "-multiwindow", "-clipboard", "-wgl", "-ac"}},
-		{`C:\Program Files (x86)\VcXsrv\vcxsrv.exe`, []string{":0", "-multiwindow", "-clipboard", "-wgl", "-ac"}},
-		{`C:\Program Files\Xming\Xming.exe`, []string{":0", "-clipboard", "-multiwindow", "-ac"}},
-		{`C:\Program Files (x86)\Xming\Xming.exe`, []string{":0", "-clipboard", "-multiwindow", "-ac"}},
-	}
-
-	for _, c := range candidates {
-		if _, err := os.Stat(c.path); err == nil {
-			cmd := exec.Command(c.path, c.args...)
-			if err := cmd.Start(); err != nil {
-				return "", fmt.Errorf("found %s but failed to start it: %w", c.path, err)
-			}
-			a.loggingService.LogAudit("XSERVER_STARTED", "xserver", "", "", "", "SUCCESS", c.path)
-			return "Started X server: " + c.path + " (display :0). Enable 'X11 Forwarding' on a session, then run a GUI app like 'xclock'.", nil
+	if runtime.GOOS != "windows" {
+		if entries, err := os.ReadDir("/tmp/.X11-unix"); err == nil && len(entries) > 0 {
+			return true
+		}
+		if os.Getenv("DISPLAY") != "" {
+			return true
 		}
 	}
+	return false
+}
 
-	return "", fmt.Errorf("no X server found. Install VcXsrv (recommended, free) from sourceforge.net/projects/vcxsrv and try again")
+// LaunchXServer starts (or confirms) a local X server so X11-forwarded remote GUI
+// apps can display. Cross-platform: Windows → VcXsrv/Xming; macOS → XQuartz;
+// Linux → the desktop session's native X server. Returns a status string.
+func (a *App) LaunchXServer() (string, error) {
+	if a.IsXServerRunning() {
+		return "An X server is already running/available on this system. Enable 'X11 Forwarding' on a session and run a GUI app like 'xclock'.", nil
+	}
+
+	switch runtime.GOOS {
+	case "windows":
+		type candidate struct {
+			path string
+			args []string
+		}
+		candidates := []candidate{
+			{`C:\Program Files\VcXsrv\vcxsrv.exe`, []string{":0", "-multiwindow", "-clipboard", "-wgl", "-ac"}},
+			{`C:\Program Files (x86)\VcXsrv\vcxsrv.exe`, []string{":0", "-multiwindow", "-clipboard", "-wgl", "-ac"}},
+			{`C:\Program Files\Xming\Xming.exe`, []string{":0", "-clipboard", "-multiwindow", "-ac"}},
+			{`C:\Program Files (x86)\Xming\Xming.exe`, []string{":0", "-clipboard", "-multiwindow", "-ac"}},
+		}
+		for _, c := range candidates {
+			if _, err := os.Stat(c.path); err == nil {
+				if err := exec.Command(c.path, c.args...).Start(); err != nil {
+					return "", fmt.Errorf("found %s but failed to start it: %w", c.path, err)
+				}
+				a.loggingService.LogAudit("XSERVER_STARTED", "xserver", "", "", "", "SUCCESS", c.path)
+				return "Started X server: " + c.path + " (display :0). Enable 'X11 Forwarding' on a session, then run a GUI app like 'xclock'.", nil
+			}
+		}
+		return "", fmt.Errorf("no X server found. Install VcXsrv (recommended, free) from sourceforge.net/projects/vcxsrv and try again")
+
+	case "darwin":
+		for _, p := range []string{"/Applications/Utilities/XQuartz.app", "/Applications/XQuartz.app"} {
+			if _, err := os.Stat(p); err == nil {
+				if err := exec.Command("open", "-a", "XQuartz").Start(); err != nil {
+					return "", fmt.Errorf("found XQuartz but failed to start it: %w", err)
+				}
+				a.loggingService.LogAudit("XSERVER_STARTED", "xserver", "", "", "", "SUCCESS", p)
+				return "Started XQuartz. If forwarded apps don't appear, open XQuartz → Preferences → Security and tick 'Allow connections from network clients'. Then enable 'X11 Forwarding' on a session and run e.g. 'xclock'.", nil
+			}
+		}
+		// Fall back to letting launchservices resolve it by name.
+		if err := exec.Command("open", "-a", "XQuartz").Start(); err == nil {
+			return "Attempting to start XQuartz. If nothing appears, install XQuartz (free) from xquartz.org.", nil
+		}
+		return "", fmt.Errorf("XQuartz not found. Install it (free) from xquartz.org, then try again")
+
+	default: // linux and others
+		if d := os.Getenv("DISPLAY"); d != "" {
+			return "Linux provides a native X server (DISPLAY=" + d + "). No separate X server is needed — just enable 'X11 Forwarding' on a session and run a GUI app.", nil
+		}
+		return "", fmt.Errorf("no DISPLAY detected. On Linux the desktop session is the X server — start a graphical session (or set DISPLAY), then enable X11 Forwarding")
+	}
 }
 
 // RunSSHCommand runs a one-shot command on the SSH connection bound to tabID and

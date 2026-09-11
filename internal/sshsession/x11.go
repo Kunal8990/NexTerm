@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -67,13 +68,22 @@ func setupX11Forwarding(session *ssh.Session, client *ssh.Client, display int) e
 }
 
 // forwardX11Channel pipes a single incoming x11 channel to the local X server.
+// On macOS/Linux the X server usually listens on a unix socket
+// (/tmp/.X11-unix/X<display>); on Windows (and TCP-enabled X servers) it's
+// TCP 127.0.0.1:(6000+display). Try the unix socket first off-Windows, then TCP.
 func forwardX11Channel(ch ssh.Channel, display int) {
 	if display < 0 {
 		display = 0
 	}
-	port := 6000 + display
-	xconn, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port))
-	if err != nil {
+	var xconn net.Conn
+	var err error
+	if runtime.GOOS != "windows" {
+		xconn, err = net.Dial("unix", fmt.Sprintf("/tmp/.X11-unix/X%d", display))
+	}
+	if xconn == nil {
+		xconn, err = net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", 6000+display))
+	}
+	if err != nil || xconn == nil {
 		_ = ch.Close()
 		return
 	}
