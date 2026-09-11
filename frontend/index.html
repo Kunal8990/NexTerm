@@ -273,13 +273,17 @@
                   </div>
                   <div style="display:flex; align-items:center; gap:6px;">
                     <button id="connectedBroadcastBtn" class="connected-header-bcast-btn" title="Broadcast Command to All Connected (Alt+B)" type="button">
-                      <span>📡</span> Broadcast
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
+                      <span>Broadcast</span>
                     </button>
                     <span class="connected-badge" id="connectedCountBadge">0</span>
                   </div>
                 </div>
                 <div id="connectedServersList" class="connected-servers-list">
-                  <div class="connected-empty-msg">No active connections</div>
+                  <div class="connected-empty-msg">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5; margin-bottom:4px;"><circle cx="12" cy="12" r="10"></circle><path d="m4.93 4.93 4.24 4.24"></path><path d="m14.83 9.17 4.24-4.24"></path><path d="m14.83 14.83 4.24 4.24"></path><path d="m9.17 14.83-4.24 4.24"></path></svg>
+                    <span>No active connections</span>
+                  </div>
                 </div>
               </div>
 
@@ -287,18 +291,35 @@
               <div class="sidebar-section-container saved-sessions-section">
                 <div class="sessions-header-row saved-header-row">
                   <span class="sessions-root-label">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="color: #60a5fa; margin-right: 5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-                    SAVED SESSIONS
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="color: #38bdf8; margin-right: 5px;"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    <span>SAVED SESSIONS</span>
                   </span>
                   <div class="session-tree-tools">
-                    <button id="treeMultiConnectBtn" class="tree-multiconnect-btn" title="Multi-Server Connect & Broadcast" type="button">📡 Broadcast</button>
-                    <button id="treeAddSessionBtn" title="New Session">＋</button>
-                    <button id="treeAddFolderBtn" title="New Folder">📁</button>
-                    <button id="treeExpandAllBtn" title="Expand All Folders">⊞</button>
-                    <button id="treeCollapseAllBtn" title="Collapse All Folders">⊟</button>
-                    <button id="treeImportBtn" title="Import sessions from a JSON file">📥</button>
-                    <button id="treeExportBtn" title="Export all sessions to a JSON file">📤</button>
-                    <button id="treeRefreshBtn" title="Refresh">↻</button>
+                    <button id="treeMultiConnectBtn" class="tree-multiconnect-btn" title="Multi-Server Connect & Broadcast" type="button">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49"></path></svg>
+                      <span>Broadcast</span>
+                    </button>
+                    <button id="treeAddSessionBtn" title="New Session">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </button>
+                    <button id="treeAddFolderBtn" title="New Folder">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    </button>
+                    <button id="treeExpandAllBtn" title="Expand All Folders">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <button id="treeCollapseAllBtn" title="Collapse All Folders">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                    </button>
+                    <button id="treeImportBtn" title="Import sessions from a JSON file">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    </button>
+                    <button id="treeExportBtn" title="Export all sessions to a JSON file">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    </button>
+                    <button id="treeRefreshBtn" title="Refresh">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    </button>
                   </div>
                 </div>
 
@@ -525,10 +546,24 @@
           <!-- A. Home / Welcome Screen (Dashboard) -->
           <div id="welcomeState" class="welcome-dashboard active">
             <div class="welcome-content">
-              <!-- Compact brand header (logo + name) -->
-              <div class="nexterm-brand-row">
-                <img src="src/assets/nexterm-logo.png" alt="NexTerm" class="nexterm-brand-icon" />
-                <span class="nexterm-brand-text"><span class="nb-nex">Nex</span><span class="nb-term">Term</span></span>
+              <!-- Hero Brand & Ambient Glow -->
+              <div class="nexterm-hero-showcase">
+                <div class="hero-badge">
+                  <span class="hero-badge-pulse"></span>
+                  <span>NEXT-GENERATION TERMINAL & CLOUD WORKSPACE</span>
+                </div>
+                <div class="nexterm-brand-row">
+                  <div class="brand-logo-frame">
+                    <img src="src/assets/nexterm-logo.png" alt="NexTerm" class="nexterm-brand-icon" />
+                  </div>
+                  <h1 class="nexterm-hero-title">
+                    <span class="nb-nex">Nex</span><span class="nb-term">Term</span>
+                    <span class="hero-edition-tag">PRO</span>
+                  </h1>
+                </div>
+                <p class="nexterm-hero-desc">
+                  Ultra-fast multi-session SSH, graphical dual SFTP, and native ConPTY orchestration
+                </p>
               </div>
 
               <!-- Bento Action Cards -->
@@ -538,24 +573,36 @@
                     <div class="bento-icon-box local-icon">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
                     </div>
-                    <span class="bento-tag">ConPTY</span>
+                    <div class="bento-tags-row">
+                      <span class="bento-tag">ConPTY</span>
+                      <span class="bento-kbd">↵ Enter</span>
+                    </div>
                   </div>
                   <div class="bento-card-main">
-                    <span class="bento-card-title">Local Terminal</span>
-                    <span class="bento-card-sub">PowerShell, CMD, or WSL shell</span>
+                    <div class="bento-title-row">
+                      <span class="bento-card-title">Local Terminal</span>
+                      <svg class="bento-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </div>
+                    <span class="bento-card-sub">PowerShell, CMD, or native WSL shell</span>
                   </div>
                 </button>
 
-                <button id="newSSHSessionBigBtn" class="bento-card session-card">
+                <button id="newSSHSessionBigBtn" class="bento-card session-card featured-bento">
                   <div class="bento-card-top">
                     <div class="bento-icon-box session-icon">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     </div>
-                    <span class="bento-tag">SSH / SFTP</span>
+                    <div class="bento-tags-row">
+                      <span class="bento-tag">SSH / SFTP</span>
+                      <span class="bento-kbd">Ctrl+N</span>
+                    </div>
                   </div>
                   <div class="bento-card-main">
-                    <span class="bento-card-title">New SSH Session</span>
-                    <span class="bento-card-sub">Connect with Keys or Vault</span>
+                    <div class="bento-title-row">
+                      <span class="bento-card-title">New SSH Session</span>
+                      <svg class="bento-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </div>
+                    <span class="bento-card-sub">Connect with Keys, Certificates or Vault</span>
                   </div>
                 </button>
 
@@ -564,11 +611,17 @@
                     <div class="bento-icon-box broadcast-icon">
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
                     </div>
-                    <span class="bento-tag">MultiExec</span>
+                    <div class="bento-tags-row">
+                      <span class="bento-tag">MultiExec</span>
+                      <span class="bento-kbd">Alt+M</span>
+                    </div>
                   </div>
                   <div class="bento-card-main">
-                    <span class="bento-card-title">Multi-Server Broadcast</span>
-                    <span class="bento-card-sub">Simultaneous cluster execution</span>
+                    <div class="bento-title-row">
+                      <span class="bento-card-title">Multi-Server Broadcast</span>
+                      <svg class="bento-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                    </div>
+                    <span class="bento-card-sub">Simultaneous cluster execution across tabs</span>
                   </div>
                 </button>
               </div>
