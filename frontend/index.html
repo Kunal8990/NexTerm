@@ -13,6 +13,7 @@
   <!-- xterm.js local assets -->
   <link rel="stylesheet" href="vendor/xterm.css" />
   <link rel="stylesheet" href="src/style.css" />
+  <link rel="stylesheet" href="src/modern-ui.css" />
 </head>
 <body>
   <div id="app">
@@ -93,109 +94,117 @@
     <!-- 2. Main Icon Toolbar -->
     <header id="mainToolbar" class="main-toolbar">
       <div class="toolbar-left">
-        <button id="tbSessionBtn" class="tb-btn" title="New Session">
+        <button id="tbSessionBtn" class="tb-btn" title="New Session (Ctrl+N)">
           <div class="tb-icon tb-session-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
           </div>
           <span class="tb-label">Session</span>
         </button>
 
         <button id="tbServersBtn" class="tb-btn" title="Session Tree">
           <div class="tb-icon tb-servers-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
           </div>
           <span class="tb-label">Servers</span>
         </button>
 
-        <button id="tbToolsBtn" class="tb-btn" title="Tools & Utilities">
-          <div class="tb-icon tb-tools-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-          </div>
-          <span class="tb-label">Tools</span>
-        </button>
-
-        <button id="tbSplitBtn" class="tb-btn" title="Split Terminal Layout (1 / 2-Vertical / 2-Horizontal / 4-Grid)">
+        <button id="tbSplitBtn" class="tb-btn" title="Split Terminal Layout (Ctrl+Shift+\)">
           <div class="tb-icon tb-split-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
           </div>
           <span class="tb-label">Split</span>
         </button>
 
-        <button id="tbMultiExecBtn" class="tb-btn" title="Multi-Execution Across All Terminals">
+        <div class="tb-sep"></div>
+
+        <button id="tbMultiExecBtn" class="tb-btn" title="Multi-Execution Across All Terminals (Alt+M)">
           <div class="tb-icon tb-multiexec-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3v12"></path><path d="M18 3v12"></path><path d="M6 9h12"></path><circle cx="12" cy="18" r="3"></circle></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v12"></path><path d="M18 3v12"></path><path d="M6 9h12"></path><circle cx="12" cy="18" r="3"></circle></svg>
           </div>
           <span class="tb-label">MultiExec</span>
         </button>
 
         <button id="tbBroadcastBtn" class="tb-btn" title="Broadcast Command Across Connected Terminals (Ctrl+Alt+B)">
-          <div class="tb-icon tb-broadcast-icon" style="background: linear-gradient(135deg, #0284c7, #38bdf8);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
+          <div class="tb-icon tb-broadcast-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
           </div>
           <span class="tb-label">Broadcast</span>
         </button>
 
         <button id="tbMacrosBtn" class="tb-btn" title="Terminal Macros (Record & Replay)">
           <div class="tb-icon tb-macros-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           </div>
           <span class="tb-label">Macros</span>
         </button>
 
         <button id="tbTunnelingBtn" class="tb-btn" title="SSH Tunneling / Port Forwarding">
           <div class="tb-icon tb-tunneling-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="12" r="3"></circle><line x1="9" y1="12" x2="15" y2="12"></line></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>
           </div>
           <span class="tb-label">Tunneling</span>
         </button>
 
-        <button id="tbPackagesBtn" class="tb-btn" title="Package Manager">
-          <div class="tb-icon tb-packages-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-          </div>
-          <span class="tb-label">Packages</span>
-        </button>
+        <div class="tb-sep"></div>
 
-        <button id="tbThemeBtn" class="tb-btn" title="Choose UI Theme">
-          <div class="tb-icon tb-theme-icon" style="background: linear-gradient(135deg, #ec4899, #8b5cf6);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 10 10c0 2.5-1.5 4.5-3.5 4.5h-1.5c-.8 0-1.5.7-1.5 1.5 0 .4.2.8.5 1.1.3.3.5.7.5 1.1 0 1-.8 1.8-1.8 1.8-5.5 0-10-4.5-10-10C4.7 6.5 8 2 12 2z"></path><circle cx="8.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="8.5" r="1.5"></circle><circle cx="12" cy="6" r="1.5"></circle></svg>
+        <button id="tbToolsBtn" class="tb-btn" title="Tools & Utilities">
+          <div class="tb-icon tb-tools-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
           </div>
-          <span class="tb-label">Themes</span>
-        </button>
-
-        <button id="tbSettingsBtn" class="tb-btn" title="Settings">
-          <div class="tb-icon tb-settings-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-          </div>
-          <span class="tb-label">Settings</span>
+          <span class="tb-label">Tools</span>
         </button>
 
         <button id="tbMonitorBtn" class="tb-btn" title="Server Monitoring — live load, memory, users, ports & network">
           <div class="tb-icon tb-monitor-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"></path><path d="M7 15l3-4 3 2 4-6"></path></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="M7 15l3-4 3 2 4-6"></path></svg>
           </div>
           <span class="tb-label">Monitor</span>
         </button>
 
         <button id="tbXServerBtn" class="tb-btn" title="X Server — start a local X server so remote Linux GUI apps display here (X11 forwarding)">
           <div class="tb-icon tb-xserver-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M8 8l3 3-3 3"></path><path d="M13 14h4"></path></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M8 8l3 3-3 3"></path><path d="M13 14h4"></path></svg>
           </div>
           <span class="tb-label">X Server</span>
         </button>
 
+        <div class="tb-sep"></div>
+
+        <button id="tbPackagesBtn" class="tb-btn" title="Package Manager">
+          <div class="tb-icon tb-packages-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          </div>
+          <span class="tb-label">Packages</span>
+        </button>
+
+        <button id="tbThemeBtn" class="tb-btn" title="Choose UI Theme">
+          <div class="tb-icon tb-theme-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 10 10c0 2.5-1.5 4.5-3.5 4.5h-1.5c-.8 0-1.5.7-1.5 1.5 0 .4.2.8.5 1.1.3.3.5.7.5 1.1 0 1-.8 1.8-1.8 1.8-5.5 0-10-4.5-10-10C4.7 6.5 8 2 12 2z"></path><circle cx="8.5" cy="8.5" r="1.5"></circle><circle cx="15.5" cy="8.5" r="1.5"></circle><circle cx="12" cy="6" r="1.5"></circle></svg>
+          </div>
+          <span class="tb-label">Themes</span>
+        </button>
+
+        <button id="tbSettingsBtn" class="tb-btn" title="Settings">
+          <div class="tb-icon tb-settings-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </div>
+          <span class="tb-label">Settings</span>
+        </button>
+
         <button id="tbCommandPaletteBtn" class="tb-btn" title="Command Palette & Quick Search (Ctrl+K)">
-          <div class="tb-icon tb-cmd-icon" style="background: linear-gradient(135deg, #4f46e5, #06b6d4);">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <div class="tb-icon tb-cmd-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
           </div>
           <span class="tb-label">⌘K</span>
         </button>
       </div>
 
-      <!-- MobaXterm Fast Connection Bar -->
+      <!-- Spotlight Fast Connection Bar -->
       <div class="toolbar-quick-connect" id="toolbarQuickConnect">
         <div class="quick-connect-box">
-          <span class="quick-connect-icon" title="Quick Connect">⚡</span>
+          <span class="quick-connect-icon" title="Quick Connect">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </span>
           <input type="text" id="quickConnectInput" class="quick-connect-input" placeholder="ssh user@192.168.1.20" autocomplete="off" spellcheck="false" />
         </div>
         <button id="quickConnectBtn" class="quick-connect-btn" title="Quick Connect (Enter)">Connect</button>
@@ -204,7 +213,7 @@
       <div class="toolbar-right">
         <button id="tbExitBtn" class="tb-btn exit-btn" title="Exit Application">
           <div class="tb-icon tb-exit-icon">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
           </div>
           <span class="tb-label">Exit</span>
         </button>
@@ -233,20 +242,20 @@
         <div class="sidebar-body">
           <!-- Vertical Icon Strip on the Far Left -->
           <nav class="vertical-nav-strip">
-            <button class="nav-strip-btn active" id="navTabSessions" title="User Sessions (★)">
-              ★
+            <button class="nav-strip-btn active" id="navTabSessions" title="User Sessions">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
             </button>
-            <button class="nav-strip-btn" id="navTabSFTP" title="Graphical SFTP Browser (📁)">
-              📁
+            <button class="nav-strip-btn" id="navTabSFTP" title="Graphical SFTP Browser">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
             </button>
-            <button class="nav-strip-btn" id="navTabMacros" title="Terminal Macros (📜)">
-              📜
+            <button class="nav-strip-btn" id="navTabMacros" title="Terminal Macros">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
             </button>
-            <button class="nav-strip-btn" id="navTabTunnel" title="Nexterm Tunnel Port Forwarding (🔑)">
-              🔑
+            <button class="nav-strip-btn" id="navTabTunnel" title="Nexterm Tunnel Port Forwarding">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="5.5"></circle><path d="m21 2-9.6 9.6"></path><path d="m15.5 7.5 3 3L22 7l-3-3"></path></svg>
             </button>
-            <button class="nav-strip-btn" id="navTabTools" title="System & Network Tools (⚡)">
-              ⚡
+            <button class="nav-strip-btn" id="navTabTools" title="System & Network Tools">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
             </button>
           </nav>
 
@@ -495,13 +504,19 @@
           <div id="tabbar" class="tabbar">
             <!-- Home Dashboard Tab -->
             <div class="tab-item home-tab active" id="homeTabBtn" title="Dashboard">
-              <span class="home-tab-icon">🏠</span>
+              <span class="home-tab-icon">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+              </span>
             </div>
             <!-- Dynamic Connection Tabs inserted here -->
           </div>
           <div class="tabbar-end-tools">
-            <button id="newTabAddBtn" class="tab-add-icon-btn" title="New Tab">＋</button>
-            <button id="wsSettingsBtn" class="tab-tool-icon-btn" title="Settings">⚙</button>
+            <button id="newTabAddBtn" class="tab-add-icon-btn" title="New Tab">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            </button>
+            <button id="wsSettingsBtn" class="tab-tool-icon-btn" title="Settings">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
           </div>
         </div>
 
@@ -516,34 +531,70 @@
                 <span class="nexterm-brand-text"><span class="nb-nex">Nex</span><span class="nb-term">Term</span></span>
               </div>
 
-              <!-- Main Action Buttons -->
-              <div class="welcome-big-actions">
-                <button id="startLocalTerminalBtn" class="big-action-btn local-btn">
-                  <span class="action-icon">＋</span>
-                  <span>Start local terminal</span>
+              <!-- Bento Action Cards -->
+              <div class="welcome-big-actions bento-actions-grid">
+                <button id="startLocalTerminalBtn" class="bento-card local-card">
+                  <div class="bento-card-top">
+                    <div class="bento-icon-box local-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                    </div>
+                    <span class="bento-tag">ConPTY</span>
+                  </div>
+                  <div class="bento-card-main">
+                    <span class="bento-card-title">Local Terminal</span>
+                    <span class="bento-card-sub">PowerShell, CMD, or WSL shell</span>
+                  </div>
                 </button>
-                <button id="newSSHSessionBigBtn" class="big-action-btn session-btn">
-                  <span class="action-icon">↻</span>
-                  <span>New SSH session</span>
+
+                <button id="newSSHSessionBigBtn" class="bento-card session-card">
+                  <div class="bento-card-top">
+                    <div class="bento-icon-box session-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </div>
+                    <span class="bento-tag">SSH / SFTP</span>
+                  </div>
+                  <div class="bento-card-main">
+                    <span class="bento-card-title">New SSH Session</span>
+                    <span class="bento-card-sub">Connect with Keys or Vault</span>
+                  </div>
                 </button>
-                <button id="homeMultiConnectBtn" class="big-action-btn broadcast-btn" style="background: linear-gradient(135deg, #0369a1, #0284c7); border: 1px solid #38bdf8;">
-                  <span class="action-icon">📡</span>
-                  <span>Multi-Server Broadcast</span>
+
+                <button id="homeMultiConnectBtn" class="bento-card broadcast-card">
+                  <div class="bento-card-top">
+                    <div class="bento-icon-box broadcast-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
+                    </div>
+                    <span class="bento-tag">MultiExec</span>
+                  </div>
+                  <div class="bento-card-main">
+                    <span class="bento-card-title">Multi-Server Broadcast</span>
+                    <span class="bento-card-sub">Simultaneous cluster execution</span>
+                  </div>
                 </button>
               </div>
 
-              <!-- Center Search Field -->
-              <div class="welcome-search-box">
-                <input type="text" id="welcomeSearchInput" placeholder="Find existing session or server name..." autocomplete="off" />
+              <!-- Spotlight Search Field -->
+              <div class="welcome-search-box spotlight-search-wrap">
+                <div class="spotlight-search-inner">
+                  <svg class="spotlight-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <input type="text" id="welcomeSearchInput" placeholder="Search saved servers, hostnames, or environments..." autocomplete="off" spellcheck="false" />
+                  <span class="spotlight-kbd">Ctrl+K</span>
+                </div>
               </div>
 
               <!-- Saved & Active Sessions Section (Always displayed prominently in center) -->
               <div class="recent-sessions-section" id="recentSessionsSection">
                 <div class="recent-sessions-header">
-                  <span class="recent-sessions-title">⚡ Saved & Active Server Connections</span>
+                  <span class="recent-sessions-title">Saved & Active Server Connections</span>
                   <div style="display: flex; gap: 8px; align-items: center;">
-                    <button class="btn btn-sm btn-primary" id="homeBroadcastConnectBtn" type="button" style="background: linear-gradient(135deg, #0284c7, #38bdf8); font-size: 11px; font-weight: 600;">📡 Multi-Connect & Broadcast</button>
-                    <button class="btn btn-sm home-newserver-btn" id="homeAddServerBtn" type="button">＋ New Server</button>
+                    <button class="btn btn-sm btn-primary" id="homeBroadcastConnectBtn" type="button" style="display:inline-flex; align-items:center; gap:6px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; font-size: 11px; font-weight: 600; border-radius:6px; padding: 4px 10px;">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
+                      <span>Multi-Connect & Broadcast</span>
+                    </button>
+                    <button class="btn btn-sm home-newserver-btn" id="homeAddServerBtn" type="button" style="display:inline-flex; align-items:center; gap:5px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); color: #f1f5f9; font-size: 11px; font-weight: 500; border-radius:6px; padding: 4px 10px;">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      <span>New Server</span>
+                    </button>
                   </div>
                 </div>
                 <div class="recent-sessions-grid" id="recentSessionsGrid"></div>
@@ -551,35 +602,47 @@
 
               <!-- Quick Launch Options in Home Tab -->
               <div class="home-options-panel">
-                <div class="home-panel-title">🧰 All Tools & Protocols</div>
+                <div class="home-panel-title">All Tools & Protocols</div>
                 <div class="home-quick-tools-grid">
                   <button class="home-tool-card" id="homeToolSSH" type="button">
-                    <span class="tool-card-icon">🖥️</span>
+                    <span class="tool-card-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                    </span>
                     <span class="tool-card-title">SSH Session</span>
                     <span class="tool-card-desc">Remote terminal shell</span>
                   </button>
                   <button class="home-tool-card" id="homeToolSFTP" type="button">
-                    <span class="tool-card-icon">📁</span>
+                    <span class="tool-card-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                    </span>
                     <span class="tool-card-title">SFTP Dual Browser</span>
                     <span class="tool-card-desc">Transfer & edit files</span>
                   </button>
                   <button class="home-tool-card" id="homeToolTunnel" type="button">
-                    <span class="tool-card-icon">🔑</span>
+                    <span class="tool-card-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </span>
                     <span class="tool-card-title">SSH Tunneling</span>
                     <span class="tool-card-desc">Port forwarding manager</span>
                   </button>
                   <button class="home-tool-card" id="homeToolMacros" type="button">
-                    <span class="tool-card-icon">📜</span>
+                    <span class="tool-card-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+                    </span>
                     <span class="tool-card-title">Terminal Macros</span>
                     <span class="tool-card-desc">Record & replay scripts</span>
                   </button>
                   <button class="home-tool-card" id="homeToolTaskMgr" type="button">
-                    <span class="tool-card-icon">🏃</span>
+                    <span class="tool-card-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    </span>
                     <span class="tool-card-title">Task Manager</span>
                     <span class="tool-card-desc">Windows process monitor</span>
                   </button>
                   <button class="home-tool-card" id="homeToolScanner" type="button">
-                    <span class="tool-card-icon">📶</span>
+                    <span class="tool-card-icon">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+                    </span>
                     <span class="tool-card-title">Port Scanner</span>
                     <span class="tool-card-desc">Scan open remote ports</span>
                   </button>

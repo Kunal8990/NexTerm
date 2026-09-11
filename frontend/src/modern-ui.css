@@ -1,0 +1,944 @@
+/* ==========================================================================
+   Nexterm Modern UI — Clean Minimalist / macOS Native Styling
+   Elevated Workstation Aesthetics: Frosted Glass, Pill Controls,
+   Bento Action Cards, Spotlight Search, & Refined Typography.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   0. Global Polish & Smooth Font Smoothing
+   -------------------------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body, html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-family: var(--font-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif);
+  color: var(--text-primary);
+  background-color: var(--bg-app);
+}
+
+/* --------------------------------------------------------------------------
+   1. Menubar & Dropdowns (macOS Clean Frosted Bar)
+   -------------------------------------------------------------------------- */
+.menubar {
+  height: 28px !important;
+  background: rgba(15, 18, 26, 0.9) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  padding: 0 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  user-select: none !important;
+}
+
+.menu-item {
+  padding: 3px 9px !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  color: var(--text-muted) !important;
+  border-radius: 5px !important;
+  transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.menu-item:hover,
+.menu-item.active {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.dropdown-menu {
+  top: 28px !important;
+  background: rgba(20, 24, 34, 0.96) !important;
+  backdrop-filter: blur(20px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.15) !important;
+  border-radius: 10px !important;
+  min-width: 220px !important;
+  padding: 5px !important;
+  animation: menuFadeIn 0.12s ease-out !important;
+}
+
+@keyframes menuFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.menu-option {
+  padding: 6px 12px !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  color: #cbd5e1 !important;
+  border-radius: 6px !important;
+  transition: all 0.1s ease !important;
+}
+
+.menu-option:hover {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35) !important;
+}
+
+.menu-separator {
+  height: 1px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  margin: 4px 0 !important;
+}
+
+/* --------------------------------------------------------------------------
+   2. Main Toolbar (macOS Workstation Glass Header)
+   -------------------------------------------------------------------------- */
+.main-toolbar {
+  height: 56px !important;
+  background: rgba(19, 23, 34, 0.88) !important;
+  backdrop-filter: blur(18px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  padding: 0 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important;
+}
+
+.tb-btn {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 8px !important;
+  padding: 4px 8px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+  cursor: pointer !important;
+  min-width: 48px !important;
+  height: 48px !important;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.tb-btn:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  transform: translateY(-1px) !important;
+}
+
+.tb-btn:active {
+  background: rgba(0, 0, 0, 0.25) !important;
+  transform: translateY(0) !important;
+}
+
+.tb-icon {
+  width: 26px !important;
+  height: 26px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 7px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #94a3b8 !important;
+  box-shadow: none !important;
+  transition: all 0.15s ease !important;
+}
+
+.tb-icon svg {
+  stroke-width: 2 !important;
+}
+
+.tb-btn:hover .tb-icon {
+  background: rgba(56, 189, 248, 0.12) !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+  color: #38bdf8 !important;
+  transform: scale(1.05) !important;
+}
+
+.tb-label {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.2px !important;
+  color: #94a3b8 !important;
+  transition: color 0.15s ease !important;
+}
+
+.tb-btn:hover .tb-label {
+  color: #f1f5f9 !important;
+}
+
+/* Remove garish linear gradients from toolbar icons */
+.tb-session-icon,
+.tb-servers-icon,
+.tb-tools-icon,
+.tb-split-icon,
+.tb-multiexec-icon,
+.tb-tunneling-icon,
+.tb-packages-icon,
+.tb-settings-icon,
+.tb-help-icon,
+.tb-exit-icon {
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: none !important;
+}
+
+/* Subtle individual tint on icon hover */
+.tb-btn:hover .tb-session-icon { color: #38bdf8 !important; background: rgba(56, 189, 248, 0.15) !important; }
+.tb-btn:hover .tb-servers-icon { color: #60a5fa !important; background: rgba(96, 165, 250, 0.15) !important; }
+.tb-btn:hover .tb-tools-icon { color: #fbbf24 !important; background: rgba(251, 191, 36, 0.15) !important; }
+.tb-btn:hover .tb-split-icon { color: #818cf8 !important; background: rgba(129, 140, 248, 0.15) !important; }
+.tb-btn:hover .tb-multiexec-icon { color: #f43f5e !important; background: rgba(244, 63, 94, 0.15) !important; }
+.tb-btn:hover .tb-tunneling-icon { color: #34d399 !important; background: rgba(52, 211, 153, 0.15) !important; }
+.tb-btn:hover .tb-settings-icon { color: #94a3b8 !important; background: rgba(148, 163, 184, 0.15) !important; }
+.tb-btn:hover .tb-exit-icon { color: #fb7185 !important; background: rgba(251, 113, 133, 0.15) !important; }
+
+.tb-sep {
+  width: 1px !important;
+  height: 24px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  margin: 0 5px !important;
+  border: none !important;
+}
+
+/* Spotlight Quick Connect Pill in Toolbar */
+.toolbar-quick-connect {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin: 0 16px !important;
+  flex: 1 !important;
+  max-width: 380px !important;
+  min-width: 220px !important;
+}
+
+.quick-connect-box {
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 !important;
+  background: rgba(13, 15, 23, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 9999px !important;
+  padding: 0 12px !important;
+  height: 32px !important;
+  transition: all 0.15s ease !important;
+}
+
+.quick-connect-box:focus-within {
+  border-color: rgba(56, 189, 248, 0.5) !important;
+  background: rgba(16, 20, 30, 0.95) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15) !important;
+}
+
+.quick-connect-icon {
+  display: flex !important;
+  align-items: center !important;
+  color: #64748b !important;
+  margin-right: 8px !important;
+}
+
+.quick-connect-input {
+  flex: 1 !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  color: #f1f5f9 !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11.5px !important;
+}
+
+.quick-connect-btn {
+  height: 32px !important;
+  padding: 0 14px !important;
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 9999px !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35) !important;
+  transition: all 0.15s ease !important;
+}
+
+.quick-connect-btn:hover {
+  background: #1d4ed8 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.45) !important;
+}
+
+/* --------------------------------------------------------------------------
+   3. Sidebar & Vertical Navigation Strip
+   -------------------------------------------------------------------------- */
+.sidebar {
+  background: rgba(19, 23, 34, 0.95) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.vertical-nav-strip {
+  width: 38px !important;
+  background: rgba(13, 15, 23, 0.98) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  padding-top: 8px !important;
+  gap: 6px !important;
+}
+
+.nav-strip-btn {
+  width: 28px !important;
+  height: 28px !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: #64748b !important;
+  border-radius: 7px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.15s ease !important;
+}
+
+.nav-strip-btn svg {
+  stroke-width: 2 !important;
+}
+
+.nav-strip-btn:hover {
+  color: #f1f5f9 !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+}
+
+.nav-strip-btn.active {
+  color: #38bdf8 !important;
+  background: rgba(56, 189, 248, 0.12) !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+  box-shadow: 0 2px 6px rgba(56, 189, 248, 0.15) !important;
+}
+
+.sidebar-quick-connect {
+  background: rgba(15, 18, 26, 0.6) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  padding: 8px !important;
+}
+
+.sidebar-quick-connect input {
+  background: rgba(13, 15, 23, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 6px !important;
+  color: #f1f5f9 !important;
+  font-size: 11.5px !important;
+}
+
+.sidebar-quick-connect input:focus {
+  border-color: rgba(56, 189, 248, 0.5) !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.15) !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. Tabbar & Floating Pill Tabs
+   -------------------------------------------------------------------------- */
+.tabbar-container {
+  height: 36px !important;
+  background: rgba(15, 18, 26, 0.95) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 6px !important;
+}
+
+.tabbar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.tab-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  height: 28px !important;
+  padding: 0 10px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 7px !important;
+  color: #94a3b8 !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  white-space: nowrap !important;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.tab-item:hover {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.tab-item.active {
+  background: rgba(24, 29, 42, 0.95) !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 10px rgba(56, 189, 248, 0.08) !important;
+}
+
+.home-tab {
+  padding: 0 8px !important;
+}
+
+.tab-close {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 12px !important;
+  opacity: 0.5 !important;
+  transition: all 0.12s ease !important;
+}
+
+.tab-item:hover .tab-close {
+  opacity: 0.85 !important;
+}
+
+.tab-close:hover {
+  opacity: 1 !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #f43f5e !important;
+}
+
+/* --------------------------------------------------------------------------
+   5. Welcome Dashboard & Bento Action Cards
+   -------------------------------------------------------------------------- */
+.welcome-dashboard {
+  background: radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.06) 0%, rgba(10, 12, 18, 0.98) 65%) !important;
+  padding: 40px 24px 60px 24px !important;
+}
+
+.nexterm-brand-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 12px !important;
+  margin-bottom: 28px !important;
+}
+
+.nexterm-brand-icon {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 10px !important;
+  filter: drop-shadow(0 4px 16px rgba(56, 189, 248, 0.25)) !important;
+}
+
+.nexterm-brand-text {
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.5px !important;
+}
+
+.nb-nex {
+  color: #ffffff !important;
+}
+
+.nb-term {
+  color: #38bdf8 !important;
+}
+
+/* Bento Actions Grid */
+.bento-actions-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 14px !important;
+  margin-bottom: 24px !important;
+  width: 100% !important;
+  max-width: 680px !important;
+}
+
+.bento-card {
+  background: rgba(24, 29, 42, 0.6) !important;
+  backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
+  padding: 16px 14px !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  min-height: 108px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  outline: none !important;
+}
+
+.bento-card:hover {
+  background: rgba(30, 36, 52, 0.85) !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), 0 0 16px rgba(56, 189, 248, 0.12) !important;
+}
+
+.bento-card:active {
+  transform: translateY(-1px) !important;
+}
+
+.bento-card-top {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  margin-bottom: 12px !important;
+}
+
+.bento-icon-box {
+  width: 34px !important;
+  height: 34px !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: transform 0.15s ease !important;
+}
+
+.bento-card:hover .bento-icon-box {
+  transform: scale(1.06) !important;
+}
+
+.bento-icon-box.local-icon {
+  background: rgba(16, 185, 129, 0.14) !important;
+  border: 1px solid rgba(16, 185, 129, 0.25) !important;
+  color: #10b981 !important;
+}
+
+.bento-icon-box.session-icon {
+  background: rgba(56, 189, 248, 0.14) !important;
+  border: 1px solid rgba(56, 189, 248, 0.25) !important;
+  color: #38bdf8 !important;
+}
+
+.bento-icon-box.broadcast-icon {
+  background: rgba(168, 85, 247, 0.14) !important;
+  border: 1px solid rgba(168, 85, 247, 0.25) !important;
+  color: #a855f7 !important;
+}
+
+.bento-tag {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.4px !important;
+  padding: 2px 7px !important;
+  border-radius: 9999px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #94a3b8 !important;
+}
+
+.bento-card-main {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+}
+
+.bento-card-title {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: #f1f5f9 !important;
+}
+
+.bento-card-sub {
+  font-size: 11px !important;
+  color: #64748b !important;
+  line-height: 1.3 !important;
+}
+
+/* --------------------------------------------------------------------------
+   6. Spotlight Search Bar
+   -------------------------------------------------------------------------- */
+.spotlight-search-wrap {
+  width: 100% !important;
+  max-width: 680px !important;
+  margin-bottom: 24px !important;
+}
+
+.spotlight-search-inner {
+  display: flex !important;
+  align-items: center !important;
+  background: rgba(16, 20, 30, 0.8) !important;
+  backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 9999px !important;
+  padding: 0 16px !important;
+  height: 42px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+  transition: all 0.18s ease !important;
+}
+
+.spotlight-search-inner:focus-within {
+  border-color: rgba(56, 189, 248, 0.55) !important;
+  background: rgba(20, 25, 38, 0.95) !important;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18), 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+.spotlight-search-icon {
+  color: #64748b !important;
+  margin-right: 10px !important;
+  flex-shrink: 0 !important;
+}
+
+.spotlight-search-inner input {
+  flex: 1 !important;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  font-size: 12.5px !important;
+  color: #f1f5f9 !important;
+}
+
+.spotlight-search-inner input::placeholder {
+  color: #64748b !important;
+}
+
+.spotlight-kbd {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: #64748b !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 5px !important;
+  padding: 2px 7px !important;
+  user-select: none !important;
+  letter-spacing: 0.3px !important;
+}
+
+/* --------------------------------------------------------------------------
+   7. Recent & Saved Sessions Glass Cards
+   -------------------------------------------------------------------------- */
+.recent-sessions-section {
+  width: 100% !important;
+  max-width: 680px !important;
+  margin-bottom: 24px !important;
+}
+
+.recent-sessions-title {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #94a3b8 !important;
+  letter-spacing: 0.6px !important;
+  text-transform: uppercase !important;
+  margin-bottom: 12px !important;
+}
+
+.home-env-cards-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.recent-session-card {
+  background: rgba(24, 29, 42, 0.65) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 10px !important;
+  padding: 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  cursor: pointer !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+}
+
+.recent-session-card:hover {
+  background: rgba(30, 36, 52, 0.85) !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+.card-header-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-bottom: 6px !important;
+}
+
+.card-proto-tag {
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #94a3b8 !important;
+}
+
+.card-env-badge {
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  padding: 1px 6px !important;
+  border-radius: 4px !important;
+}
+
+.card-name {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: #f1f5f9 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.card-host {
+  font-size: 11px !important;
+  font-family: var(--font-mono) !important;
+  color: #64748b !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  margin-bottom: 8px !important;
+}
+
+.card-actions-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-top: 4px !important;
+}
+
+.card-connect-btn {
+  flex: 1 !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+  background: rgba(56, 189, 248, 0.14) !important;
+  border: 1px solid rgba(56, 189, 248, 0.3) !important;
+  color: #38bdf8 !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+}
+
+.card-connect-btn:hover {
+  background: #0284c7 !important;
+  border-color: #0284c7 !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4) !important;
+}
+
+.card-color-btn {
+  height: 26px !important;
+  padding: 0 8px !important;
+  border-radius: 6px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #94a3b8 !important;
+  font-size: 11px !important;
+  cursor: pointer !important;
+  transition: all 0.12s ease !important;
+}
+
+.card-color-btn:hover {
+  background: rgba(255, 255, 255, 0.09) !important;
+  color: #f1f5f9 !important;
+}
+
+.card-delete-btn {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #64748b !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.12s ease !important;
+}
+
+.card-delete-btn:hover {
+  background: rgba(244, 63, 94, 0.15) !important;
+  border-color: rgba(244, 63, 94, 0.3) !important;
+  color: #f43f5e !important;
+}
+
+/* --------------------------------------------------------------------------
+   8. Bottom Statusbar
+   -------------------------------------------------------------------------- */
+.statusbar {
+  height: 26px !important;
+  background: rgba(10, 12, 18, 0.98) !important;
+  backdrop-filter: blur(12px) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 12px !important;
+  font-size: 11px !important;
+  color: #64748b !important;
+}
+
+.status-left, .status-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+.status-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+}
+
+.status-dot {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background: #10b981 !important;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6) !important;
+}
+
+/* --------------------------------------------------------------------------
+   9. Clean Modern Scrollbars
+   -------------------------------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* --------------------------------------------------------------------------
+   10. Modals, Dialogs & Community Badge
+   -------------------------------------------------------------------------- */
+.modal-overlay {
+  background: rgba(5, 7, 12, 0.72) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+.modal-card {
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 1px rgba(255, 255, 255, 0.2) !important;
+  background: #131722 !important;
+}
+
+.unregistered-tag {
+  font-size: 9.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.5px !important;
+  padding: 2px 7px !important;
+  border-radius: 4px !important;
+  background: rgba(56, 189, 248, 0.12) !important;
+  color: #38bdf8 !important;
+  border: 1px solid rgba(56, 189, 248, 0.25) !important;
+}
+
+/* --------------------------------------------------------------------------
+   11. Quick Launch Tools Grid
+   -------------------------------------------------------------------------- */
+.home-options-panel {
+  width: 100% !important;
+  max-width: 680px !important;
+  margin-top: 10px !important;
+  margin-bottom: 24px !important;
+}
+
+.home-panel-title {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #94a3b8 !important;
+  letter-spacing: 0.6px !important;
+  text-transform: uppercase !important;
+  margin-bottom: 12px !important;
+  text-align: left !important;
+}
+
+.home-quick-tools-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)) !important;
+  gap: 12px !important;
+}
+
+.home-tool-card {
+  background: rgba(24, 29, 42, 0.5) !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  border-radius: 10px !important;
+  padding: 14px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.home-tool-card:hover {
+  background: rgba(30, 36, 52, 0.8) !important;
+  border-color: rgba(56, 189, 248, 0.3) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35) !important;
+}
+
+.tool-card-icon {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #38bdf8 !important;
+  margin-bottom: 8px !important;
+  transition: all 0.15s ease !important;
+}
+
+.home-tool-card:hover .tool-card-icon {
+  background: rgba(56, 189, 248, 0.15) !important;
+  border-color: rgba(56, 189, 248, 0.35) !important;
+  transform: scale(1.05) !important;
+}
+
+.tool-card-title {
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: #f1f5f9 !important;
+  margin-bottom: 2px !important;
+}
+
+.tool-card-desc {
+  font-size: 10.5px !important;
+  color: #64748b !important;
+  line-height: 1.3 !important;
+}
+
+

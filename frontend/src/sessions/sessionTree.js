@@ -728,9 +728,14 @@ export function updateRecentSessionsGrid(targetNode = null, filterText = "") {
         <span class="card-name" title="${safeName}">${safeName}</span>
         <span class="card-host" title="${safeHost}">${safeHost}</span>
         <div class="card-actions-row">
-          <button class="card-connect-btn" type="button" data-id="${s.id}">${isConn ? '⚡ Focus Tab' : '⚡ Connect'}</button>
-          <button class="card-color-btn" type="button" data-id="${s.id}" title="Change Environment / Color">🎨 Env ▾</button>
-          <button class="card-delete-btn" type="button" data-id="${s.id}" data-node-id="${nodeId}" title="Remove Server">🗑️</button>
+          <button class="card-connect-btn" type="button" data-id="${s.id}">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            <span>${isConn ? 'Focus Tab' : 'Connect'}</span>
+          </button>
+          <button class="card-color-btn" type="button" data-id="${s.id}" title="Change Environment / Color">Env ▾</button>
+          <button class="card-delete-btn" type="button" data-id="${s.id}" data-node-id="${nodeId}" title="Remove Server">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          </button>
         </div>
       </div>
     `;

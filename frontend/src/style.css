@@ -4,38 +4,46 @@
    ========================================================================== */
 
 :root, [data-theme="dark-modern"] {
-  --bg-app: #161920;
-  --bg-topbar: #1e222b;
-  --bg-menubar: #161920;
-  --bg-toolbar: #1e222b;
-  --bg-sidebar: #1e222b;
-  --bg-sidebar-strip: #161920;
-  --bg-workspace: #161920;
-  --bg-card: #21252b;
-  --bg-card-hover: #282c34;
-  --bg-input: #1a1d24;
-  --bg-input-border: #2d323d;
+  --bg-app: #0d0f17;
+  --bg-topbar: #131722;
+  --bg-menubar: #0f121a;
+  --bg-toolbar: #131722;
+  --bg-sidebar: #131722;
+  --bg-sidebar-strip: #0d0f17;
+  --bg-workspace: #0a0c12;
+  --bg-card: #181d2a;
+  --bg-card-hover: #1e2433;
+  --bg-input: #10131c;
+  --bg-input-border: #222938;
 
-  --border-subtle: #232731;
-  --border-active: #333842;
+  --border-subtle: #1c2230;
+  --border-active: #2c364c;
 
-  --accent-cyan: #56b6c2;
-  --accent-blue: #61afef;
-  --accent-green: #98c379;
-  --accent-amber: #d19a66;
-  --accent-rose: #e06c75;
-  --accent-purple: #c678dd;
+  --accent-cyan: #38bdf8;
+  --accent-blue: #3b82f6;
+  --accent-green: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+  --accent-purple: #a855f7;
 
-  --text-primary: #abb2bf;
-  --text-muted: #828997;
-  --text-dim: #5c6370;
+  --text-primary: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
 
-  --font-ui: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
-  --font-mono: 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(56, 189, 248, 0.15);
+  --glass-bg: rgba(19, 23, 34, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 [data-theme="nord"] {
