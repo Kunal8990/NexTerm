@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "checkJs": false,
+    "noImplicitAny": false,
+    "strict": false
+  },
+  "include": [
+    "frontend/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}
