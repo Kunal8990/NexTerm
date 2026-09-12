@@ -22,7 +22,7 @@ import {
   showAuthChallengeModal,
   showHostKeyVerificationModal
 } from './ui/modal.js';
-import { showToast, updateStatus } from './ui/notifications.js';
+import { showToast, updateStatus, initNotificationCenter, toggleNotificationPanel } from './ui/notifications.js';
 import { tabs, activeTabId } from './state/tabState.js';
 import { rootNode } from './state/sessionState.js';
 import {
@@ -53,6 +53,10 @@ import { openBroadcastDialog } from './terminal/broadcast.js';
 import { openServerMonitor } from './monitor/serverMonitor.js';
 import { promptSaveGroup, showGroupsDialog, maybeAutoStartGroups } from './sessions/sessionGroups.js';
 import { showSnippetsDialog } from './terminal/snippets.js';
+import { showRecorderDialog, toggleRecording } from './terminal/sessionRecorder.js';
+import { showSchedulerDialog, initScheduler } from './terminal/scheduler.js';
+import { showHistoryDialog } from './terminal/cmdHistory.js';
+import { showServerExtrasDialog } from './terminal/serverExtras.js';
 import { showShortcutsOverlay } from './ui/shortcutsHelp.js';
 import { toggleSessionLogging, isAutoLogEnabled, setAutoLog } from './terminal/terminalManager.js';
 import { showNewSessionDialog, showFolderDialog } from './sessions/sessionDialog.js';
@@ -217,6 +221,46 @@ registerCommandPaletteActions([
     subtitle: "Select between Dark Modern, One Dark, Nord, or Dracula",
     icon: "🎨",
     action: () => showThemePickerDialog()
+  },
+  {
+    id: "cmd-recorder",
+    category: "Automation",
+    title: "Session Recorder...",
+    subtitle: "Record, edit and replay a sequence of commands",
+    icon: "⏺",
+    action: () => showRecorderDialog()
+  },
+  {
+    id: "cmd-record-toggle",
+    category: "Automation",
+    title: "Start / Stop Recording",
+    subtitle: "Capture the commands you run on the active terminal",
+    icon: "●",
+    action: () => toggleRecording()
+  },
+  {
+    id: "cmd-scheduler",
+    category: "Automation",
+    title: "Command Scheduler...",
+    subtitle: "Auto-run a command or recording once or on a repeating interval",
+    icon: "⏱️",
+    action: () => showSchedulerDialog()
+  },
+  {
+    id: "cmd-history",
+    category: "Automation",
+    title: "Command History...",
+    subtitle: "Search and re-run any command you've run over SSH",
+    icon: "🕘",
+    action: () => showHistoryDialog()
+  },
+  {
+    id: "cmd-server-tools",
+    category: "Automation",
+    title: "Server Tools (Notes / Quick / Startup)...",
+    subtitle: "Per-server notes, one-click commands, and startup commands",
+    icon: "🗂️",
+    action: () => showServerExtrasDialog()
   }
 ]);
 
@@ -288,6 +332,7 @@ export function setupEventListeners() {
   // Session logging + snippets
   safeClick("mSnippets", () => showSnippetsDialog());
   safeClick("mShortcuts", () => showShortcutsOverlay());
+  safeClick("mAbout", () => showToast("NexTerm — Professional SSH & Terminal Manager (Connect Beyond Limits)", "info"));
   safeClick("mToggleLogging", () => {
     if (activeTabId && activeTabId !== "home") toggleSessionLogging(activeTabId);
     else showToast("Open a terminal tab first", "warning");
@@ -308,6 +353,107 @@ export function setupEventListeners() {
     }
   });
 
+  // Left Navigation Rail (Stage 1 redesign) — wired to existing actions
+  const setNavRailActive = (id) => {
+    document.querySelectorAll(".nav-rail-btn").forEach(b => b.classList.toggle("active", b.id === id));
+    // Home view hides the old left sidebar (mockup); any sidebar view shows it
+    document.body.classList.toggle("on-home", id === "navRailHomeBtn");
+  };
+  // Off-canvas navigation drawer — hidden until opened from the top-bar menu
+  const openNavDrawer = () => {
+    document.getElementById("navRail")?.classList.add("open");
+    document.getElementById("navBackdrop")?.classList.add("show");
+  };
+  const closeNavDrawer = () => {
+    document.getElementById("navRail")?.classList.remove("open");
+    document.getElementById("navBackdrop")?.classList.remove("show");
+  };
+  const toggleNavDrawer = () => {
+    const rail = document.getElementById("navRail");
+    if (rail && rail.classList.contains("open")) closeNavDrawer(); else openNavDrawer();
+  };
+  safeClick("topMenuToggle", toggleNavDrawer);
+  safeClick("navRailPin", closeNavDrawer);
+  const navBackdrop = document.getElementById("navBackdrop");
+  if (navBackdrop) navBackdrop.onclick = closeNavDrawer;
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeNavDrawer(); });
+  // Any button clicked inside the drawer also closes it
+  document.getElementById("navRail")?.addEventListener("click", (e) => {
+    if (e.target.closest("button") && e.target.closest("button").id !== "navRailPin") closeNavDrawer();
+  });
+  // Start on the Home dashboard with the sidebar hidden
+  document.body.classList.add("on-home");
+  // Keep the left session-tree sidebar tied to the home dashboard's visibility:
+  // when a terminal/session becomes active (home hidden), show the sidebar;
+  // when the home dashboard is showing, hide it. Connecting a server thus
+  // switches straight into the terminal view WITH the session tree visible.
+  const welcomeEl = document.getElementById("welcomeState");
+  if (welcomeEl) {
+    const syncHomeChrome = () => {
+      document.body.classList.toggle("on-home", welcomeEl.classList.contains("active"));
+    };
+    new MutationObserver(syncHomeChrome).observe(welcomeEl, { attributes: true, attributeFilter: ["class"] });
+    syncHomeChrome();
+  }
+  // navRailAction fires the action, marks active, then closes the drawer
+  const navRailAction = (id, fn, markActive = true) => {
+    const el = document.getElementById(id);
+    if (el) el.onclick = () => { if (markActive) setNavRailActive(id); fn(); closeNavDrawer(); };
+  };
+  navRailAction("navRailHomeBtn", () => activateHomeTab());
+  const brandHome = document.getElementById("navRailHome");
+  if (brandHome) brandHome.onclick = () => { setNavRailActive("navRailHomeBtn"); activateHomeTab(); };
+  navRailAction("navRailTerminal", () => startLocalTerminal("powershell"), false);
+  navRailAction("navRailSessions", () => switchSidebarView("sessions"));
+  navRailAction("navRailServers", async () => {
+    switchSidebarView("sessions");
+    if (window.go && window.go.main && window.go.main.App && window.go.main.App.ExpandAllFolders) {
+      try { await window.go.main.App.ExpandAllFolders(true); } catch (_) {}
+    }
+    await refreshTree();
+  });
+  navRailAction("navRailSFTP", () => switchSidebarView("sftp"));
+  navRailAction("navRailTools", () => switchSidebarView("tools"));
+  navRailAction("navRailMacros", () => switchSidebarView("macros"));
+  navRailAction("navRailTunneling", () => showTunnelingDialog(), false);
+  navRailAction("navRailBroadcast", () => openBroadcastDialog("all"), false);
+  navRailAction("navRailWorkspaces", () => showGroupsDialog(), false);
+  navRailAction("navRailSettings", () => showSettingsDialog(), false);
+
+  // Quick light/dark theme toggle (sun/moon) — remembers your last dark theme
+  function isLightTheme() {
+    return (document.documentElement.getAttribute("data-theme") || "") === "light-modern";
+  }
+  function syncThemeToggleIcon() {
+    const icon = document.getElementById("tbThemeToggleIcon");
+    const btn = document.getElementById("tbThemeToggleBtn");
+    if (!icon) return;
+    if (isLightTheme()) {
+      // currently light -> show sun (click to keep light? no: show moon meaning "switch to dark")
+      // We show the icon of the CURRENT mode so it reads as a status + toggle.
+      icon.innerHTML = '<circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>';
+      if (btn) btn.title = "Light mode — click for Dark";
+    } else {
+      icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>';
+      if (btn) btn.title = "Dark mode — click for Light";
+    }
+  }
+  function toggleLightDarkTheme() {
+    if (isLightTheme()) {
+      let back = "dark-modern";
+      try { back = localStorage.getItem("nexterm_last_dark_theme") || "dark-modern"; } catch (_) {}
+      if (back === "light-modern") back = "dark-modern";
+      applyUITheme(back, true);
+    } else {
+      const cur = document.documentElement.getAttribute("data-theme") || "dark-modern";
+      try { localStorage.setItem("nexterm_last_dark_theme", cur); } catch (_) {}
+      applyUITheme("light-modern", true);
+    }
+    syncThemeToggleIcon();
+  }
+  syncThemeToggleIcon();
+  initNotificationCenter();
+
   // Toolbar buttons
   safeClick("tbSessionBtn", () => showNewSessionDialog());
   safeClick("tbServersBtn", async () => {
@@ -326,6 +472,8 @@ export function setupEventListeners() {
   safeClick("tbTunnelingBtn", showTunnelingDialog);
   safeClick("tbPackagesBtn", showPkgMgrDialog);
   safeClick("tbThemeBtn", showThemePickerDialog);
+  safeClick("tbThemeToggleBtn", toggleLightDarkTheme);
+  safeClick("tbNotifBtn", toggleNotificationPanel);
   safeClick("tbSettingsBtn", showSettingsDialog);
   safeClick("tbCommandPaletteBtn", openCommandPalette);
   safeClick("tbMonitorBtn", () => openServerMonitor());
@@ -342,6 +490,81 @@ export function setupEventListeners() {
     }
   });
   safeClick("tbExitBtn", () => { if (confirm("Exit Nexterm?")) window.close(); });
+
+  // ---- Mockup top bar: brand, global search, window controls ----
+  safeClick("topBrandHome", () => { setNavRailActive("navRailHomeBtn"); activateHomeTab(); });
+  const topSearch = document.getElementById("topGlobalSearch");
+  if (topSearch) {
+    topSearch.addEventListener("focus", () => openCommandPalette());
+    topSearch.addEventListener("keydown", (e) => { if (e.key === "Enter") openCommandPalette(); });
+  }
+  const rt = () => (window.runtime || (window.wails && window.wails.runtime) || null);
+  safeClick("winMinBtn", () => { const r = rt(); if (r && r.WindowMinimise) r.WindowMinimise(); });
+  safeClick("winMaxBtn", () => { const r = rt(); if (r && r.WindowToggleMaximise) r.WindowToggleMaximise(); });
+  safeClick("winCloseBtn", () => {
+    const r = rt();
+    if (r && r.Quit) { r.Quit(); } else { window.close(); }
+  });
+
+  // ---- Mockup home: hero + embedded terminal + workspaces ----
+  safeClick("homeViewDocsBtn", () => {
+    const r = rt();
+    const url = "https://github.com/gnmyt/Nexterm";
+    if (r && r.BrowserOpenURL) { try { r.BrowserOpenURL(url); return; } catch (_) {} }
+    showToast("Documentation is available in the project README", "info");
+  });
+  safeClick("homeTermNewBtn", () => showNewSessionDialog());
+  safeClick("homeTermExpandBtn", () => {
+    const ids = Object.keys(tabs).filter(id => id !== "home" && id !== "welcome");
+    if (ids.length > 0) { try { activateTab(ids[0]); return; } catch (_) {} }
+    startLocalTerminal("powershell");
+  });
+  // Workspace color items -> filter saved sessions by environment name
+  document.querySelectorAll(".nav-ws-item").forEach(btn => {
+    btn.onclick = () => {
+      const ws = btn.getAttribute("data-ws") || "";
+      activateHomeTab();
+      const si = document.getElementById("welcomeSearchInput");
+      if (si) { si.value = ws; }
+      try { refreshTree(ws); } catch (_) {}
+    };
+  });
+
+  // ---- Mockup nav rail extras ----
+  navRailAction("navRailMonitor", () => openServerMonitor(), false);
+  navRailAction("navRailRecorder", () => showRecorderDialog(), false);
+  navRailAction("navRailScheduler", () => showSchedulerDialog(), false);
+  navRailAction("navRailHistory", () => showHistoryDialog(), false);
+  navRailAction("navRailServerTools", () => showServerExtrasDialog(), false);
+  initScheduler();
+  navRailAction("navRailXServer", async () => {
+    if (!(window.go && window.go.main && window.go.main.App && window.go.main.App.LaunchXServer)) {
+      showToast("X Server support requires rebuilding the app (run.bat)", "error");
+      return;
+    }
+    try { showToast(await window.go.main.App.LaunchXServer() || "X server started", "success"); }
+    catch (err) { showToast("X Server: " + err, "warning"); }
+  }, false);
+  safeClick("navRailSplit", (e) => showSplitMenu(e.clientX, e.clientY + 10));
+  safeClick("navRailMultiExec", showMultiExecutionModal);
+  safeClick("navRailPackages", showPkgMgrDialog);
+  safeClick("navRailThemes", showThemePickerDialog);
+
+  // ---- System Overview live counts ----
+  function updateSystemOverview() {
+    const active = document.getElementById("sysActiveSessions");
+    const saved = document.getElementById("sysSavedServers");
+    if (active) {
+      const n = Object.keys(tabs).filter(id => id !== "home" && id !== "welcome").length;
+      active.textContent = String(n);
+    }
+    if (saved) {
+      const cards = document.querySelectorAll("#recentSessionsGrid .recent-session-card").length;
+      saved.textContent = String(cards);
+    }
+  }
+  updateSystemOverview();
+  setInterval(updateSystemOverview, 4000);
 
   // MultiExec
   safeClick("multiExecSendBtn", sendMultiExec);

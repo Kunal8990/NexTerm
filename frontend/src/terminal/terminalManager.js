@@ -42,6 +42,9 @@ import { showToast, updateStatus, escapeHtml } from "../ui/notifications.js";
 import { promptPasswordDialog, promptPassphraseDialog, promptBastionSecretDialog, registerLocalTerminalLauncher } from "../ui/modal.js";
 import { getContextMenuEl, posMenu, hideContextMenu } from "../ui/contextMenu.js";
 import { openBroadcastDialog } from "./broadcast.js";
+import { recordCommand } from "./sessionRecorder.js";
+import { pushHistory } from "./cmdHistory.js";
+import { runStartupCommands } from "./serverExtras.js";
 
 let setupDualPaneSFTPFn = null;
 let switchSidebarViewFn = null;
@@ -912,6 +915,8 @@ export function createTab(tabId, profile, isLocal = false, initialState = "Conne
         const cmd = inputBuffer.trim();
         inputBuffer = "";
         handleTerminalCdCommand(tabId, cmd);
+        try { recordCommand(tabId, cmd); } catch (_) {}
+        try { pushHistory(tabs[tabId] && tabs[tabId].profile ? tabs[tabId].profile.host : "", cmd); } catch (_) {}
       } else if (ch === "\x7f" || ch === "\b") {
         inputBuffer = inputBuffer.slice(0, -1);
       } else if (ch === "\x03" || ch === "\x15") {
@@ -1354,6 +1359,7 @@ export async function connectToSession(profile, forceNewTab = false) {
     setTabConnectionState(tabId, "Connected");
     if (isAutoLogEnabled() && tabs[tabId]) tabs[tabId].logging = true;
     showToast(`Connected to ${profile.name}`, "success");
+    try { runStartupCommands(tabId, profile); } catch (_) {}
   } catch (err) {
     const classified = parseClassifiedError(err);
     setTabConnectionState(tabId, "Failed", classified);
