@@ -617,7 +617,78 @@
                 </button>
               </section>
 
-              <!-- ============ THREE PANELS ============ -->
+              <!-- ============ TWO DASHBOARD PANELS ============ -->
+              <section class="nx-panels">
+                <!-- Panel 1: Saved Sessions & Active Connections -->
+                <div class="nx-panel nx-panel-saved" id="recentSessionsSection">
+                  <div class="nx-panel-head">
+                    <div class="nx-panel-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                      <span>Saved &amp; Active Servers</span>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                      <button id="homeBroadcastConnectBtn" class="btn btn-sm btn-primary" type="button" style="display:inline-flex; align-items:center; gap:6px; background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; font-size: 11px; font-weight: 600; border-radius:6px; padding: 4px 10px; cursor: pointer;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"></circle><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"></path></svg>
+                        <span>Multi-Connect</span>
+                      </button>
+                      <button id="homeAddServerBtn" class="nx-panel-add" type="button" title="Add New Server Connection">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="nx-saved-search">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="welcomeSearchInput" placeholder="Filter servers, environments, or hostnames..." autocomplete="off" spellcheck="false" />
+                  </div>
+                  <div class="nx-saved-list" id="recentSessionsGrid">
+                    <!-- Populated dynamically by updateRecentSessionsGrid() -->
+                  </div>
+                </div>
+
+                <!-- Panel 2: System Status & Workstation Overview -->
+                <div class="nx-panel nx-panel-sys">
+                  <div class="nx-panel-head">
+                    <div class="nx-panel-title">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                      <span>Workstation Status</span>
+                    </div>
+                    <span class="nx-sys-target">Local Station</span>
+                  </div>
+                  <div class="nx-sys-stats">
+                    <div class="nx-stat-card">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                      <span class="nx-stat-num" id="sysActiveSessions">0</span>
+                      <span class="nx-stat-label">Active Terminals</span>
+                    </div>
+                    <div class="nx-stat-card">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="8" rx="2"></rect><rect x="2" y="13" width="20" height="8" rx="2"></rect><line x1="6" y1="7" x2="6.01" y2="7"></line><line x1="6" y1="17" x2="6.01" y2="17"></line></svg>
+                      <span class="nx-stat-num" id="sysSavedServers">0</span>
+                      <span class="nx-stat-label">Saved Servers</span>
+                    </div>
+                  </div>
+                  <div class="nx-sys-metrics">
+                    <div class="nx-metric">
+                      <span class="nx-metric-label">Security</span>
+                      <div class="nx-metric-bar"><span class="nx-metric-fill fill-emerald" style="width: 100%;"></span></div>
+                      <span class="nx-metric-val">Vault</span>
+                    </div>
+                    <div class="nx-metric">
+                      <span class="nx-metric-label">X11 Server</span>
+                      <div class="nx-metric-bar"><span class="nx-metric-fill fill-purple" style="width: 85%;"></span></div>
+                      <span class="nx-metric-val">Ready</span>
+                    </div>
+                    <div class="nx-metric">
+                      <span class="nx-metric-label">Tunnels</span>
+                      <div class="nx-metric-bar"><span class="nx-metric-fill fill-amber" style="width: 100%;"></span></div>
+                      <span class="nx-metric-val">Active</span>
+                    </div>
+                  </div>
+                  <div class="nx-sys-quote">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    <span>Enterprise AES-256 GCM credential encryption active</span>
+                  </div>
+                </div>
+              </section>
             </div>
           </div>
 
